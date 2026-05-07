@@ -31,3 +31,7 @@ results/
 !omiclass/data/gencode_GRCh37_hg19.csv
 !omiclass/data/gencode_v34_GRCh38_hg38.csv
 !omiclass/data/
+
+!examples/data
+!examples/data/patients_meta.csv
+!examples/data/raw_count.csv
