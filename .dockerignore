@@ -1,0 +1,29 @@
+# Ignore files and directories for Docker build context
+
+# Git files
+.git
+.gitignore
+
+# virtual environment and logs
+.env
+.venv/
+venv/
+*.log
+
+# large files
+data/
+*.csv
+*.tsv
+*.xlsx
+*.h5
+*.h5ad
+*.joblib
+*.pkl
+
+# Python cache files
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# local files
+.DS_Store

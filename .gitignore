@@ -1,9 +1,25 @@
-# data and results
-Allsort/
-AML/
-BRCA/
-BRCA-protein/
-epitype_and_ighv/
-generate_data_test/
-test_clean_and_run/
-tmp_test/
+# .gitignore for the project
+
+# virtual environment and logs
+.env
+.venv/
+venv/
+*.log
+
+# large files
+data/
+*.csv
+*.tsv
+*.xlsx
+*.h5
+*.h5ad
+*.joblib
+*.pkl
+
+# Python cache files
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# local files
+.DS_Store
