@@ -12,7 +12,7 @@ python examples/run_python_example.py
 ## Run with Docker
 
 ```bash
-run_docker_example.sh
+bash run_docker_example.sh
 ```
 # Parameters
 
@@ -41,6 +41,302 @@ These parameters define the main input files, output location, label column, bat
 | `test_holdout_path` | Optional path to an external holdout/test dataset. | Path |
 | `markers_path` | Path to predefined marker genes or gene sets. | Path |
 
+More advanced / optional parameters at the bottom
+
+## Example Output Reports
+
+After running the example, Omiclass generates several interactive HTML reports.  
+The reports are linked through the left sidebar and can be opened directly from the output directory.
+
+The main reports are:
+
+1. Final Summary Report
+2. Model Reports
+3. Batch Correction Reports
+4. Differential Expression Report
+5. Prediction and Survival Report
+
+Each report contains interactive SVG figures with zoom, pan, reset, and download options.
+
+---
+
+## 1. Final Summary Report
+![Final Summary Report](image/final_report.png)
+
+The final summary report provides a global overview of the model comparison and the final prediction performance.
+
+### Run Metadata
+
+Shows the main run information, including:
+
+- Number of test samples
+- Number of classes
+- Main configuration values used in the run
+
+### 1) Leaderboard
+
+Ranks all trained models according to the selected main metric, usually macro F1.
+
+This plot is used to quickly compare the overall performance of all models.
+
+### 2) Confusion Matrices
+
+Shows one row-normalized confusion matrix for each model.
+
+This plot is used to inspect which classes are predicted correctly and which classes are confused with one another.
+
+### 3) Key Performance Metrics
+
+Shows the main evaluation metrics for each model, including:
+
+- Accuracy
+- Precision
+- Recall
+- Macro F1
+- AUROC or AUPRC when available
+
+This plot gives a compact comparison of model performance across several metrics.
+
+### 4) Macro PR and Macro ROC
+
+Shows macro-averaged Precision-Recall and ROC curves across the models.
+
+The Macro PR curve evaluates performance under class imbalance and focuses on precision and recall.  
+The Macro ROC curve evaluates the tradeoff between true positive rate and false positive rate.
+
+### 5) Feature Reduction Analysis
+
+Shows model performance as a function of the number of selected genes.
+
+This plot is used to check whether the model can maintain strong performance with fewer genes, and to evaluate how sensitive the model is to feature reduction.
+
+---
+
+## 2. Model Reports
+![Model Reports](image/light_gbm.png)
+
+A separate report is generated for each trained model, for example LightGBM, XGBoost, Random Forest, or the stacked ensemble.
+
+### Data and Provenance
+
+Shows the training data dimensions, class counts, Python environment, random seed, and run information.
+
+This section helps track exactly which data and settings were used for the model.
+
+### Scorecards
+
+Summarizes the main cross-validation and test performance metrics.
+
+This section provides a quick comparison between internal CV performance and final holdout performance.
+
+### Train Cross-Validation
+
+Shows the mean and standard deviation of the cross-validation metrics.
+
+This is used to evaluate model stability across folds.
+
+### Gene-Set Optimization
+
+Shows the selected feature-set settings used during model training.
+
+This includes the final consensus gene set size and the parameters used for selecting stable genes across folds.
+
+### Top Genes by Fold Frequency
+
+Lists genes that were repeatedly selected across cross-validation folds.
+
+Genes selected more frequently are considered more stable and more important for the classification task.
+
+### Consensus Genes
+
+Shows the final gene set used by the model.
+
+This is the final selected feature set after cross-validation based gene selection.
+
+### Per-Fold Selected Genes
+
+Shows which genes were selected in each fold.
+
+This helps evaluate whether the selected gene set is stable or changes strongly between folds.
+
+### Test Holdout Classification Report
+
+Shows per-class precision, recall, F1 score, and support on the held-out test set.
+
+This section is used to inspect class-specific performance.
+
+### Hyperparameters
+
+Shows the final hyperparameters selected after tuning.
+
+This helps make the model reproducible.
+
+---
+
+## 3. Batch Correction Reports
+
+The batch correction reports evaluate the effect of limma batch correction by comparing the original and corrected expression matrices.
+
+The batch correction output is split into:
+
+1. Overview
+2. PCA Comparison
+3. Diagnostics
+
+---
+
+## 3.1 Batch Correction Overview
+![Batch Correction Overview](image/index.png)
+
+### Data
+
+Shows the expression matrix dimensions, number of genes, number of samples, and metadata columns used in the correction.
+
+### Configuration
+
+Shows the batch correction settings, including:
+
+- Batch mode
+- Batch column
+- Design columns
+- Number of PCs used
+- Missing value handling
+
+### Silhouette Scores in PC Space
+
+Compares sample separation before and after correction.
+
+The scores are calculated for metadata variables such as cohort, age, or sex.
+
+A reduction in batch-related separation after correction suggests that batch effects were reduced.
+
+### Gene-Level Batch Association
+
+Counts how many genes are significantly associated with the batch variable before and after correction.
+
+This section checks whether the correction reduced gene-level batch signal.
+
+---
+
+## 3.2 Batch Correction PCA Comparison
+![ Batch Correction PCA Comparison](image/pca_comparison.png)
+
+### Hierarchical Clustering Dendrogram
+
+Compares sample clustering before and after correction.
+
+This plot is used to check whether samples cluster mainly by batch before correction, and whether this structure is reduced after correction.
+
+### PCA PC1-2 by Cohort
+
+Shows the first two principal components colored by cohort before and after correction.
+
+This plot checks whether cohort-driven separation is reduced after batch correction.
+
+### PCA PC1-2 by Sex
+
+Shows the first two principal components colored by sex before and after correction.
+
+This plot checks whether biological or metadata-associated structure is preserved or changed by the correction.
+
+---
+
+## 3.3 Batch Correction Diagnostics
+![ Batch Correction Diagnostics](image/diagnostic_plots.png)
+
+### PC vs Variables Heatmap
+
+Shows the association between principal components and metadata variables before and after correction.
+
+This plot helps identify whether major PCs are driven by batch-related variables.
+
+After correction, batch-associated PC signals should be reduced, while relevant biological signals should ideally be preserved.
+
+### PC1-4 Boxplots by Cohort
+
+Shows the distribution of the first four PCs across cohorts before and after correction.
+
+This plot checks whether cohort-specific shifts in PC space were reduced by the correction.
+
+### Top Batch-Associated Genes
+
+Shows genes most strongly associated with the batch variable before and after correction.
+
+This plot evaluates whether gene-level batch effects were removed or reduced.
+
+---
+
+## 4. Differential Expression Report
+![ Differential Expression Report](image/de_report.png)
+
+The differential expression report summarizes the limma-voom differential expression analysis and the gene-set selection step.
+
+### Configuration Summary
+
+Shows the main differential expression settings, including:
+
+- Design column
+- Covariates
+- Number of classes
+- Selected genes
+- FDR threshold
+- log2 fold-change threshold
+- Minimum count filter
+- Minimum sample fraction
+
+It also reports the number of detected DE genes, selected pan markers, final gene-set size, and number of volcano plots.
+
+### Selected Genes
+
+Shows the final selected genes used downstream by the framework.
+
+This section provides the gene identifiers selected by the DE-based gene selection step.
+
+### Volcano Plots
+
+Shows differential expression results for each contrast.
+
+The x-axis shows log2 fold change.  
+The y-axis shows statistical significance as `-log10(p-value)`.
+
+Genes passing the selected fold-change and significance thresholds are highlighted.
+
+This plot is used to inspect the strength and direction of differential expression between classes.
+
+---
+
+## 5. Prediction and Survival Report
+![Prediction and Survival Report](image/survival_prediction.png)
+
+The prediction and survival report evaluates model predictions in relation to survival outcome when survival metadata is provided.
+
+### Summary
+
+Shows the model name, number of prediction samples, and the global survival test p-value.
+
+This section summarizes whether predicted classes or risk groups show survival differences.
+
+### Confidence Diagnostics
+
+#### Confidence Histogram
+
+Shows the distribution of model prediction confidence.
+
+This plot is used to check whether predictions are generally high-confidence or uncertain.
+
+#### Confidence Violin per Class
+
+Shows prediction confidence grouped by predicted class.
+
+This plot helps identify classes where the model is more or less confident.
+
+### Kaplan-Meier Curves
+
+Shows survival curves stratified by predicted class or predicted risk group.
+
+This plot evaluates whether the predicted groups are associated with different survival outcomes.
+
+The report also includes the global log-rank p-value and the number of patients at risk over time.
 
 ### Advanced / optional parameters
 

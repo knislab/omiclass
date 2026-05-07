@@ -34,4 +34,5 @@ results/
 
 !examples/data
 !examples/data/patients_meta.csv
-!examples/data/raw_count.csv
+!examples/data/raw_counts.csv
+!examples/data/gene_lengths.csv

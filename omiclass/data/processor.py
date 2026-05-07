@@ -367,12 +367,21 @@ class DataProcessor:
         if gene_lengths is None or gene_lengths.empty:
             raise DataError("Gene lengths must be provided.")
 
-        try:
-            lengths = gene_lengths.loc[X_counts.index].astype(float)
-        except KeyError:
-            missing = set(X_counts.index) - set(gene_lengths.index)
-            print(f"[DEBUG] [processor] Missing gene lengths for: {list(missing)[:10]}")
-            raise DataError(f"Missing gene lengths for: {list(missing)[:10]}")
+        missing = set(X_counts.index) - set(gene_lengths.index)
+
+        if missing:
+            missing_list = list(missing)
+            X_counts = X_counts.loc[X_counts.index.intersection(gene_lengths.index)]
+
+            if X_counts.shape[0] < self.cfg.de.k_genes:
+                raise DataError(
+                    f"After dropping genes without gene lengths, only {X_counts.shape[0]} genes remain, "
+                    f"which is less than de.k_genes={self.cfg.de.k_genes}. "
+                    f"Example missing genes: {missing_list[:10]}"
+                    f"X_counts.shape: {X_counts.shape}"
+                )
+
+        lengths = gene_lengths.loc[X_counts.index].astype(float)
 
         if (lengths <= 0).any():
             raise DataError("Gene lengths contain non-positive values.")
