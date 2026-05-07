@@ -1,4 +1,4 @@
-# generic_classifier/train/cv_engine.py
+# omiclass/train/cv_engine.py
 from __future__ import annotations
 
 from dataclasses import dataclass

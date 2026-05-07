@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Dict, List
 import numpy as np
 import pandas as pd
-from generic_classifier.utils.surface_markers import apply_surface_marker_filter_with_min
+from omiclass.utils.surface_markers import apply_surface_marker_filter_with_min
 
 
 @dataclass

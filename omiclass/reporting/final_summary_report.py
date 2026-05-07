@@ -1,4 +1,4 @@
-# generic_classifier/reporting/final_summary_report.py
+# omiclass/reporting/final_summary_report.py
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +8,7 @@ import pandas as pd
 from ..plotting.plotter import FinalSummaryPlotter
 from .assets import wrap_report_html, get_inline_assets
 from .components import card, svg_panel, json_kv, split_card_1_1, vcard
-from generic_classifier.reporting.nav import build_sidebar_from_run_dir, render_sidebar_html
+from omiclass.reporting.nav import build_sidebar_from_run_dir, render_sidebar_html
 
 
 def render_final_summary_html(

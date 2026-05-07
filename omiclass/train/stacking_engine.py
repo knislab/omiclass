@@ -1,4 +1,4 @@
-# generic_classifier/train/stacking_engine.py
+# omiclass/train/stacking_engine.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -13,7 +13,7 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import get_scorer
 
 from skopt import BayesSearchCV
-from generic_classifier.train.cv_engine import nested_oof_cv, CVResult, _safe_stratified_kfold
+from omiclass.train.cv_engine import nested_oof_cv, CVResult, _safe_stratified_kfold
 
 def train_oof_stacker(
     *,

@@ -1,9 +1,9 @@
-# generic_classifier/cli/runtime.py
+# omiclass/cli/runtime.py
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Literal, List
-from generic_classifier.config.schema import Config
-from generic_classifier.utils.clean_and_pred import has_leaderboard
+from omiclass.config.schema import Config
+from omiclass.utils.clean_and_pred import has_leaderboard
 
 
 

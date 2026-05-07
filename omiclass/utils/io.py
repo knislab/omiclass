@@ -2,10 +2,10 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from typing import Union, List, Optional
-from generic_classifier.errors.errors import DataShapeError
+from omiclass.errors.errors import DataShapeError
 from io import StringIO
 import matplotlib.pyplot as plt
-from generic_classifier.config.schema import Config
+from omiclass.config.schema import Config
 
 
 def load_matrix(path: Union[str, Path], numeric: bool = True) -> pd.DataFrame:

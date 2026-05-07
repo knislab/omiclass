@@ -1,4 +1,4 @@
-# generic_classifier/pipeline/runner_result.py
+# omiclass/pipeline/runner_result.py
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Union

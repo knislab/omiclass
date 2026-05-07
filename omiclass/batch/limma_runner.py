@@ -14,9 +14,9 @@ except Exception:
 from typing import Optional, Sequence, Union, Tuple
 from pathlib import Path
 import tempfile, shutil, logging
-from generic_classifier.utils.batch import _assert_unique, _align_samples, _write_csv
-from generic_classifier.plotting.limma_plotter import limma_plotter
-from generic_classifier.errors.errors import RBackendError, GCError
+from omiclass.utils.batch import _assert_unique, _align_samples, _write_csv
+from omiclass.plotting.limma_plotter import limma_plotter
+from omiclass.errors.errors import RBackendError, GCError
 
 class LimmaRunner:
     def __init__(self):
@@ -132,7 +132,7 @@ class LimmaRunner:
                   design_cols: Optional[Sequence[str]] = None, 
                   n_pc: int = 0, 
                   na_fill: Optional[Union[str, int, float]] = None,
-                  r_script_path: Union[str, Path] = "generic_classifier/batch/limma_correction.R", 
+                  r_script_path: Union[str, Path] = "omiclass/batch/limma_correction.R", 
                   out_csv: str = "limma_results.csv",
                   plot_n_pcs: int = 10,
                   eval_cols: Optional[Sequence[str]] = None,

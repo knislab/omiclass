@@ -1,4 +1,4 @@
-# generic_classifier/reporting/components.py
+# omiclass/reporting/components.py
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,4 +1,4 @@
-# generic_classifier/train/auto_config.py
+# omiclass/train/auto_config.py
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Any, Callable, Optional

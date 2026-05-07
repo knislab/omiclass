@@ -6,13 +6,13 @@ import rpy2.robjects as ro
 from typing import Optional, Sequence, Union, Tuple
 from pathlib import Path
 import tempfile, shutil
-from generic_classifier.utils.batch import _assert_unique, _align_samples, _write_csv 
-from generic_classifier.plotting.volcano_plot import plot_volcano_from_limma
-from generic_classifier.utils.io import load_matrix
-from generic_classifier.de.gene_selection import select_marker_genes
-from generic_classifier.errors.errors import RBackendError, GCError
-from generic_classifier.reporting.de_report import write_de_geneset_report_html
-from generic_classifier.utils.debug import debug_volcano_plot_from_limma
+from omiclass.utils.batch import _assert_unique, _align_samples, _write_csv 
+from omiclass.plotting.volcano_plot import plot_volcano_from_limma
+from omiclass.utils.io import load_matrix
+from omiclass.de.gene_selection import select_marker_genes
+from omiclass.errors.errors import RBackendError, GCError
+from omiclass.reporting.de_report import write_de_geneset_report_html
+from omiclass.utils.debug import debug_volcano_plot_from_limma
 try:
     # rpy2 >= 3.5
     from rpy2.rinterface_lib.embedded import RRuntimeError
@@ -69,7 +69,7 @@ class LimmaVoomRunner:
                        design_col: str, 
                        covariates: Optional[Sequence[str]] = None, 
                        out_csv: str = "limma_voom_de_results.csv",
-                       r_script_path: Union[str, Path] = Path("generic_classifier/de/limma_voom_de.R"), 
+                       r_script_path: Union[str, Path] = Path("omiclass/de/limma_voom_de.R"), 
                        min_count: float = 20, 
                        min_samples_frac: float = 0.5, 
                        gene_list: Optional[Sequence[str]] = None,

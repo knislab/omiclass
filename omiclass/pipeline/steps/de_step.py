@@ -1,13 +1,13 @@
-# generic_classifier/pipeline/steps/de_step.py
+# omiclass/pipeline/steps/de_step.py
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from generic_classifier.pipeline.orchestrator import RunContext
-from generic_classifier.utils.io import load_matrix
-from generic_classifier.data.processor import DataProcessor
-from generic_classifier.de.limma_voom_runner import LimmaVoomRunner
-from generic_classifier.utils.pipeline import make_or_load_split
+    from omiclass.pipeline.orchestrator import RunContext
+from omiclass.utils.io import load_matrix
+from omiclass.data.processor import DataProcessor
+from omiclass.de.limma_voom_runner import LimmaVoomRunner
+from omiclass.utils.pipeline import make_or_load_split
 
 
 class DEStep:

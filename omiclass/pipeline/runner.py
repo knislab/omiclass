@@ -1,15 +1,15 @@
-# generic_classifier/pipeline/runner.py
+# omiclass/pipeline/runner.py
 from __future__ import annotations
 from datetime import datetime
 
 from pathlib import Path
 from typing import Any
 
-from generic_classifier.config.loaders import load_config
-from generic_classifier.cli.runtime import create_runtime_options_from_path_conf_kwargs
-from generic_classifier.pipeline.orchestrator import PipelineOrchestrator
-from generic_classifier.pipeline.runner_result import PipelineRunResult
-from generic_classifier.utils.clean_and_pred import has_leaderboard
+from omiclass.config.loaders import load_config
+from omiclass.cli.runtime import create_runtime_options_from_path_conf_kwargs
+from omiclass.pipeline.orchestrator import PipelineOrchestrator
+from omiclass.pipeline.runner_result import PipelineRunResult
+from omiclass.utils.clean_and_pred import has_leaderboard
 
 def run_pipeline(
     expression_file: Path,

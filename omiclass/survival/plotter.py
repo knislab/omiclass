@@ -1,4 +1,4 @@
-# generic_classifier/survival/plotter.py
+# omiclass/survival/plotter.py
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,8 +15,8 @@ from statsmodels.stats.multitest import multipletests
 from lifelines import KaplanMeierFitter, CoxPHFitter
 from lifelines.plotting import add_at_risk_counts
 from lifelines.statistics import multivariate_logrank_test, logrank_test
-from generic_classifier.utils.io import fig_to_svg_str
-from generic_classifier.utils.toolbox import get_class_display_name
+from omiclass.utils.io import fig_to_svg_str
+from omiclass.utils.toolbox import get_class_display_name
 
 
 

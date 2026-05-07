@@ -8,10 +8,10 @@ import re
 
 import yaml
 from .schema import Config, ProjectCfg
-from generic_classifier.errors.errors import ConfigError, SchemaValidationError
-from generic_classifier.config.overrides import normalize_user_overrides
+from omiclass.errors.errors import ConfigError, SchemaValidationError
+from omiclass.config.overrides import normalize_user_overrides
 from pydantic import ValidationError
-from generic_classifier.utils.clean_and_pred import has_leaderboard
+from omiclass.utils.clean_and_pred import has_leaderboard
 
 def _deep_update(base: dict, upd: dict) -> dict:
     out = copy.deepcopy(base)

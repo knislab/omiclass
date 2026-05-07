@@ -1,4 +1,4 @@
-# generic_classifier/pipeline/steps/feature_reduction_step.py
+# omiclass/pipeline/steps/feature_reduction_step.py
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING
 import joblib
 import pandas as pd
 
-from generic_classifier.eval.feature_reduction import evaluate_feature_reduction
-from generic_classifier.plotting.feature_reduction import plot_feature_reduction_curve
+from omiclass.eval.feature_reduction import evaluate_feature_reduction
+from omiclass.plotting.feature_reduction import plot_feature_reduction_curve
 
 if TYPE_CHECKING:
-    from generic_classifier.pipeline.orchestrator import RunContext
+    from omiclass.pipeline.orchestrator import RunContext
 
 
 class FeatureReductionStep:

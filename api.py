@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
 
-from generic_classifier.pipeline.runner import run_pipeline
+from omiclass.pipeline.runner import run_pipeline
 
 
 def run(
@@ -19,16 +19,20 @@ def run(
 def run_from_cli():
     parser = argparse.ArgumentParser(description="Run the pipeline via command line.")
     
-    parser.add_argument("expression_file", type=Path, help="Path to the expression file (CSV/Parquet/etc.)")
     parser.add_argument("--override", nargs=2, action="append", default=[])
     args = parser.parse_args()
-    expression_file = args.expression_file
+    expression_file = None
     active_kwargs = {}
     for k, v in args.override:
-        if "," in v:
-            active_kwargs[k] = [x.strip() for x in v.split(",") if x.strip()]
+        if k == "expression_file":
+            expression_file = Path(v)
         else:
-            active_kwargs[k] = v    
+            if "," in v:
+                active_kwargs[k] = [x.strip() for x in v.split(",") if x.strip()]
+            else:
+                active_kwargs[k] = v    
+    if expression_file is None:
+        raise ValueError("expression_file must be provided via --override expression_file <path>")
     return run(expression=expression_file, **active_kwargs)
 
 if __name__ == "__main__":

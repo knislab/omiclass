@@ -1,4 +1,4 @@
-# generic_classifier/survival/predict.py
+# omiclass/survival/predict.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -9,12 +9,12 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from generic_classifier.config.schema import SurvivalPredictionCfg
-from generic_classifier.utils.io import load_survival_matrix, load_matrix
-from generic_classifier.survival.plotter import plot_confidence_histogram, plot_confidence_violin, plot_km_and_forest
-from generic_classifier.survival.report import render_survival_prediction_html
-from generic_classifier.errors.errors import SurvivalPredictionError
-from generic_classifier.utils.debug import debug_prediction_and_survival_inputs
+from omiclass.config.schema import SurvivalPredictionCfg
+from omiclass.utils.io import load_survival_matrix, load_matrix
+from omiclass.survival.plotter import plot_confidence_histogram, plot_confidence_violin, plot_km_and_forest
+from omiclass.survival.report import render_survival_prediction_html
+from omiclass.errors.errors import SurvivalPredictionError
+from omiclass.utils.debug import debug_prediction_and_survival_inputs
 
 
 @dataclass

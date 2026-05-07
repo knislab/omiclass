@@ -1,4 +1,4 @@
-# generic_classifier/utils/env.py
+# omiclass/utils/env.py
 
 import os
 import sys

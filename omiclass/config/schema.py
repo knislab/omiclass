@@ -193,7 +193,7 @@ class PerFoldEstimatorsCfg(BaseModel):
 # ---------- runtime ----------
 class RuntimeCfg(BaseModel):
     random_state: int = 42
-    n_jobs: int = 5
+    n_jobs: int = 1
     scoring: str = "f1_macro"
     cv_folds: Optional[int] = None
     learning_rate: float = 0.1

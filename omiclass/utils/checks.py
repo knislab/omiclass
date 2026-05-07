@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from typing import Tuple
-from generic_classifier.errors.errors import DataShapeError
+from omiclass.errors.errors import DataShapeError
 
 def basic_checks(X: pd.DataFrame, y: pd.Series):
     print(f"[data] X shape: {X.shape}, y length: {len(y)}")

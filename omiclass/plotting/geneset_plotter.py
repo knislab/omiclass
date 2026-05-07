@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from generic_classifier.utils.io import fig_to_svg_str 
+from omiclass.utils.io import fig_to_svg_str 
 
 
 def plot_geneset_top_frequency_bar(

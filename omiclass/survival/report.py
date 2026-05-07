@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
 
-from generic_classifier.reporting.assets import wrap_report_html, get_inline_assets
-from generic_classifier.reporting.components import card, split_card_1_1, svg_panel, kv_table, esc, panel
-from generic_classifier.reporting.nav import build_sidebar_from_run_dir, render_sidebar_html
+from omiclass.reporting.assets import wrap_report_html, get_inline_assets
+from omiclass.reporting.components import card, split_card_1_1, svg_panel, kv_table, esc, panel
+from omiclass.reporting.nav import build_sidebar_from_run_dir, render_sidebar_html
 
 import pandas as pd
 

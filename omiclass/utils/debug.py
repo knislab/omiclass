@@ -69,7 +69,7 @@ def debug_volcano_plot_from_limma(
     Returns a structured VolcanoDebugResult, so you can log it / attach to HTML.
     """
     # local import so this function is standalone + doesn't import plotting unless called
-    from generic_classifier.plotting.volcano_plot import plot_volcano_from_limma
+    from omiclass.plotting.volcano_plot import plot_volcano_from_limma
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

@@ -1,9 +1,9 @@
-# generic_classifier/pipeline/steps/raw_count_norm_step.py
+# omiclass/pipeline/steps/raw_count_norm_step.py
 from __future__ import annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from generic_classifier.pipeline.orchestrator import RunContext
-from generic_classifier.data.processor import DataProcessor
+    from omiclass.pipeline.orchestrator import RunContext
+from omiclass.data.processor import DataProcessor
 
 class RawCountNormalizationStep:
     name = "raw_count_normalization"

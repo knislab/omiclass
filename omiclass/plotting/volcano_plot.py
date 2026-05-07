@@ -3,7 +3,7 @@ import pandas as pd
 from pathlib import Path
 from typing import List, Union, Optional
 import matplotlib.pyplot as plt
-from generic_classifier.utils.io import load_matrix, fig_to_svg_str
+from omiclass.utils.io import load_matrix, fig_to_svg_str
 
 
 def plot_volcano_from_limma(

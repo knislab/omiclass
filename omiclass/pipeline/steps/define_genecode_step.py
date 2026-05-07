@@ -1,8 +1,8 @@
-# generic_classifier/pipeline/steps/define_genecode.py
+# omiclass/pipeline/steps/define_genecode.py
 from __future__ import annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from generic_classifier.pipeline.orchestrator import RunContext
+    from omiclass.pipeline.orchestrator import RunContext
 from pathlib import Path
 
 class DefineGeneCodeStep:

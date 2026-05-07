@@ -24,6 +24,10 @@ __pycache__/
 # local files
 .DS_Store
 
+# ignore all files in the tests directory
+tests/
+results/
+
 !omiclass/data/gencode_GRCh37_hg19.csv
 !omiclass/data/gencode_v34_GRCh38_hg38.csv
 !omiclass/data/

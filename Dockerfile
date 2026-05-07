@@ -34,5 +34,9 @@ COPY . /app
 ENV PYTHONPATH=/app
 ENV PATH=/opt/conda/envs/omiclass_env/bin:$PATH
 ENV CONDA_DEFAULT_ENV=omiclass_env
+ENV HOME=/tmp
+ENV XDG_CACHE_HOME=/tmp/.cache
+
+RUN mkdir -p /tmp/.cache/mamba/proc && chmod -R 777 /tmp/.cache
 
 ENTRYPOINT ["micromamba", "run", "-n", "omiclass_env", "python", "api.py"]

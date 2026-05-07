@@ -1,4 +1,4 @@
-# generic_classifier/utils/pipeline.py
+# omiclass/utils/pipeline.py
 from __future__ import annotations
 
 from pathlib import Path
@@ -6,10 +6,10 @@ from typing import Tuple, Optional, List
 
 import pandas as pd
 
-from generic_classifier.utils.splits import holdout_split, save_split, load_split, apply_split
-from generic_classifier.utils.io import load_labels
-from generic_classifier.errors.errors import DataShapeError
-from generic_classifier.config.schema import Config
+from omiclass.utils.splits import holdout_split, save_split, load_split, apply_split
+from omiclass.utils.io import load_labels
+from omiclass.errors.errors import DataShapeError
+from omiclass.config.schema import Config
 
 
 

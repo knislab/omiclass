@@ -23,10 +23,10 @@ from ..utils.toolbox import _to_dict, _aggregate_best_rounds, sanitize_fit_kwarg
 from ..reporting.per_model_report import report_cv
 from ..utils.param_router import split_init_and_fit_kwargs
 from .auto_config import apply_auto_config
-from generic_classifier.errors.errors import TuningError 
-from generic_classifier.errors.faild_model import _failed_row
+from omiclass.errors.errors import TuningError 
+from omiclass.errors.faild_model import _failed_row
 from sklearn.pipeline import Pipeline as SkPipeline
-from generic_classifier.utils.surface_markers import apply_surface_marker_filter_with_min
+from omiclass.utils.surface_markers import apply_surface_marker_filter_with_min
 try:
     from imblearn.pipeline import Pipeline as ImbPipeline
 except ImportError:

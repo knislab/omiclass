@@ -1,4 +1,4 @@
-# generic_classifier/reporting/limma_report.py
+# omiclass/reporting/limma_report.py
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
@@ -15,9 +15,9 @@ try:
 except ImportError:
     pd = None
 
-from generic_classifier.reporting.assets import wrap_report_html, get_inline_assets
-from generic_classifier.reporting.components import card, kv_table, metric_grid, panel, esc, svg_panel, split_card_1_1, nav_buttons
-from generic_classifier.reporting.nav import build_sidebar_from_run_dir, render_sidebar_html
+from omiclass.reporting.assets import wrap_report_html, get_inline_assets
+from omiclass.reporting.components import card, kv_table, metric_grid, panel, esc, svg_panel, split_card_1_1, nav_buttons
+from omiclass.reporting.nav import build_sidebar_from_run_dir, render_sidebar_html
 
 
 # ----------------

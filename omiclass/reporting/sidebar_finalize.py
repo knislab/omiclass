@@ -2,7 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
-from generic_classifier.reporting.nav import build_sidebar_from_run_dir, render_sidebar_html
+from omiclass.reporting.nav import build_sidebar_from_run_dir, render_sidebar_html
 
 _ASIDE_RE = re.compile(r"(<aside\s+class=\"sidebar\"\s*>)(.*?)(</aside>)", re.DOTALL)
 

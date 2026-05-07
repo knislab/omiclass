@@ -1,4 +1,4 @@
-# generic_classifier/config/overrides.py
+# omiclass/config/overrides.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Tuple, Type
 from pydantic import BaseModel
 
 from .schema import Config
-from generic_classifier.errors.errors import ConfigError
+from omiclass.errors.errors import ConfigError
 
 
 @dataclass(frozen=True)

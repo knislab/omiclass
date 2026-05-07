@@ -1,13 +1,13 @@
-# generic_classifier/pipeline/steps/load_step.py
+# omiclass/pipeline/steps/load_step.py
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from generic_classifier.pipeline.orchestrator import RunContext
+    from omiclass.pipeline.orchestrator import RunContext
 
-from generic_classifier.data.processor import DataProcessor
+from omiclass.data.processor import DataProcessor
 
 
 class LoadInputStep:

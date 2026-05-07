@@ -5,11 +5,11 @@ from pathlib import Path
 from typing import Any, Dict, Sequence, Union, Optional, List, Tuple
 import datetime
 import pandas as pd
-from generic_classifier.reporting.assets import wrap_report_html
-from generic_classifier.reporting.components import card, kv_table, metric_grid, chips_panel, esc, vertical_metric_grid, split_card_3_1, svg_panel
-from generic_classifier.reporting.nav import build_sidebar_from_run_dir, render_sidebar_html
-from generic_classifier.utils.gene_symbols import get_gene_symbols
-from generic_classifier.utils.toolbox import get_class_display_name
+from omiclass.reporting.assets import wrap_report_html
+from omiclass.reporting.components import card, kv_table, metric_grid, chips_panel, esc, vertical_metric_grid, split_card_3_1, svg_panel
+from omiclass.reporting.nav import build_sidebar_from_run_dir, render_sidebar_html
+from omiclass.utils.gene_symbols import get_gene_symbols
+from omiclass.utils.toolbox import get_class_display_name
 
 
 def write_de_geneset_report_html(

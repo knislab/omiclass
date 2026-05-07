@@ -1,4 +1,4 @@
-# generic_classifier/pipeline/steps/batch_step.py
+# omiclass/pipeline/steps/batch_step.py
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,12 +8,12 @@ import pandas as pd
 import joblib
 
 if TYPE_CHECKING:
-    from generic_classifier.pipeline.orchestrator import RunContext
-from generic_classifier.batch.limma_runner import LimmaRunner
-from generic_classifier.reporting.limma_report import write_limma_report
-from generic_classifier.utils.io import load_matrix
-from generic_classifier.data.processor import DataProcessor
-from generic_classifier.utils.splits import load_split
+    from omiclass.pipeline.orchestrator import RunContext
+from omiclass.batch.limma_runner import LimmaRunner
+from omiclass.reporting.limma_report import write_limma_report
+from omiclass.utils.io import load_matrix
+from omiclass.data.processor import DataProcessor
+from omiclass.utils.splits import load_split
 
 
 class RebatchCorrectionStep:

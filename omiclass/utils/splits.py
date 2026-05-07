@@ -4,7 +4,7 @@ from pathlib import Path
 import json
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from generic_classifier.utils.io import load_list
+from omiclass.utils.io import load_list
  
 
 Split = Dict[str, Any]

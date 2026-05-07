@@ -1,12 +1,12 @@
-# generic_classifier/pipeline/steps/survival_step.py
+# omiclass/pipeline/steps/survival_step.py
 from __future__ import annotations
 from typing import TYPE_CHECKING
 from pathlib import Path
 if TYPE_CHECKING:
-    from generic_classifier.pipeline.orchestrator import RunContext
-from generic_classifier.survival.predict import run_survival_prediction
-from generic_classifier.errors.errors import SurvivalPredictionError
-from generic_classifier.utils.io import load_matrix
+    from omiclass.pipeline.orchestrator import RunContext
+from omiclass.survival.predict import run_survival_prediction
+from omiclass.errors.errors import SurvivalPredictionError
+from omiclass.utils.io import load_matrix
 import json
 
 class SurvivalStep:

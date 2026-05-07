@@ -1,4 +1,4 @@
-# generic_classifier/utils/html_figs.py
+# omiclass/utils/html_figs.py
 from __future__ import annotations
 import base64
 import html as _html

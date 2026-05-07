@@ -8,8 +8,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import silhouette_score
 from scipy.stats import ttest_ind, f_oneway
 from typing import Dict, Optional, Sequence, Tuple, Union, List
-from generic_classifier.utils.io import fig_to_svg_str 
-from generic_classifier.utils.toolbox import _bh_fdr
+from omiclass.utils.io import fig_to_svg_str 
+from omiclass.utils.toolbox import _bh_fdr
 from scipy.cluster.hierarchy import linkage, dendrogram
 from scipy.spatial.distance import pdist
 

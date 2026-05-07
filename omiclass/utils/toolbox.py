@@ -128,7 +128,7 @@ def unwrap_for_export(model):
 
     # 2) XGBoost custom wrapper → try to pull inner XGBClassifier
     mod = model.__class__.__module__
-    if mod.startswith("generic_classifier.models.xgboost"):
+    if mod.startswith("omiclass.models.xgboost"):
         if isinstance(model, xgb.XGBClassifier):
             return model
         for attr in ("inner", "model", "estimator_", "clf"):

@@ -9,7 +9,7 @@ import requests
 import sys
 import os
 from typing import List
-from generic_classifier.utils.io import load_list
+from omiclass.utils.io import load_list
 
 # Update the URL list with the reliable PNAS direct link
 SURFACEOME_URLS: Sequence[str] = (

@@ -1,9 +1,9 @@
-# generic_classifier/pipeline/steps/surface_merker_step.py
+# omiclass/pipeline/steps/surface_merker_step.py
 from __future__ import annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from generic_classifier.pipeline.orchestrator import RunContext
-from generic_classifier.utils.surface_markers import fillter_surface_markers
+    from omiclass.pipeline.orchestrator import RunContext
+from omiclass.utils.surface_markers import fillter_surface_markers
 
 class SurfaceMarkerStep:
     name = "surface_marker_filtering"

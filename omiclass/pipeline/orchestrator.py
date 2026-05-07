@@ -1,4 +1,4 @@
-# generic_classifier/pipeline/orchestrator.py
+# omiclass/pipeline/orchestrator.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,19 +6,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Protocol, List
 
-from generic_classifier.config.schema import Config
-from generic_classifier.cli.runtime import RuntimeOptions
-from generic_classifier.pipeline.runner_result import PipelineRunResult
-from generic_classifier.pipeline.steps.load_step import LoadInputStep
-from generic_classifier.pipeline.steps.survival_step import SurvivalStep
-from generic_classifier.pipeline.steps.batch_step import BatchCorrectionStep
-from generic_classifier.pipeline.steps.train_eval_step import TrainAndEvalStep
-from generic_classifier.pipeline.steps.raw_count_norm_step import RawCountNormalizationStep
-from generic_classifier.pipeline.steps.de_step import DEStep
-from generic_classifier.pipeline.steps.surface_merker_step import SurfaceMarkerStep
-from generic_classifier.reporting.sidebar_finalize import finalize_unified_sidebar
-from generic_classifier.pipeline.steps.rebatch_step import RebatchCorrectionStep
-from generic_classifier.pipeline.steps.define_genecode_step import DefineGeneCodeStep
+from omiclass.config.schema import Config
+from omiclass.cli.runtime import RuntimeOptions
+from omiclass.pipeline.runner_result import PipelineRunResult
+from omiclass.pipeline.steps.load_step import LoadInputStep
+from omiclass.pipeline.steps.survival_step import SurvivalStep
+from omiclass.pipeline.steps.batch_step import BatchCorrectionStep
+from omiclass.pipeline.steps.train_eval_step import TrainAndEvalStep
+from omiclass.pipeline.steps.raw_count_norm_step import RawCountNormalizationStep
+from omiclass.pipeline.steps.de_step import DEStep
+from omiclass.pipeline.steps.surface_merker_step import SurfaceMarkerStep
+from omiclass.reporting.sidebar_finalize import finalize_unified_sidebar
+from omiclass.pipeline.steps.rebatch_step import RebatchCorrectionStep
+from omiclass.pipeline.steps.define_genecode_step import DefineGeneCodeStep
 
 
 

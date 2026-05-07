@@ -6,11 +6,11 @@ from typing import Optional, List, Tuple
 import numpy as np
 import pandas as pd
 
-from generic_classifier.config.schema import Config
-from generic_classifier.utils.io import load_matrix, load_labels, load_list, load_meta_matrix
-from generic_classifier.utils.checks import check_and_prepare_xy, ensure_dense_finite
-from generic_classifier.utils.surface_markers import fillter_surface_markers
-from generic_classifier.errors.errors import DataError, DataShapeError
+from omiclass.config.schema import Config
+from omiclass.utils.io import load_matrix, load_labels, load_list, load_meta_matrix
+from omiclass.utils.checks import check_and_prepare_xy, ensure_dense_finite
+from omiclass.utils.surface_markers import fillter_surface_markers
+from omiclass.errors.errors import DataError, DataShapeError
 
 
 @dataclass

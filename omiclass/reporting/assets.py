@@ -1,4 +1,4 @@
-# generic_classifier.reporting.assets.py
+# omiclass.reporting.assets.py
 from __future__ import annotations
 
 from dataclasses import dataclass

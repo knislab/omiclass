@@ -1,4 +1,4 @@
-# generic_classifier/pipeline/steps/train_eval_step.py
+# omiclass/pipeline/steps/train_eval_step.py
 from __future__ import annotations
 
 from pathlib import Path
@@ -10,23 +10,23 @@ import numpy as np
 import pandas as pd
 from typing import TYPE_CHECKING
 
-from generic_classifier.utils.pipeline import make_or_load_split
-from generic_classifier.data.processor import DataProcessor
-from generic_classifier.train.trainer import Trainer
-from generic_classifier.eval.holdout import evaluate_holdout, evaluate_holdout_with_thresholds, write_holdout_csvs
-from generic_classifier.eval.thresholds import learn_multiclass_thresholds
-from generic_classifier.reporting.per_model_report import finalize_report_for_model
-from generic_classifier.plotting.plotter import FinalSummaryPlotter
-from generic_classifier.reporting.final_summary_report import render_final_summary_html
-from generic_classifier.utils.toolbox import _build_class_name_map
-from generic_classifier.eval.feature_reduction_runner import FeatureReductionStep
-from generic_classifier.utils.pipeline import apply_batch_holdout
-from generic_classifier.train.tune import resolve_cv_folds
-from generic_classifier.config.loaders import freeze_config
+from omiclass.utils.pipeline import make_or_load_split
+from omiclass.data.processor import DataProcessor
+from omiclass.train.trainer import Trainer
+from omiclass.eval.holdout import evaluate_holdout, evaluate_holdout_with_thresholds, write_holdout_csvs
+from omiclass.eval.thresholds import learn_multiclass_thresholds
+from omiclass.reporting.per_model_report import finalize_report_for_model
+from omiclass.plotting.plotter import FinalSummaryPlotter
+from omiclass.reporting.final_summary_report import render_final_summary_html
+from omiclass.utils.toolbox import _build_class_name_map
+from omiclass.eval.feature_reduction_runner import FeatureReductionStep
+from omiclass.utils.pipeline import apply_batch_holdout
+from omiclass.train.tune import resolve_cv_folds
+from omiclass.config.loaders import freeze_config
 
 
 if TYPE_CHECKING:
-    from generic_classifier.pipeline.orchestrator import RunContext
+    from omiclass.pipeline.orchestrator import RunContext
 
 
 class TrainAndEvalStep:

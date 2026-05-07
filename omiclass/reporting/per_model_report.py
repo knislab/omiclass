@@ -1,4 +1,4 @@
-# generic_classifier/reporting/per_model_report.py
+# omiclass/reporting/per_model_report.py
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
@@ -12,12 +12,12 @@ import sys
 import numpy as np
 import pandas as pd
 
-from generic_classifier.reporting.assets import wrap_report_html
-from generic_classifier.reporting.components import card, kv_table, metric_grid, panel, chips_panel, esc, svg_panel
+from omiclass.reporting.assets import wrap_report_html
+from omiclass.reporting.components import card, kv_table, metric_grid, panel, chips_panel, esc, svg_panel
 
-from generic_classifier.plotting.geneset_plotter import plot_geneset_top_frequency_bar
-from generic_classifier.reporting.nav import build_sidebar_from_run_dir, render_sidebar_html
-from generic_classifier.utils.gene_symbols import get_gene_symbols
+from omiclass.plotting.geneset_plotter import plot_geneset_top_frequency_bar
+from omiclass.reporting.nav import build_sidebar_from_run_dir, render_sidebar_html
+from omiclass.utils.gene_symbols import get_gene_symbols
 
 
 
