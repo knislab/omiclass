@@ -13,6 +13,9 @@ The framework is designed to run either directly with Python or inside Docker, s
 - Imbalance handling using class weights and oversampling strategies
 - Output folders with trained models, predictions, metrics, and reports
 
+## Schema
+![Schema](examples/image/schema.png)
+
 ## Repository structure
 
 ```text
