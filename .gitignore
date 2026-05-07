@@ -23,3 +23,7 @@ __pycache__/
 
 # local files
 .DS_Store
+
+!omiclass/data/gencode_GRCh37_hg19.csv
+!omiclass/data/gencode_v34_GRCh38_hg38.csv
+!omiclass/data/
