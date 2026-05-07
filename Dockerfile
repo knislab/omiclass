@@ -1,6 +1,8 @@
-FROM python:3.12-slim
+FROM mambaorg/micromamba:1.5.8
 
 WORKDIR /app
+
+USER root
 
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -8,15 +10,29 @@ RUN apt-get update && apt-get install -y \
     g++ \
     git \
     libgomp1 \
+    libxml2-dev \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libfontconfig1-dev \
+    libfreetype6-dev \
+    libpng-dev \
+    libtiff5-dev \
+    libjpeg-dev \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libharfbuzz-dev \
+    libfribidi-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt /app/requirements.txt
+COPY environment.yml /tmp/environment.yml
 
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN micromamba env create -f /tmp/environment.yml && \
+    micromamba clean --all --yes
 
 COPY . /app
 
 ENV PYTHONPATH=/app
+ENV PATH=/opt/conda/envs/omiclass_env/bin:$PATH
+ENV CONDA_DEFAULT_ENV=omiclass_env
 
-ENTRYPOINT ["python", "api.py"]
+ENTRYPOINT ["micromamba", "run", "-n", "omiclass_env", "python", "api.py"]
