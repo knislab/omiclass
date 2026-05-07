@@ -1,0 +1,9 @@
+# data and results
+Allsort/
+AML/
+BRCA/
+BRCA-protein/
+epitype_and_ighv/
+generate_data_test/
+test_clean_and_run/
+tmp_test/
