@@ -1,0 +1,82 @@
+# generic_classifier/pipeline/steps/batch_step.py
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING, Dict, Any
+import numpy as np
+import pandas as pd
+import joblib
+
+if TYPE_CHECKING:
+    from generic_classifier.pipeline.orchestrator import RunContext
+from generic_classifier.batch.limma_runner import LimmaRunner
+from generic_classifier.reporting.limma_report import write_limma_report
+from generic_classifier.utils.io import load_matrix
+from generic_classifier.data.processor import DataProcessor
+from generic_classifier.utils.splits import load_split
+
+
+class RebatchCorrectionStep:
+    name = "rebatch_correction"
+
+    def should_run(self, ctx: RunContext) -> bool:
+        if ctx.opts.mode == "clean_and_predict":
+            return True
+        return False
+
+
+    def run(self, ctx: RunContext) -> None:
+        """
+        Run limma batch correction + batch holdout, store result in ctx.cache["X_corrected"].
+        """
+        full_expr = ctx.cache["full_expr"]
+
+        # Optional log1p before limma
+        if ctx.cfg.runtime.log_transform is True and not ctx.cache.get("_did_raw_count_norm", False) and not ctx.cache.get("_did_log_transform", False):
+            full_expr = np.log1p(full_expr)
+
+        dp = DataProcessor(ctx.cfg)
+        meta_df, cov_matrix, labels = dp.load_batch_metadata_prediction(
+            X_expr=full_expr
+        )
+
+
+        limma_runner = LimmaRunner()
+        limma_out_dir = ctx.out_dir / "limma_re-correction"
+        limma_out_dir.mkdir(parents=True, exist_ok=True)
+        limma_out_csv = "limma_corrected_expression.csv"
+
+        bc = ctx.cfg.batch_correction
+
+        limma_run_res = limma_runner.run_limma(
+            expr_df=full_expr,
+            meta_df=meta_df,
+            output_dir=limma_out_dir,
+            cov_matrix=cov_matrix,
+            batch_col=bc.batch_column or None,
+            design_cols=bc.design_columns or None,
+            n_pc=bc.n_pcs or 0,
+            na_fill=bc.fill_na or None,
+            out_csv=limma_out_csv,
+        )
+
+        X_full_raw = load_matrix(limma_out_dir / limma_out_csv)
+
+        _ = write_limma_report(
+            out_dir=limma_out_dir,
+            expr_shape=X_full_raw.shape,
+            meta_cols=list(meta_df.columns) if meta_df is not None else [],
+            batch_col=bc.batch_column or None,
+            design_cols=bc.design_columns or None,
+            n_pc=bc.n_pcs or 10,
+            na_fill=bc.fill_na or None,
+            limma_result=limma_run_res,
+        )
+        try:
+            split = load_split(ctx.cfg.project.split_data_dir / "split.json")
+        except Exception as e:
+            split = load_split(ctx.out_dir / "split.json")
+        train_idx, test_idx = split["train_index"], split["test_index"]
+        overall_idx = train_idx + test_idx
+        X_full_raw = X_full_raw.drop(columns=overall_idx, errors='ignore')
+        ctx.cache["X_recorrected"] = X_full_raw

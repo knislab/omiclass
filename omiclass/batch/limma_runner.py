@@ -1,0 +1,362 @@
+import pandas as pd
+import numpy as np
+import json
+import os
+import rpy2.robjects as ro
+from rpy2.robjects.packages import importr
+try:
+    # rpy2 >= 3.5
+    from rpy2.rinterface_lib.embedded import RRuntimeError
+except Exception:
+    # rpy2 <= 3.4 fallback
+    from rpy2.rinterface import RRuntimeError
+
+from typing import Optional, Sequence, Union, Tuple
+from pathlib import Path
+import tempfile, shutil, logging
+from generic_classifier.utils.batch import _assert_unique, _align_samples, _write_csv
+from generic_classifier.plotting.limma_plotter import limma_plotter
+from generic_classifier.errors.errors import RBackendError, GCError
+
+class LimmaRunner:
+    def __init__(self):
+        self.r_loaded = False
+        self.r_limma_func = None
+
+    def _run_qc_and_plotting(
+        self,
+        expr_df: pd.DataFrame,
+        meta_df: pd.DataFrame,
+        label_series: dict[str, pd.Series],
+        output_dir: Path,
+        plot_n_pcs: int,
+        prefix: str, # e.g., "orig" or "corr"
+    ) -> dict: 
+        # 1. Initialize Plotter
+        plotter = limma_plotter(expr_df, n_pcs=plot_n_pcs)
+
+        pca_svgs: dict[str, dict] = {}
+        box_svgs: dict[str, str] = {}
+
+
+        for name, s in label_series.items():
+            
+            # PCA Plots
+            svg1, svg2 = plotter.plot_pca_pairs(
+                labels=s,
+                label_name=name,
+                title_prefix=f"By {name} ({prefix.capitalize()})",
+            )
+            pca_svgs[name] = {"pc1_pc2": svg1, "pc3_pc4": svg2}
+
+            # Boxplots
+            svg = plotter.plot_pc_boxplots(
+                group_labels=s,
+                group_name=name,
+                pcs=(1, 2, 3, 4),
+                title=f"PC1–4 by {name} ({prefix.capitalize()})",
+            )
+            box_svgs[name] = svg
+
+        # 2. Heatmap
+        binary_labels: dict[str, pd.Series] = {
+            name: s for name, s in label_series.items() 
+            if pd.Series(s).dropna().nunique() == 2
+        }
+        multi_label = next((s for name, s in label_series.items() if pd.Series(s).dropna().nunique() > 2), None)
+        multi_label_name = next((name for name, s in label_series.items() if pd.Series(s).dropna().nunique() > 2), None)
+
+        if binary_labels or multi_label is not None:
+            heatmap_svg = plotter.plot_pc_batch_heatmap(
+                binary_labels=binary_labels,
+                multi_label=multi_label,
+                multi_label_name=multi_label_name or "group",
+                title=f"({prefix} correction)",
+            )
+        else:
+            heatmap_svg = None
+
+        # 3. Silhouette scores
+        sil_scores = plotter.compute_silhouette_scores(label_series)
+
+        dendrogram_svg = plotter.plot_sample_dendrogram(
+            label_dict=label_series,
+            title=f"Hierarchical clustering ({prefix.capitalize()})",
+            top_var_genes=2000, 
+            zscore_genes=True,
+            metric="correlation",
+            method="average",
+        )
+
+        gene_assoc = None
+        top_gene_boxplot_svg = None
+        batch_like_name = self.batch_like_name
+        if batch_like_name is None:
+            batch_like_name = next(
+                (n for n in label_series.keys() if any(k in n.lower() for k in ("batch", "center", "centrum", "site"))),
+                None
+            )
+        if batch_like_name is not None:
+            gene_assoc = plotter.gene_batch_association_summary(
+                labels=label_series[batch_like_name],
+                label_name=batch_like_name,
+                fdr=0.1,
+            )
+            top_gene_boxplot_svg = plotter.plot_top_batch_genes_boxplot(
+                labels=label_series[batch_like_name],
+                label_name=batch_like_name,
+                gene_table=gene_assoc["table"],
+                top_n=12,
+                title=f"Top batch-associated genes by {batch_like_name} ({prefix.capitalize()})",
+            )
+
+        # 4. Return results dictionary
+        return {
+            "plots": {
+                "pca": pca_svgs,
+                "boxplots": box_svgs,
+                "heatmap": heatmap_svg,
+                "dendrogram": dendrogram_svg,
+                "top_batch_gene_boxplots": top_gene_boxplot_svg,
+            },
+            "silhouette_scores": sil_scores,
+            "gene_level": gene_assoc, 
+        }
+
+    def run_limma(self, 
+                  expr_df: pd.DataFrame, 
+                  meta_df: Optional[pd.DataFrame], 
+                  output_dir: Union[str, Path], 
+                  cov_matrix: Optional[pd.DataFrame] = None, 
+                  batch_col: Optional[str] = None, 
+                  design_cols: Optional[Sequence[str]] = None, 
+                  n_pc: int = 0, 
+                  na_fill: Optional[Union[str, int, float]] = None,
+                  r_script_path: Union[str, Path] = "generic_classifier/batch/limma_correction.R", 
+                  out_csv: str = "limma_results.csv",
+                  plot_n_pcs: int = 10,
+                  eval_cols: Optional[Sequence[str]] = None,
+            ) -> dict:
+        
+        self.batch_like_name = batch_col
+        # 1. Input Validation and Alignment
+        if not isinstance(expr_df, pd.DataFrame):
+            raise TypeError("expr_df must be a pandas DataFrame")
+        _assert_unique(expr_df, "expr_df")
+        if meta_df is not None:
+            if not isinstance(meta_df, pd.DataFrame):
+                raise TypeError("meta_df must be a pandas DataFrame")
+            _assert_unique(meta_df, "meta_df")
+        if cov_matrix is not None:
+            if not isinstance(cov_matrix, pd.DataFrame):
+                raise TypeError("cov_matrix must be a pandas DataFrame")
+            _assert_unique(cov_matrix, "cov_matrix")
+
+        # Align samples and filter expression data for variance
+        required_meta_cols = [batch_col] + (design_cols if design_cols else [])
+        X, M = _align_samples(expr_df, meta_df, required_meta_cols=required_meta_cols)
+        v = X.var(axis=1, skipna=True, numeric_only=True)
+        X = X.loc[v > 0]
+        if M is not None:
+            M = M.loc[X.columns]
+        if cov_matrix is not None:
+            common_cov_samples = cov_matrix.index.intersection(X.columns)
+            cov_matrix = cov_matrix.loc[common_cov_samples]
+            X = X.loc[:, common_cov_samples]
+            if M is not None:
+                M = M.loc[common_cov_samples]
+
+        
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        r_script_path = Path(r_script_path)
+        
+        # Determine correction type flags
+        have_design = bool(design_cols)
+        have_batch  = batch_col is not None
+        have_covs   = cov_matrix is not None
+        have_pcs    = n_pc > 0
+
+        # Check basic requirements
+        if have_design and M is None:
+            raise ValueError("design_cols provided but meta_df is None")
+        if have_batch and M is None:
+            raise ValueError("batch_col provided but meta_df is None")
+        if not (have_batch or have_covs or have_pcs):
+            raise ValueError("You must provide at least one of: batch_col, cov_matrix, or n_pc")
+
+        # Handle NAs in meta_df
+        if M is not None and na_fill is not None:
+            used_cols = set()
+            if have_batch:   used_cols.add(batch_col)
+            if have_design:  used_cols |= set(design_cols)
+            used_cols = [c for c in used_cols if c in M.columns]
+            if used_cols:
+                block = (
+                    M.loc[:, used_cols]
+                    .replace({True: 1.0, False: 0.0})
+                    .apply(pd.to_numeric, errors="coerce")
+                    .astype("float64")
+                    .fillna(float(na_fill))
+                )
+                M.loc[:, used_cols] = block.values
+
+                M.loc[:, used_cols] = M.loc[:, used_cols].fillna(na_fill)
+        
+        # Final checks and design string creation
+        design_str = None
+        if have_design:
+            missing = [c for c in design_cols if c not in M.columns]
+            if missing:
+                raise ValueError(f"design_cols missing in meta_df: {missing}")
+            # Combine design columns for the R formula (e.g., "condition + age")
+            design_str = " + ".join(design_cols) 
+
+        if have_batch and batch_col not in M.columns:
+            raise ValueError(f"batch_col '{batch_col}' not in meta_df")
+
+        # Check for mutually exclusive batch types
+        if sum([have_batch, have_covs, have_pcs]) > 1:
+             raise ValueError("The 'run_limma' function only supports one batch removal type at a time: batch_col OR cov_matrix OR n_pc. Please select only one.")
+
+        # 2. Determine State and extra parameters
+        state = None
+        extra1 = None
+        extra2 = design_str # extra2 is always the design string or None
+
+        # State Map: 1: batch, 2: batch + design, 3: covariates, 4: covariates + design 5: pcs, 6: pcs + design
+        
+        if have_batch:
+            state = 2 if have_design else 1
+            extra1 = batch_col
+        elif have_covs:
+            state = 4 if have_design else 3
+            # extra1 will be the path to the covariate matrix CSV
+        elif have_pcs:
+            state = 6 if have_design else 5
+            extra1 = n_pc
+        
+        # 3. Prepare Files and Configuration
+        temp_dir = Path(tempfile.mkdtemp())
+        
+        try:
+            expr_filepath = temp_dir / "expr_data.csv"
+            meta_filepath = temp_dir / "meta_data.csv"
+            cov_filepath = temp_dir / "cov_matrix.csv"
+            json_filepath = temp_dir / "config.json"
+            output_filepath = output_dir / out_csv
+
+            # Write input CSVs
+            _write_csv(X, expr_filepath)
+            _write_csv(M, meta_filepath)
+            
+            # Special handling for covariate matrix (State 3, 4)
+            final_extra1 = extra1
+            if have_covs:
+                # Transpose and align covariate matrix (R expects Covariates as matrix of Covariates x Samples)
+                C = cov_matrix.loc[X.columns]
+                _write_csv(C, cov_filepath)
+                final_extra1 = str(cov_filepath) # Pass the path to R
+
+            # Create JSON configuration
+            config_data = {
+                "state": state,
+                "expr_filepath": str(expr_filepath),
+                "meta_filepath": str(meta_filepath),
+                "output_filepath": str(output_filepath),
+                "extra1": final_extra1,
+                "extra2": extra2
+            }
+            with open(json_filepath, 'w') as f:
+                json.dump(config_data, f, indent=4)
+
+            # Define Label Series for QC
+            label_series: dict[str, pd.Series] = {}
+            if M is not None:
+                # 1) batch_col (if relevant and present)
+                if batch_col and batch_col in M.columns:
+                    label_series[batch_col] = M[batch_col]
+
+                # 2) design_cols (if any and present)
+                if design_cols:
+                    for dc in design_cols:
+                        if dc in M.columns and dc not in label_series:
+                            label_series[dc] = M[dc]
+
+                # 3) extra evaluation columns
+                if eval_cols:
+                    for c in eval_cols:
+                        if c in M.columns and c not in label_series:
+                            label_series[c] = M[c]
+                            
+            result_dict = {}
+            if M is not None and label_series:
+                orig_qc_res = self._run_qc_and_plotting(
+                    expr_df=X,
+                    meta_df=M,
+                    label_series=label_series,
+                    output_dir=output_dir,
+                    plot_n_pcs=plot_n_pcs,
+                    prefix="orig", # Original results
+                )
+                # Store original results with distinct keys
+                result_dict["plots_orig"] = orig_qc_res["plots"]
+                result_dict["silhouette_scores_orig"] = orig_qc_res["silhouette_scores"]
+                result_dict["gene_level_orig"] = orig_qc_res.get("gene_level")
+            # 4. Load R code and Call Function
+            if not self.r_loaded:
+                try:
+                    # Load the R script and get the main function
+                    ro.r.source(str(r_script_path))
+                    self.r_limma_func = ro.globalenv['execute_limma_batch_correction']
+                    self.r_loaded = True
+                except RRuntimeError as e:
+                    raise RBackendError("R backend failed: " + str(e)) from e
+            
+            try:
+                r_result_str = self.r_limma_func(str(json_filepath))[0]
+            except RRuntimeError as e:
+                raise RBackendError(
+                    f"R function execute_limma_batch_correction crashed: {e}"
+                ) from e
+            
+            # 5. Handle Output
+            r_result_dict = json.loads(r_result_str)
+            result_dict.update(r_result_dict)
+            
+            if result_dict['status'] == 'error':
+                raise RuntimeError(f"R execution failed: {result_dict['message']}")
+            
+            if M is not None and output_filepath.exists() and label_series:
+                expr_corr = pd.read_csv(output_filepath, index_col=0)
+                
+                # Align labels to the corrected expression data's columns (important if filtering happened)
+                # Although M columns should match expr_corr columns, this is safer.
+                aligned_label_series = {k: s.reindex(expr_corr.columns) for k, s in label_series.items()}
+
+                corr_qc_res = self._run_qc_and_plotting(
+                    expr_df=expr_corr,
+                    meta_df=M,
+                    label_series=aligned_label_series,
+                    output_dir=output_dir,
+                    plot_n_pcs=plot_n_pcs,
+                    prefix="corr", # Corrected results
+                )
+
+                # Store corrected results with standard keys (overwriting any previous placeholder keys)
+                result_dict["plots"] = corr_qc_res["plots"]
+                result_dict["silhouette_scores"] = corr_qc_res["silhouette_scores"]
+                result_dict["gene_level"] = corr_qc_res.get("gene_level")
+
+            # Final cleanup and state
+            result_dict["state"] = state
+            return result_dict
+    
+        except Exception as e:
+            raise GCError(f"LimmaRunner failed: {e}") from e
+        finally:
+            # Clean up temporary directory
+            if temp_dir.exists():
+                shutil.rmtree(temp_dir)
+
+        
