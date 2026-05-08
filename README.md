@@ -119,6 +119,11 @@ From the project root:
 ```bash
 cd examples
 ```
+Create conda environment
+```bash
+conda env create -f ../environment.yml
+conda activate omiclass_env
+```
 Run the example 
 ```bash
 python python_example.py
