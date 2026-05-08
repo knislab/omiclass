@@ -15,6 +15,7 @@ data/
 *.h5ad
 *.joblib
 *.pkl
+*json
 
 # Python cache files
 __pycache__/
@@ -28,6 +29,7 @@ __pycache__/
 tests/
 results/
 
+
 !omiclass/data/gencode_GRCh37_hg19.csv
 !omiclass/data/gencode_v34_GRCh38_hg38.csv
 !omiclass/data/
@@ -36,3 +38,7 @@ results/
 !examples/data/patients_meta.csv
 !examples/data/raw_counts.csv
 !examples/data/gene_lengths.csv
+
+!examples/results/
+!examples/results/**/
+!examples/results/**/*.html

@@ -115,10 +115,13 @@ kwargs = {
 run(expression_file, **kwargs)
 ```
 
-Run the example from the project root:
-
+From the project root:
 ```bash
-python examples/python_example.py
+cd examples
+```
+Run the example 
+```bash
+python python_example.py
 ```
 
 The main input expression file is passed as the first argument to `run()`.  

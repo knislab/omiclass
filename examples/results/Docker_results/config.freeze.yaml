@@ -1,0 +1,144 @@
+project:
+  name: generic-classifier
+  out_dir: /app/results
+  split_data_dir: /app/results
+  classes_names:
+  - class 1
+  - class 2
+  - class 3
+  - class 4
+  hold_out_path: null
+  meta_path: /app/data/patients_meta.csv
+  cluster_column: class
+  geneset_path: null
+  version: 19
+batch_correction:
+  method: []
+  batch_column: batch
+  design_columns:
+  - age
+  - sex
+  covariates_path: null
+  n_pcs: null
+  fill_na: null
+runtime:
+  random_state: 42
+  n_jobs: 5
+  scoring: f1_macro
+  cv_folds: 5
+  learning_rate: 0.1
+  min_features: 20
+  bayesian_iterations: 40
+  log_transform: true
+  activation_method: sigmoid
+  split:
+    method: stratified
+    train_ratio: 0.8
+  imbalance:
+    mild_threshold: 1.5
+    severe_threshold: 3.0
+  tuning:
+    enabled: true
+    method: bayes
+    inner_cv: 3
+  per_fold_estimators:
+    method: median
+    pad: 0.05
+    min_rounds: 50
+  feature_selection:
+    enabled: true
+    subset_fracs:
+    - 0.05
+    - 0.1
+    - 0.2
+    - 0.3
+    min_features: 20
+    max_features: null
+    consensus_top_n: null
+    consensus_min_frac: 0.6
+    consensus_min_folds: 2
+    consensus_min_genes: 20
+  survival_prediction:
+    enabled: false
+    X_path: null
+    time_col: null
+    event_col: null
+    time_scale: 365.25
+  feature_reduction:
+    enabled: false
+    k_ratios:
+    - 0.01
+    - 0.02
+    - 0.05
+    - 0.1
+    - 0.2
+    - 0.3
+    - 0.5
+    - 1.0
+    n_repeats: 3
+    min_features: 10
+models:
+  random_forest:
+    defaults:
+      oob_score: true
+      verbose: 0
+      calibration:
+        calibrate: true
+        method: sigmoid
+      search_space: null
+    variants:
+      plain_random_forest:
+        filename: plain_random_forest.joblib
+        class_weight: null
+      weighted_random_forest:
+        filename: weighted_random_forest.joblib
+        class_weight: null
+      smote_random_forest:
+        filename: smote_random_forest.joblib
+        class_weight: null
+      adasyn_random_forest:
+        filename: adasyn_random_forest.joblib
+        class_weight: null
+      svm_smote_random_forest:
+        filename: svm_smote_random_forest.joblib
+        class_weight: null
+      bl_smote_random_forest:
+        filename: bl_smote_random_forest.joblib
+        class_weight: null
+  light_gbm:
+    filename: light_gbm.joblib
+    weighted_filename: light_gbm_weighted.joblib
+    init_params:
+      verbosity: -1
+      early_stopping_rounds: 10
+    param_grid: null
+    eval_metric: multi_logloss
+    metric: multi_logloss
+  xgboost:
+    filename: xgboost.joblib
+    weighted_filename: xgboost_weighted.joblib
+    init_params:
+      verbosity: 0
+      early_stopping_rounds: 10
+    param_grid: null
+    eval_metric: mlogloss
+  stacked_ensemble:
+    filename: stacked_ensemble.joblib
+    logistic_regression:
+      max_iter: 500
+      solver: lbfgs
+de:
+  covariates:
+  - age
+  - sex
+  min_samples_frac: 0.5
+  geneset_selection: true
+  k_genes: 100
+  logfc_thresh: 1.0
+  fdr_thresh: 0.05
+  min_count: 10
+normalization:
+  gene_lengths_path: /app/data/gene_lengths.csv
+  gtf_path: null
+surface_markers:
+  enabled: false
