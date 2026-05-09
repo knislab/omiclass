@@ -59,9 +59,9 @@ def write_de_geneset_report_html(
             for gid, sym in zip(gene_ids, symbols)
         ]
 
-    # Load DE results just for counts (avoid heavy tables here for now)
+    # Load DE counts (avoid heavy tables)
     df = pd.read_csv(de_results_csv, index_col=0)
-    # Meta for config table
+    # Build config metadata
     meta = {
         "Timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
         "Design column": design_col or "—",
@@ -76,7 +76,7 @@ def write_de_geneset_report_html(
         # "Volcano plots": int(len(volcano_svgs)),
     }
 
-    # Summary metrics (publication-style “at a glance”)
+    # Summary metrics
     n_pan = len((geneset_summary or {}).get("pan_genes", []) or []) if geneset_summary else 0
     n_final = len(combined_genes)
     summary_html = vertical_metric_grid(
@@ -88,7 +88,7 @@ def write_de_geneset_report_html(
         ]
     )
 
-    # Gene panels (chips + search + copy)
+    # Gene panels
     genes_html_parts: List[str] = []
 
     if n_classes <= 2:
@@ -157,7 +157,7 @@ def write_de_geneset_report_html(
 
     volcano_html = figs if figs else "<div class='muted'>No plots found</div>"
 
-    # Assemble report using shared components
+    # Assemble report
     side_by_side = split_card_3_1(
     title="Configuration Summary",
     subtitle="Parameters and settings used for differential expression analysis.",
@@ -176,7 +176,7 @@ def write_de_geneset_report_html(
     )
 
 
-    # Wrap in global shell (adds shared CSS/JS)
+    # Render full HTML
     final_html = wrap_report_html(
         title="Differential Expression Report",
         subtitle="Limma-voom differential expression and gene-set selection summary.",

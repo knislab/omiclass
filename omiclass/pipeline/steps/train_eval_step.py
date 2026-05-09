@@ -61,14 +61,14 @@ class TrainAndEvalStep:
             out_dir=ctx.out_dir,
         )
 
-        # 1) Build X, y for ML
+        # Build X, y for training
         X, y = dp.build_xy_from_corrected(
             X_full_raw=X_full_raw,
             gene_list=gene_list,
         )
         resolve_cv_folds(ctx.cfg, y)
 
-        # 2) Train/test split
+        # Train/test split
         Xtr, Xte, ytr, yte, split_path, created = make_or_load_split(
             X=X,
             y=y,
@@ -76,7 +76,7 @@ class TrainAndEvalStep:
             cfg=ctx.cfg,
             reuse_split=ctx.opts.reuse_split,
         )
-        # 3) Train on train set
+        # Train on training set
         train_dir = ctx.out_dir / "train_artifacts"
         trainer = Trainer(ctx.cfg, artifacts_dir=train_dir)
         summary = trainer.run(Xtr, ytr)

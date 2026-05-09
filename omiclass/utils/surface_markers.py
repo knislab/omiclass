@@ -5,9 +5,8 @@ from typing import Union, Optional, Sequence
 import subprocess
 import shutil
 import pandas as pd
-import requests 
+import requests
 import sys
-import os
 from typing import List
 from omiclass.utils.io import load_list
 

@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Union, List, Optional
 from omiclass.errors.errors import DataShapeError
 from io import StringIO
-import matplotlib.pyplot as plt
 from omiclass.config.schema import Config
 
 
@@ -27,7 +26,7 @@ def load_meta_matrix(path: Union[str, Path], cluster_col: Optional[str] = None) 
     p = str(path)
     cluster_categories = None
 
-    # ---- load ----
+    # Load metadata
     if p.endswith(".parquet"):
         df = pd.read_parquet(p)
     elif p.endswith(".csv") or p.endswith(".tsv"):
@@ -36,7 +35,7 @@ def load_meta_matrix(path: Union[str, Path], cluster_col: Optional[str] = None) 
     else:
         raise ValueError(f"Unsupported matrix file: {p}")
 
-    # ---- de-duplicate (same as load_matrix) ----
+    # Remove duplicates
     df = df[~df.index.duplicated(keep="first")]
     df = df.loc[:, ~df.columns.duplicated(keep="first")]
 

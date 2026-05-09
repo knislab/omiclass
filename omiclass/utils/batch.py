@@ -13,7 +13,7 @@ def _align_samples(expr_df: pd.DataFrame, meta_df: Optional[pd.DataFrame], requi
     required_meta_cols = [c for c in required_meta_cols if c is not None] if required_meta_cols is not None else None
     if meta_df is None:
         return expr_df, None
-    # drops nans
+    # Drop all-NaN columns
     expr_df = expr_df.dropna(axis=1, how='all')
     if required_meta_cols is not None and len(required_meta_cols) > 0:
         missing = [c for c in required_meta_cols if c not in meta_df.columns]
@@ -22,12 +22,12 @@ def _align_samples(expr_df: pd.DataFrame, meta_df: Optional[pd.DataFrame], requi
         meta_df = meta_df[required_meta_cols]
         meta_df = meta_df.dropna(axis=0, how="any")
 
-    # Check that metadata rows are samples and expression columns are samples
+    # Align expression columns and metadata rows
     common = expr_df.columns.intersection(meta_df.index)
     if len(common) == 0:
         raise ValueError("No overlapping samples between expr_df.columns and meta_df.index")
 
-    # Filter and maintain the expression column order
+    # Maintain expression column order
     return expr_df.loc[:, common], meta_df.loc[common]
 
 def _write_csv(obj: Union[pd.DataFrame, pd.Series], path: Path):
