@@ -1,4 +1,4 @@
-name: omiclass_env
+name: omiclass
 channels:
   - conda-forge
   - bioconda
