@@ -118,8 +118,6 @@ def write_de_geneset_report_html(
             for c in (geneset_summary.get("contrast_order", []) or []):
                 items = (geneset_summary.get("by_contrast", {}) or {}).get(c, []) or []
                 class_name = get_class_display_name(c, cfg=cfg, class_values=(geneset_summary.get("contrast_order", []) or []))
-                print(f"[DEBUG] Adding panel for contrast '{c}' with class name '{class_name}' and {len(items)} genes")
-                # panel_id must be stable + safe; keep it simple
                 pid = f"genes_{str(c).replace(' ', '_').replace('/', '_')}"
                 genes_html_parts.append(
                     chips_panel(

@@ -83,9 +83,7 @@ class PipelineOrchestrator:
         )
         for step in self.steps:
             if step.should_run(ctx):
-                print(f"[DEBUG] [ORCHESTRATOR] running {step.name}")
                 step.run(ctx)
-                #print(f"[DEBUG] [ORCHESTRATOR] finished {step.name}")
 
         # render html reports 
         finalize_unified_sidebar(Path(ctx.out_dir))

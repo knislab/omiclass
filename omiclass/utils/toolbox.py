@@ -164,7 +164,6 @@ def _bh_fdr(pvals: np.ndarray) -> np.ndarray:
         return q
 
 def get_class_display_name(c: Any, cfg: Any = None, class_values: Optional[Sequence[Any]] = None,) -> str:
-    print(f"[DEBUG] Resolving display name for class '{c}' with config: {cfg} and class_values: {class_values}")
     """
     Convert class index/key to display name using project.classes_names.
     Falls back to the original value if unavailable.

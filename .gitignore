@@ -31,7 +31,10 @@ results/
 examples/results/Docker_results/de_results/limma_voom_selected_genes.txt
 examples/results/Docker_results/train_artifacts/genesets/**
 examples/results/Docker_results/config.freeze.yaml
-examples/results/pipeline-20260509-121958/de_results/limma_voom_selected_genes.txt
+examples/results/Python_results/de_results/limma_voom_selected_genes.txt
+examples/results/Python_results/config.freeze.yaml
+examples/results/Python_results/train_artifacts/genesets/**
+
 
 !omiclass/data/gencode_GRCh37_hg19.csv
 !omiclass/data/gencode_v34_GRCh38_hg38.csv

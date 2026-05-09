@@ -388,13 +388,7 @@ class Trainer:
                 weighted_xgb_multiclass = True
 
         init_params, fit_kwargs = split_init_and_fit_kwargs(key, raw)
-        ## [DEBUG]
         if key == "weighted_light_gbm":
-            print("\n[DEBUG] LightGBM weighted mode")
-            print("[DEBUG] raw class_weight:", raw.get("class_weight"))
-            print("[DEBUG] init_params class_weight:", init_params.get("class_weight"))
-            print("[DEBUG] fit_kwargs:", fit_kwargs)
-
             tmp_builder = get_builder(
                 key,
                 random_state=int(r.random_state),
@@ -403,29 +397,11 @@ class Trainer:
             )
             tmp_est = tmp_builder()
 
-            print("[DEBUG] estimator class:", tmp_est.__class__.__name__)
-            print("[DEBUG] estimator class_weight:", tmp_est.get_params().get("class_weight"))
-
         fit_kwargs.pop("early_stopping_rounds", None)
         fit_kwargs.pop("early_stopping", None)
 
         if weighted_xgb_multiclass:
             sw = compute_sample_weight("balanced", y)
-
-            print("\n[DEBUG] XGBoost weighted mode")
-            print("[DEBUG] class counts:")
-            print(pd.Series(y).value_counts())
-
-            if len(pd.Series(y).value_counts()) == 2:
-                print("[DEBUG] scale_pos_weight:", raw.get("scale_pos_weight"))
-            else:
-                sw = compute_sample_weight("balanced", y)
-                print("[DEBUG] sample_weight stats:")
-                print("min:", sw.min(), "max:", sw.max(), "mean:", sw.mean())
-
-                print("[DEBUG] per-class avg weight:")
-                print(pd.Series(sw, index=y.index).groupby(y).mean())
-
             fit_kwargs["sample_weight"] = sw
             
         def base_builder():

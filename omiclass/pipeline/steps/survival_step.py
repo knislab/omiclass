@@ -23,14 +23,12 @@ class SurvivalStep:
         Run survival analysis prediction and store results in ctx.cache["survival_results"].
         """
         try:
-            print(f"[DEBUG] [SurvivalStep] Starting SurvivalStep")
             final_test_res_path = Path(ctx.out_dir) / "test_metrics.csv"
             surv_cfg = ctx.cfg.runtime.survival_prediction
             surv_path = Path(ctx.cfg.project.meta_path)
             time_col = surv_cfg.time_col
             event_col = surv_cfg.event_col
             time_scale = float(surv_cfg.time_scale)
-            print(f"[DEBUG] [SurvivalStep] Survival prediction config: {surv_cfg}")
 
             X = None
             if ctx.opts.mode == "clean_and_predict":
@@ -46,7 +44,6 @@ class SurvivalStep:
                             "[WARN] Survival prediction enabled but no valid expression data found; skipping survival prediction."
                         )
                         return
-            print(f"[DEBUG] [SurvivalStep] Using expression data from: {X}")
                     
             final_test_res = load_matrix(final_test_res_path, numeric=False)
             model_path = Path(final_test_res.iloc[0]["artifact"])

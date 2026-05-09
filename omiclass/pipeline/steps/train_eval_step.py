@@ -40,7 +40,6 @@ class TrainAndEvalStep:
         return ctx.opts.mode in ("full", "train-only", "de-train", "batch-train")
 
     def run(self, ctx: RunContext) -> None:
-        print(f"[DEBUG] [TrainAndEvalStep] Starting TrainAndEvalStep")
         dp = DataProcessor(ctx.cfg)
 
         # Choose which expression matrix to use: corrected vs original
@@ -152,7 +151,6 @@ class TrainAndEvalStep:
             })
 
         combined_test_csv = ctx.out_dir / "test_metrics.csv"
-        print(f"[DEBUG][Train_and_eval]: Saving combined test metrics: {test_rows}")
         final_test_res = pd.DataFrame(test_rows).sort_values(
             "f1_macro", ascending=False
         )

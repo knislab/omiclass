@@ -358,7 +358,6 @@ class DataProcessor:
                 str(self.cfg.normalization.gtf_path)
             )
         else:
-            print("[DEBUG] [processor] No gene lengths source provided in config; cannot normalize raw counts.")
             raise DataError("No gene lengths source provided in configuration.")
         
         if X_counts.empty:
@@ -391,12 +390,10 @@ class DataProcessor:
             raise DataError("Counts contain non-numeric values.")
         if (X < 0).any().any():
             raise DataError("Counts contain negative values.")
-        print(f"[DEBUG] [processor] Normalizing raw counts with {X.shape[0]} genes and {X.shape[1]} samples.")
         rpk = X.divide(lengths / 1000, axis=0)
         sf = rpk.sum(axis=0)
         if (sf <= 0).any():
             raise DataError("Some samples have zero RPK total.")
-        print(f"[DEBUG] [processor] Size factors (per-sample RPK sums) range from {sf.min()} to {sf.max()}.")
 
         tpm = rpk.divide(sf, axis=1) * 1e6
         return np.log1p(tpm)
