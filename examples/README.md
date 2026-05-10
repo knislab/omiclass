@@ -16,7 +16,7 @@ conda activate omiclass_env
 ```
 Run the example 
 ```bash
-python python_example.py
+python run_python_example.py
 ```
 
 ## Run with Docker
@@ -28,6 +28,21 @@ cd examples
 Run the example 
 ```bash
 bash run_docker_example.sh
+```
+
+## Run with Bash
+From the project root:
+```bash
+cd examples
+```
+Create conda environment
+```bash
+conda env create -f ../environment.yml
+conda activate omiclass_env
+```
+Run the example 
+```bash
+bash run_bash_example.sh
 ```
 # Parameters
 

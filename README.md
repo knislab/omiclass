@@ -131,6 +131,20 @@ python python_example.py
 
 The main input expression file is passed as the first argument to `run()`.  
 Additional parameters are passed as keyword arguments through `**kwargs`.
+
+## Quick start with Bash
+
+You can run the `run` function from `api.py` from bash.
+```bash
+python api.py \
+--override expression_file <data_path>/raw_counts.csv \
+--override output_dir <data_path>/results \
+--override meta_path <data_path>/patients_meta.csv \
+--override class_col class \
+--override batch_column batch \
+--override de_covariates age,sex \
+```
+
 ## Example folder
 
 The `examples/` folder contains:

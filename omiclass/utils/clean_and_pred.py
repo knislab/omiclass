@@ -1,11 +1,12 @@
 from datetime import datetime
 from pathlib import Path
 import re
-from typing import Optional
+from typing import Any, Optional
 
 
-def extract_pipeline_ts(path: Path) -> Optional[str]:
-    m = re.match(r"^pipeline-(\d{8}-\d{6})$", path.name)
+def extract_pipeline_ts(path: Path, cfg: Any) -> Optional[str]:
+    proj_name = cfg.project.name
+    m = re.match(rf"^{proj_name}-(\d{8}-\d{6})$", path.name)
     return m.group(1) if m else datetime.now().strftime("%Y%m%d-%H%M%S")
 
 

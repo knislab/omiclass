@@ -23,12 +23,13 @@ def run_pipeline(
     split_out = None
 
     if not has_leaderboard(project_out_dir):
+        proj_name = cfg.project.name
         ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-        out_dir = project_out_dir / f"pipeline-{ts}"
+        out_dir = project_out_dir / f"{proj_name}-{ts}"
 
         split_dir = getattr(cfg.project, "split_data_dir", None)
         if split_dir is not None:
-            split_out = Path(split_dir) / f"pipeline-{ts}"
+            split_out = Path(split_dir) / f"{proj_name}-{ts}"
         else:
             split_out = out_dir
 

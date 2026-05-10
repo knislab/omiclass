@@ -54,7 +54,7 @@ class SurfaceMarkerCfg(BaseModel):
 
 # ---------- Project ----------
 class ProjectCfg(BaseModel):
-    name: str = "generic-classifier"                     
+    name: str = "Omiclass"                     
     out_dir: Path = Field(default_factory=Path.cwd)
     split_data_dir: Optional[Path] = None
     classes_names: Optional[List[str]] = None 
