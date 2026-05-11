@@ -109,7 +109,7 @@ class DataProcessor:
             and survival_cfg.event_col
         )
 
-        # ---- meta_df ----
+        # Metadata
         meta_df: Optional[pd.DataFrame] = None
         if getattr(meta_path_cfg, "meta_path", None):
             meta_path = Path(meta_path_cfg.meta_path)
@@ -127,7 +127,7 @@ class DataProcessor:
                     f"(meta_path={meta_path})."
                 )
 
-        # ---- cov_matrix ----
+        # Covariate matrix
         cov_matrix: Optional[pd.DataFrame] = None
         if getattr(bc, "covariates_path", None):
             cov_path = Path(bc.covariates_path)
@@ -186,7 +186,7 @@ class DataProcessor:
             and survival_cfg.event_col
         )
 
-        # ---- meta_df ----
+        # Metadata
         meta_df: Optional[pd.DataFrame] = None
         if getattr(meta_path_cfg, "meta_path", None):
             meta_path = Path(meta_path_cfg.meta_path)
@@ -204,7 +204,7 @@ class DataProcessor:
                     f"(meta_path={meta_path})."
                 )
 
-        # ---- cov_matrix ----
+        # Covariate matrix
         cov_matrix: Optional[pd.DataFrame] = None
         if getattr(bc, "covariates_path", None):
             cov_path = Path(bc.covariates_path)
@@ -216,7 +216,7 @@ class DataProcessor:
             if cov_matrix.empty:
                 raise DataError(f"Covariate matrix is empty: {cov_path}")
 
-            # Intersection with expression samples
+            # Check overlap with expression samples
             overlap = set(X_expr.columns) & set(cov_matrix.index)
             if not overlap:
                 raise DataError(
@@ -303,7 +303,7 @@ class DataProcessor:
         label_name = "cluster"
         meta_path_cfg = self.cfg.project
 
-        # ---- meta_df ----
+        # Metadata
         meta_df: Optional[pd.DataFrame] = None
         if getattr(meta_path_cfg, "meta_path", None):
             meta_path = Path(meta_path_cfg.meta_path)

@@ -66,7 +66,7 @@ python run_bash_re_run_example.sh
 
 ### Main parameters
 
-These parameters define the main input files, output location, label column, batch column, and basic runtime behavior.
+These parameters define the main input files, output location, label column, and optional batch/gene-selection behavior.
 
 | Parameter | Explanation | Values |
 |---|---|---|
@@ -75,7 +75,7 @@ These parameters define the main input files, output location, label column, bat
 | `meta_path` | Path to the metadata file. | Path to CSV/TSV file |
 | `class_col` | Metadata column used as the classification label. | Column name |
 | `classification_column` | Alias for `class_col`. Metadata column used as the classification label. | Column name |
-| `batch_column` | Metadata column representing the batch/cohort variable. Used for batch correction and batch-effect assessment. | Column name |
+| `batch_column` | Metadata column representing the batch/cohort variable. Used for batch correction and batch-effect assessment when batch correction is enabled. | Column name |
 | `de_covariates` | Covariates included in differential expression analysis. | Comma-separated column names, e.g. `age,sex` |
 | `n_jobs` | Number of CPU jobs/threads to use. | Integer |
 | `project_name` | Name of the project/run. Used in reports and output organization. | Text string |
@@ -87,9 +87,12 @@ These parameters define the main input files, output location, label column, bat
 | `log_transform` | Whether to apply log transformation to the expression matrix. | `true` / `false` |
 | `raw_count` | Whether the input expression matrix contains raw counts. | `true` / `false` |
 | `test_holdout_path` | Optional path to an external holdout/test dataset. | Path |
-| `markers_path` | Path to predefined marker genes or gene sets. | Path |
+| `markers_path` | Path to a predefined gene list or gene set. Providing this disables DE and gene-set selection and uses the supplied list directly. | Path |
 
 More advanced / optional parameters at the bottom
+
+Batch correction is optional: if you omit all batch-related settings (`batch_column`, `batch_covariates_path`, and `batch_n_pcs`), the batch-correction step will not run.
+Likewise, setting `markers_path` to a predefined gene list disables DE and gene-set selection.
 
 ## Example Output Reports
 

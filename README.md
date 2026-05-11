@@ -51,6 +51,9 @@ For example, for IGHV classification, the metadata file should contain a label c
 ighv_mut
 ```
 
+Batch correction is optional. If you do not provide any batch-related settings such as `batch_column`, `batch_covariates_path`, or `batch_n_pcs`, the batch-correction step is skipped.
+If you provide `markers_path` with a predefined gene list, Omiclass skips DE and gene-set selection and uses that list directly.
+
 ## Quick start with Docker
 
 Build the Docker image from the repository root:

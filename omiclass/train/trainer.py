@@ -51,7 +51,7 @@ class Trainer:
         self.cv_results: dict[str, CVResult] = {}
         self.builders: dict[str, Any] = {}
 
-    # ----- helpers -----
+    # Internal helpers
     def _safe_inner_cv(self, y: pd.Series, cv: int, seed: int):
         min_count = int(pd.Series(y).value_counts().min())
         if min_count < 2:
@@ -60,7 +60,7 @@ class Trainer:
     
     def _tune_full(self, key: str, base_builder, X: pd.DataFrame, y: pd.Series, fit_kwargs: dict | None = None) -> dict:
         """Run BayesSearchCV on ALL data to get best_params_ for the FINAL model only."""
-        # search space + prefix
+        # Build search space and prefix
         if key.endswith("forest"):
             prefix = "" if key in ("plain_random_forest", "weighted_random_forest") else "rf__"
             rf_cfg = self.cfg.models.random_forest.defaults
@@ -78,7 +78,7 @@ class Trainer:
 
         inner = self._safe_inner_cv(y, cv=int(tun.inner_cv), seed=int(runt.random_state))
         if inner == 0:
-            # can't split safely; no tuning
+            # Cannot split safely; skip tuning
             return {}
             
         try:

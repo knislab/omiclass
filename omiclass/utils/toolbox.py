@@ -1,8 +1,8 @@
 from __future__ import annotations
-from pydantic import BaseModel
+from dataclasses import asdict
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, Any
 import inspect
 from sklearn.metrics import confusion_matrix
 from sklearn.calibration import CalibratedClassifierCV
@@ -10,7 +10,6 @@ from sklearn.ensemble import StackingClassifier
 from sklearn.pipeline import Pipeline as SkPipeline
 from imblearn.pipeline import Pipeline as ImbPipeline
 import xgboost as xgb
-from typing import Any
 
 def _build_class_name_map(
     y: pd.Series, 

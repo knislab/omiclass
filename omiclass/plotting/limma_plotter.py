@@ -43,8 +43,6 @@ class limma_plotter:
 
         self.pc_df, self.pca = self._compute_pca()
 
-    # -------------------------------------------------------
-
     def _compute_pca(self):
         X = self.expr.T.values
         if self.scale_for_pca: X = StandardScaler().fit_transform(X)
@@ -66,8 +64,6 @@ class limma_plotter:
         for name, vec in label_dict.items():
             df[name] = self._align_labels(vec).values
         return df
-
-    # -------------------------------------------------------
 
     def plot_pca_pairs(self, labels: LabelVector, label_name: str, title_prefix: str = ""):
         lab = self._align_labels(labels)
@@ -93,8 +89,6 @@ class limma_plotter:
 
         return svg1, svg2
 
-    # -------------------------------------------------------
-
     def plot_sample_dendrogram(
         self,
         label_dict: Dict[str, LabelVector],
@@ -109,7 +103,7 @@ class limma_plotter:
         if self.expr is None or self.expr.empty:
             return None
 
-        # ---------- prepare matrix (genes x samples) ----------
+        # Prepare matrix (genes x samples)
         X = self.expr.copy()
 
         # keep top variable genes (optional)
@@ -129,7 +123,7 @@ class limma_plotter:
         if n_samples < 2:
             return None
 
-        # ---------- build row_colors (index must be samples) ----------
+        # Build row colors for samples
         row_colors = None
         label_names: List[str] = []
 
@@ -152,7 +146,7 @@ class limma_plotter:
         has_colors = row_colors is not None and row_colors.shape[1] > 0
         k = int(row_colors.shape[1]) if has_colors else 0
 
-        # ---------- linkage ----------
+        # Hierarchical clustering
         try:
             D = pdist(M.values, metric=metric)
             Z = linkage(D, method=method)
@@ -160,7 +154,7 @@ class limma_plotter:
             # fail safe: no dendrogram possible
             return None
 
-        # ---------- figure layout ----------
+        # Figure layout
         height = min(12.0, max(5.0, 0.02 * n_samples + 4.0))
         width = 10.0 + (0.6 * k if k > 0 else 0.0)
 
@@ -195,7 +189,7 @@ class limma_plotter:
 
         fig.tight_layout()
 
-        # ---------- render color bars robustly ----------
+        # Render color bars
         if has_colors and ax_colors is not None:
             # Ensure row_colors aligns to the clustered sample axis
             if not row_colors.index.equals(M.index):
@@ -247,12 +241,10 @@ class limma_plotter:
                 # hide color axis if we couldn't render it
                 ax_colors.axis("off")
 
-        # ---------- finalize ----------
+        # Finalize
         svg = fig_to_svg_str(fig)
         plt.close(fig)
         return svg
-
-    # -------------------------------------------------------
 
     def gene_batch_association_summary(
         self,
@@ -339,7 +331,7 @@ class limma_plotter:
             "table": df,
         }
         return out
-    # -------------------------------------------------------
+
     def plot_top_batch_genes_boxplot(
         self,
         labels: LabelVector,
@@ -375,7 +367,6 @@ class limma_plotter:
         svg = fig_to_svg_str(fig)
         plt.close(fig)
         return svg
-    # -------------------------------------------------------
 
     def plot_pc_boxplots(self, group_labels: LabelVector, group_name: str, pcs=(1,2,3,4), title="", save_path=None):
         group = self._align_labels(group_labels)
@@ -397,8 +388,6 @@ class limma_plotter:
         plt.close(fig)
         return svg
 
-    # -------------------------------------------------------
-
     def compute_silhouette_scores(self, labels_dict: Dict[str, LabelVector]):
         scores = {}
         pc_cols = [f"PC{i+1}" for i in range(self.n_pcs)]
@@ -412,7 +401,6 @@ class limma_plotter:
 
         return scores
 
-    # -------------------------------------------------------
 
     def plot_pc_batch_heatmap(
         self,

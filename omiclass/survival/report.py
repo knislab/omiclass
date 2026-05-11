@@ -74,7 +74,7 @@ def render_survival_prediction_html(
     stats = _clean_stats_for_kv(stats or {})
     global_p = stats.get("global_p", None)
 
-    # ---------- header metrics ----------
+    # Header metrics
     top_metrics: List[Tuple[str, Any]] = [("N predictions", n_samples)]
     if global_p is not None:
         # keep formatting but avoid exceptions
@@ -83,7 +83,7 @@ def render_survival_prediction_html(
         except Exception:
             top_metrics.append(("Global log-rank p", str(global_p)))
 
-    # ---------- body ----------
+    # Body content
     parts: List[str] = []
 
     # Summary card (small metadata)

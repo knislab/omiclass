@@ -40,8 +40,7 @@ class LimmaRunner:
 
 
         for name, s in label_series.items():
-            
-            # PCA Plots
+            # PCA plots
             svg1, svg2 = plotter.plot_pca_pairs(
                 labels=s,
                 label_name=name,
@@ -58,7 +57,7 @@ class LimmaRunner:
             )
             box_svgs[name] = svg
 
-        # 2. Heatmap
+        # Heatmap
         binary_labels: dict[str, pd.Series] = {
             name: s for name, s in label_series.items() 
             if pd.Series(s).dropna().nunique() == 2
@@ -76,7 +75,7 @@ class LimmaRunner:
         else:
             heatmap_svg = None
 
-        # 3. Silhouette scores
+        # Silhouette scores
         sil_scores = plotter.compute_silhouette_scores(label_series)
 
         dendrogram_svg = plotter.plot_sample_dendrogram(
@@ -110,7 +109,7 @@ class LimmaRunner:
                 title=f"Top batch-associated genes by {batch_like_name} ({prefix.capitalize()})",
             )
 
-        # 4. Return results dictionary
+        # Return results
         return {
             "plots": {
                 "pca": pca_svgs,
@@ -139,7 +138,7 @@ class LimmaRunner:
             ) -> dict:
         
         self.batch_like_name = batch_col
-        # 1. Input Validation and Alignment
+        # Validate inputs and align samples
         if not isinstance(expr_df, pd.DataFrame):
             raise TypeError("expr_df must be a pandas DataFrame")
         _assert_unique(expr_df, "expr_df")
@@ -152,7 +151,7 @@ class LimmaRunner:
                 raise TypeError("cov_matrix must be a pandas DataFrame")
             _assert_unique(cov_matrix, "cov_matrix")
 
-        # Align samples and filter expression data for variance
+        # Filter low-variance genes
         required_meta_cols = [batch_col] + (design_cols if design_cols else [])
         X, M = _align_samples(expr_df, meta_df, required_meta_cols=required_meta_cols)
         v = X.var(axis=1, skipna=True, numeric_only=True)
@@ -171,7 +170,7 @@ class LimmaRunner:
         output_dir.mkdir(parents=True, exist_ok=True)
         r_script_path = Path(r_script_path)
         
-        # Determine correction type flags
+        # Determine correction types
         have_design = bool(design_cols)
         have_batch  = batch_col is not None
         have_covs   = cov_matrix is not None

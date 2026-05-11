@@ -4,8 +4,7 @@ from .base import safe_kwargs
 import lightgbm as lgb
 import contextlib
 import os
-from typing import Any, Dict 
-import sys
+from typing import Any, Dict
 
 class _SilentLightGBMLogger:
     """Swallow all LightGBM log messages (Info + Warning)."""
