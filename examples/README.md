@@ -1,7 +1,11 @@
 
 # Examples
 
-This folder contains minimal examples for running OmiClass with either Python or Docker.
+
+This folder contains minimal examples for running OmiClass with Python, Docker, or Bash.
+
+The first run trains and evaluates the pipeline on the example dataset.  
+The rerun examples show how to apply an existing pipeline to another dataset that went through the same preprocessing steps. This is useful when you already have a trained pipeline directory and want to generate predictions, updated reports, and output files for a new compatible dataset.
 
 ## Run with Python
 
@@ -60,7 +64,7 @@ bash run_bash_example.sh
 ```bash
 cd examples
 conda activate omiclass_env
-python run_bash_re_run_example.sh
+bash run_bash_re_run_example.sh
 ```
 # Parameters
 

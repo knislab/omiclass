@@ -91,9 +91,13 @@ docker run --rm \
 
 The input files remain on your server/local machine. The results are written to the mounted `results/` folder.
 
-### Rerun using Docker
+### Rerun using Docker for prediction on a new dataset
 
-When using Docker, mount the folder that contains the input data and the previous output directory, then pass the existing pipeline directory as `output_dir`.
+You can rerun an existing pipeline on another dataset that was prepared using the same preprocessing steps as the original run.  
+This is useful when you already trained the pipeline and want to apply the same saved models, selected genes, normalization/batch settings, and report structure to a new input dataset.
+
+When using Docker, mount the folder that contains the new input data and the previous output directory. Then pass the existing pipeline directory as `output_dir`.
+
 
 ```bash
 docker run --rm \
