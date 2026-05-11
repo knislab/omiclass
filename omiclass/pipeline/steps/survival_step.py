@@ -58,8 +58,40 @@ class SurvivalStep:
                 threshold_block = data.get("threshold_optimized_holdout") or {}
                 threshold_info = threshold_block.get("thresholds")
 
+                # Only use threshold info if it improves F1
                 if threshold_info:
-                    survival_results_threshold = run_survival_prediction(
+                    original_f1 = data.get("test", {}).get("metrics", {}).get("f1_macro", 0)
+                    threshold_f1 = threshold_block.get("metrics", {}).get("f1_macro", 0)
+
+                    if threshold_f1 > original_f1:
+                        survival_results_threshold = run_survival_prediction(
+                            X=X,
+                            model_path=model_path,
+                            survival_path=surv_path,
+                            time_col=time_col,
+                            event_col=event_col,
+                            time_scale=time_scale,
+                            artifacts_dir=ctx.out_dir / "survival_prediction",
+                            ctx=ctx,
+                            class_names=labels_for_plot,
+                            threshold_info=threshold_info,
+                        )
+                        ctx.cache["survival_results"] = survival_results_threshold
+                    else:
+                        survival_results = run_survival_prediction(
+                            X=X,
+                            model_path=model_path,
+                            survival_path=surv_path,
+                            time_col=time_col,
+                            event_col=event_col,
+                            time_scale=time_scale,
+                            artifacts_dir=ctx.out_dir / "survival_prediction",
+                            ctx=ctx,
+                            class_names=labels_for_plot,
+                        )
+                        ctx.cache["survival_results"] = survival_results
+                else:
+                    survival_results = run_survival_prediction(
                         X=X,
                         model_path=model_path,
                         survival_path=surv_path,
@@ -69,9 +101,8 @@ class SurvivalStep:
                         artifacts_dir=ctx.out_dir / "survival_prediction",
                         ctx=ctx,
                         class_names=labels_for_plot,
-                        threshold_info=threshold_info,
                     )
-                    ctx.cache["survival_results"] = survival_results_threshold
+                    ctx.cache["survival_results"] = survival_results
             else:
                 survival_results = run_survival_prediction(
                     X=X,

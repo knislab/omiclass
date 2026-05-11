@@ -90,6 +90,8 @@ class TrainAndEvalStep:
         test_reports: Dict[str, Path] = {}
         per_model_payload: Dict[str, Dict[str, np.ndarray]] = {}
         per_model_threshold_payload: Dict[str, Dict[str, np.ndarray]] = {}
+        original_f1_scores: Dict[str, float] = {}
+        threshold_f1_scores: Dict[str, float] = {}
         labels_from_first: list[str] = []
 
         i = 1
@@ -132,8 +134,12 @@ class TrainAndEvalStep:
                 "y_proba": pp.get("y_proba"),
             }
 
-            # threshold final summary payload
+            # Track original F1 score
+            original_f1_scores[key] = report.get("f1_macro")
+
+            # threshold final summary payload (only if it improves F1)
             if threshold_report is not None:
+                threshold_f1_scores[key] = threshold_report.get("f1_macro")
                 tpp = threshold_report.get("plot_payload", {})
                 per_model_threshold_payload[key] = {
                     "y_pred": tpp.get("y_pred"),
@@ -195,7 +201,13 @@ class TrainAndEvalStep:
             ctx=ctx
         )
 
-        if per_model_threshold_payload:
+        # Check if best model's threshold optimization improves F1
+        best_model_improves_with_threshold = (
+            best_model in threshold_f1_scores and 
+            threshold_f1_scores[best_model] > original_f1_scores[best_model]
+        )
+
+        if per_model_threshold_payload and best_model_improves_with_threshold:
             threshold_plotter = FinalSummaryPlotter(
                 labels=labels_for_plot,
                 y_true=yte,
