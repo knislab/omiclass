@@ -19,6 +19,13 @@ Run the example
 python run_python_example.py
 ```
 
+### Rerun using Python
+```bash
+cd examples
+conda activate omiclass_env
+python run_python_re_run_example.py
+```
+
 ## Run with Docker
 
 From the project root:
@@ -30,6 +37,11 @@ Run the example
 bash run_docker_example.sh
 ```
 
+### Rerun using Docker
+```bash
+cd examples
+bash run_docker_re_run_example.sh
+```
 ## Run with Bash
 From the project root:
 ```bash
@@ -43,6 +55,12 @@ conda activate omiclass_env
 Run the example 
 ```bash
 bash run_bash_example.sh
+```
+### Rerun using Bash
+```bash
+cd examples
+conda activate omiclass_env
+python run_bash_re_run_example.sh
 ```
 # Parameters
 

@@ -46,6 +46,8 @@ examples/results/Python_results/train_artifacts/genesets/**
 !examples/data/patients_meta.csv
 !examples/data/raw_counts.csv
 !examples/data/gene_lengths.csv
+!examples/data/merged_count_data.csv
+!examples/data/merged_meta_with_external.csv
 
 !examples/results/
 !examples/results/**/

@@ -88,6 +88,22 @@ docker run --rm \
 
 The input files remain on your server/local machine. The results are written to the mounted `results/` folder.
 
+### Rerun using Docker
+
+When using Docker, mount the folder that contains the input data and the previous output directory, then pass the existing pipeline directory as `output_dir`.
+
+```bash
+docker run --rm \
+  -v "$PWD/data:/app/data" \
+  -v "$PWD/results:/app/results" \
+  omiclass:dev \
+  --override expression_file /app/data/filtered_count.csv \
+  --override output_dir /app/data/<Existing_pipeline> \
+  --override meta_path /app/data/merged_meta_cll.csv
+```
+
+The mounted directory is shared with the server, so the updated reports and outputs will be written back to the existing pipeline folder.
+
 ## Quick start with Python
 
 You can run Omiclass directly from Python by importing the `run` function from `api.py`.
