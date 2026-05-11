@@ -28,12 +28,14 @@ __pycache__/
 # ignore all files in the tests directory
 tests/
 results/
+final_results_runs/
 examples/results/Docker_results/de_results/limma_voom_selected_genes.txt
 examples/results/Docker_results/train_artifacts/genesets/**
 examples/results/Docker_results/config.freeze.yaml
 examples/results/Python_results/de_results/limma_voom_selected_genes.txt
 examples/results/Python_results/config.freeze.yaml
 examples/results/Python_results/train_artifacts/genesets/**
+
 
 
 !omiclass/data/gencode_GRCh37_hg19.csv
