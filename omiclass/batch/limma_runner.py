@@ -23,6 +23,25 @@ class LimmaRunner:
         self.r_loaded = False
         self.r_limma_func = None
 
+    @staticmethod
+    def _series_with_category_names(s: pd.Series, mapping: Optional[dict]) -> pd.Series:
+        if not mapping:
+            return s
+
+        def _lookup(value):
+            if pd.isna(value):
+                return pd.NA
+            for key in (value, str(value)):
+                if key in mapping:
+                    return mapping[key]
+            try:
+                numeric_key = int(value)
+            except (TypeError, ValueError):
+                return value
+            return mapping.get(numeric_key, mapping.get(str(numeric_key), value))
+
+        return s.map(_lookup)
+
     def _run_qc_and_plotting(
         self,
         expr_df: pd.DataFrame,
@@ -138,6 +157,8 @@ class LimmaRunner:
             ) -> dict:
         
         self.batch_like_name = batch_col
+        category_maps = getattr(meta_df, "attrs", {}).get("category_maps", {}) if meta_df is not None else {}
+
         # Validate inputs and align samples
         if not isinstance(expr_df, pd.DataFrame):
             raise TypeError("expr_df must be a pandas DataFrame")
@@ -274,19 +295,28 @@ class LimmaRunner:
             if M is not None:
                 # 1) batch_col (if relevant and present)
                 if batch_col and batch_col in M.columns:
-                    label_series[batch_col] = M[batch_col]
+                    label_series[batch_col] = self._series_with_category_names(
+                        M[batch_col],
+                        category_maps.get(batch_col),
+                    )
 
                 # 2) design_cols (if any and present)
                 if design_cols:
                     for dc in design_cols:
                         if dc in M.columns and dc not in label_series:
-                            label_series[dc] = M[dc]
+                            label_series[dc] = self._series_with_category_names(
+                                M[dc],
+                                category_maps.get(dc),
+                            )
 
                 # 3) extra evaluation columns
                 if eval_cols:
                     for c in eval_cols:
                         if c in M.columns and c not in label_series:
-                            label_series[c] = M[c]
+                            label_series[c] = self._series_with_category_names(
+                                M[c],
+                                category_maps.get(c),
+                            )
                             
             result_dict = {}
             if M is not None and label_series:
@@ -357,5 +387,3 @@ class LimmaRunner:
             # Clean up temporary directory
             if temp_dir.exists():
                 shutil.rmtree(temp_dir)
-
-        

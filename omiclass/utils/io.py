@@ -22,7 +22,11 @@ def load_matrix(path: Union[str, Path], numeric: bool = True) -> pd.DataFrame:
     df = df.loc[:, ~df.columns.duplicated(keep="first")]
     return df
 
-def load_meta_matrix(path: Union[str, Path], cluster_col: Optional[str] = None) -> pd.DataFrame:
+def load_meta_matrix(
+    path: Union[str, Path],
+    cluster_col: Optional[str] = None,
+    return_category_maps: bool = False,
+) -> pd.DataFrame:
     p = str(path)
     cluster_categories = None
 
@@ -40,6 +44,7 @@ def load_meta_matrix(path: Union[str, Path], cluster_col: Optional[str] = None) 
     df = df.loc[:, ~df.columns.duplicated(keep="first")]
 
     out = pd.DataFrame(index=df.index)
+    category_maps = {}
 
     for col in df.columns:
         s = df[col]
@@ -61,10 +66,18 @@ def load_meta_matrix(path: Union[str, Path], cluster_col: Optional[str] = None) 
         # deterministic ordering
         categories = sorted(s_cat.dropna().unique().tolist())
         cat_map = {c: i for i, c in enumerate(categories)}
+        category_maps[col] = {i: str(c) for c, i in cat_map.items()}
         if cluster_col is not None and col == cluster_col:
             cluster_categories = categories
 
         out[col] = s_cat.map(cat_map).astype("Int64")
+
+    out.attrs["category_maps"] = category_maps
+
+    if return_category_maps:
+        if cluster_col is not None:
+            return out, cluster_categories, category_maps
+        return out, category_maps
 
     if cluster_col is not None:
         return out, cluster_categories

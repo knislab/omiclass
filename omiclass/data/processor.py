@@ -42,6 +42,7 @@ class DataProcessor:
         Clean meta_df by dropping specified columns.
         """
         cleaned_meta = meta_df.drop(columns=drop_columns, errors='ignore')
+        cleaned_meta.attrs.update(meta_df.attrs)
         return cleaned_meta
 
     # 1. Expression + gene list
@@ -115,7 +116,8 @@ class DataProcessor:
             meta_path = Path(meta_path_cfg.meta_path)
             if not meta_path.exists():
                 raise DataError(f"batch_correction.meta_path does not exist: {meta_path}")
-            meta_df = load_meta_matrix(meta_path)
+            meta_df, category_maps = load_meta_matrix(meta_path, return_category_maps=True)
+            meta_df.attrs["category_maps"] = category_maps
             if meta_df.empty:
                 raise DataError(f"Meta file is empty: {meta_path}")
 
@@ -192,7 +194,8 @@ class DataProcessor:
             meta_path = Path(meta_path_cfg.meta_path)
             if not meta_path.exists():
                 raise DataError(f"batch_correction.meta_path does not exist: {meta_path}")
-            meta_df = load_meta_matrix(meta_path)
+            meta_df, category_maps = load_meta_matrix(meta_path, return_category_maps=True)
+            meta_df.attrs["category_maps"] = category_maps
             if meta_df.empty:
                 raise DataError(f"Meta file is empty: {meta_path}")
 

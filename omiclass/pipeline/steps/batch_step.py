@@ -38,17 +38,21 @@ class BatchCorrectionStep:
             full_expr = np.log1p(full_expr)
             ctx.cache["_did_log_transform"] = True
 
+        bc = ctx.cfg.batch_correction
         dp = DataProcessor(ctx.cfg)
         meta_df, cov_matrix = dp.load_batch_metadata(
             X_expr=full_expr
         )
+        batch_label_maps = getattr(meta_df, "attrs", {}).get("category_maps", {}) if meta_df is not None else {}
+        if bc.batch_column and bc.batch_column in batch_label_maps:
+            ctx.cache["batch_label_map"] = batch_label_maps[bc.batch_column]
+            ctx.cache["batch_label_names"] = list(batch_label_maps[bc.batch_column].values())
 
         limma_runner = LimmaRunner()
         limma_out_dir = ctx.out_dir / "limma_correction"
         limma_out_dir.mkdir(parents=True, exist_ok=True)
         limma_out_csv = "limma_corrected_expression.csv"
 
-        bc = ctx.cfg.batch_correction
         limma_run_res = limma_runner.run_limma(
             expr_df=full_expr,
             meta_df=meta_df,
