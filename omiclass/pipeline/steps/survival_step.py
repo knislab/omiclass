@@ -46,12 +46,13 @@ class SurvivalStep:
                         return
                     
             final_test_res = load_matrix(final_test_res_path, numeric=False)
-            model_path = Path(final_test_res.iloc[0]["artifact"])
+            model_base_path = Path(final_test_res.iloc[0]["artifact"])
             labels_for_plot = ctx.cache.get("labels_for_plot", None)
 
             # optional threshold-optimized survival report
-            model_name = model_path.stem
+            model_name = model_base_path.stem
             report_json = ctx.out_dir / "reports" / f"{model_name}.report.json"
+            model_path = ctx.out_dir / "train_artifacts" / f"{model_name}.joblib"
 
             if report_json.exists():
                 data = json.loads(report_json.read_text(encoding="utf-8"))

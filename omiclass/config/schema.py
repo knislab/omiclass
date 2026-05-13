@@ -298,7 +298,7 @@ class LightGBMCfg(BaseModel):
         if self.filename is None:
             self.filename = "light_gbm.joblib"
         if self.weighted_filename is None:
-            self.weighted_filename = "light_gbm_weighted.joblib"
+            self.weighted_filename = "weighted_light_gbm.joblib"
         return self
 
 # ---------- xgboost parm_grid ----------
@@ -328,7 +328,7 @@ class XGBoostCfg(BaseModel):
         if self.filename is None:
             self.filename = "xgboost.joblib"
         if self.weighted_filename is None:
-            self.weighted_filename = "xgboost_weighted.joblib"
+            self.weighted_filename = "weighted_xgboost.joblib"
         return self
     
 # ---------- logistic regression ----------

@@ -69,7 +69,7 @@ class LimmaVoomRunner:
                        design_col: str, 
                        covariates: Optional[Sequence[str]] = None, 
                        out_csv: str = "limma_voom_de_results.csv",
-                       r_script_path: Union[str, Path] = Path("omiclass/de/limma_voom_de.R"), 
+                       r_script_path: Optional[Union[str, Path]] = None, 
                        min_count: float = 20, 
                        min_samples_frac: float = 0.5, 
                        gene_list: Optional[Sequence[str]] = None,
@@ -95,10 +95,13 @@ class LimmaVoomRunner:
         base_output_dir = output_dir
         output_dir = output_dir / "de_results"
         output_dir.mkdir(parents=True, exist_ok=True)
-        r_script_path = Path(r_script_path)
-
-        temp_dir = Path(tempfile.mkdtemp())
+        if r_script_path is None:
+            r_script_path = Path(__file__).resolve().parent / "limma_voom_de.R"
+        else:
+            r_script_path = Path(r_script_path)
         
+        temp_dir = Path(tempfile.mkdtemp())
+                
         try:
             expr_filepath = temp_dir / "counts_data.csv"
             meta_filepath = temp_dir / "meta_data.csv"

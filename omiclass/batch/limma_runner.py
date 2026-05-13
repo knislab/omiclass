@@ -150,7 +150,7 @@ class LimmaRunner:
                   design_cols: Optional[Sequence[str]] = None, 
                   n_pc: int = 0, 
                   na_fill: Optional[Union[str, int, float]] = None,
-                  r_script_path: Union[str, Path] = "omiclass/batch/limma_correction.R", 
+                  r_script_path: Optional[Union[str, Path]] = None,
                   out_csv: str = "limma_results.csv",
                   plot_n_pcs: int = 10,
                   eval_cols: Optional[Sequence[str]] = None,
@@ -189,7 +189,10 @@ class LimmaRunner:
         
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        r_script_path = Path(r_script_path)
+        if r_script_path is None:
+            r_script_path = Path(__file__).resolve().parent / "limma_correction.R"
+        else:
+            r_script_path = Path(r_script_path)
         
         # Determine correction types
         have_design = bool(design_cols)
