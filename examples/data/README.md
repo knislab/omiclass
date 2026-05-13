@@ -8,7 +8,9 @@ This folder contains small example files used by the example scripts.
 |---|---|
 | `raw_counts.csv` | Gene expression matrix. Rows are genes/features and columns are samples. |
 | `patients_meta.csv` | Metadata table containing sample annotations, class labels, and batch labels. |
-| `hold_out_patients.txt` | Optional list of samples to use as the holdout set. |
+| `raw_counts_with_external.csv` | The gene expression matrix with demo external dtaset. |
+| `patients_meta_with_external.csv` | full Metadata table with demo external dtaset. |
+| `gene_lengths.csv` | Gene expression matrix. Rows are genes/features and columns are samples. |
 
 ## Expected format
 

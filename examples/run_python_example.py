@@ -15,6 +15,7 @@ kwargs = {
     "de_covariates": ["age", "sex"],
     "n_jobs": 5,
     "gene_lengths_path": f"{base_dir}/data/gene_lengths.csv",
+    "project_name": "python_example",
 }
 
 run(expression_file, **kwargs)

@@ -62,10 +62,10 @@ def run_survival_prediction(X: Union[pd.DataFrame, Path, str],
     class_names: Optional[list[str]] = None,
     threshold_info: Optional[Dict[str, Any]] = None,
 ) -> SurvivalPredictionResult:
-    
-    if class_names is not None:
-        class_names = list(class_names)
-    
+    cfg_class_names = ctx.cfg.project.classes_names if ctx is not None else None
+
+    if cfg_class_names is not None:
+        class_names = list(cfg_class_names)
     artifacts_dir = Path(artifacts_dir)
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 

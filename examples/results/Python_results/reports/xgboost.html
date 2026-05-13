@@ -748,8 +748,7 @@ code{
 <nav class='sidebar-nav'>
 <details class="nav-group" open>
               <summary class="nav-group-title">Final summary</summary>
-              <div class="nav-group-items"><a class='nav-item' href='../final_report.html'>Global evaluation</a>
-<a class='nav-item' href='../final_summary_threshold_optimized.html'>Threshold optimized</a></div>
+              <div class="nav-group-items"><a class='nav-item' href='../final_report.html'>Global evaluation</a></div>
             </details>
 <details class="nav-group" open>
               <summary class="nav-group-title">Models</summary>
@@ -771,6 +770,16 @@ code{
               <summary class="nav-group-title">Differential expression</summary>
               <div class="nav-group-items"><a class='nav-item' href='../de_results/de_report.html'>DE report</a></div>
             </details>
+<details class="nav-group">
+              <summary class="nav-group-title">Prediction & Survival</summary>
+              <div class="nav-group-items"><a class='nav-item' href='../survival_prediction/xgboost_survival_prediction.html'>Prediction + KM</a></div>
+            </details>
+<details class="nav-group">
+              <summary class="nav-group-title">Limma re-correction</summary>
+              <div class="nav-group-items"><a class='nav-item' href='../limma_re-correction/index.html'>Overview</a>
+<a class='nav-item' href='../limma_re-correction/diagnostic_plots.html'>Diagnostic plots</a>
+<a class='nav-item' href='../limma_re-correction/pca_comparison.html'>PCA comparison</a></div>
+            </details>
 </nav>
 </aside>
       <main class="main">
@@ -784,28 +793,28 @@ code{
         <section class="card">
   <h2>Xgboost</h2>
   
-  <div class='muted'>XGB</div><div class='muted'>Run: <code>/data01/private/projects/omiclass/examples/results/pipeline-20260509-121958</code> • 2026-05-09T13:32:54</div>
+  <div class='muted'>XGB</div><div class='muted'>Run: <code>/data01/private/projects/omiclass/examples/results/python_example-20260512-173926</code> • 2026-05-12T18:22:40</div>
 </section><section class="card">
   <h2>Data &amp; Provenance</h2>
   
-  <table class='kv'><tr><th>X shape</th><td>(480, 34)</td></tr><tr><th>Y length</th><td>480</td></tr><tr><th>Class counts</th><td><table class='kv'><tr><th>Class 1</th><td>120</td></tr><tr><th>Class 4</th><td>120</td></tr><tr><th>Class 2</th><td>120</td></tr><tr><th>Class 3</th><td>120</td></tr></table></td></tr></table><div style='height:10px;'></div><table class='kv'><tr><th>Git</th><td>—</td></tr><tr><th>Python</th><td>3.9.23</td></tr><tr><th>Env</th><td>omiclass</td></tr><tr><th>Seed</th><td>42</td></tr></table><details class="panel">
+  <table class='kv'><tr><th>X shape</th><td>(480, 39)</td></tr><tr><th>Y length</th><td>480</td></tr><tr><th>Class counts</th><td><table class='kv'><tr><th>Class 4</th><td>122</td></tr><tr><th>Class 3</th><td>122</td></tr><tr><th>Class 2</th><td>119</td></tr><tr><th>Class 1</th><td>117</td></tr></table></td></tr></table><div style='height:10px;'></div><table class='kv'><tr><th>Git</th><td>—</td></tr><tr><th>Python</th><td>3.9.19</td></tr><tr><th>Env</th><td>viz_env</td></tr><tr><th>Seed</th><td>42</td></tr></table><details class="panel">
   <summary><span class="summary-title">Full config snapshot</span></summary>
   <div class="panel-body"><table class='kv'><tr><th>CV folds</th><td>5</td></tr><tr><th>Scoring</th><td>f1_macro</td></tr><tr><th>Eval calibrated in cv</th><td>False</td></tr><tr><th>Calib method</th><td>—</td></tr><tr><th>Calib cv</th><td>0</td></tr><tr><th>Inner CV</th><td>3</td></tr><tr><th>Bayes iterations</th><td>40</td></tr></table></div>
 </details>
 </section><section class="card">
   <h2>Scorecards</h2>
   
-  <div class='grid grid-4'><div class='metric'><div class='metric-k'>CV Macro-F1</div><div class='metric-v'>0.9169 ± 0.0262</div></div><div class='metric'><div class='metric-k'>CV AUROC (macro)</div><div class='metric-v'>0.9916 ± 0.0025</div></div><div class='metric'><div class='metric-k'>CV Accuracy</div><div class='metric-v'>0.9167 ± 0.0264</div></div><div class='metric'><div class='metric-k'>CV LogLoss</div><div class='metric-v'>0.5312 ± 0.3087</div></div></div><div style='height:10px;'></div><div class='grid grid-4'><div class='metric'><div class='metric-k'>Test Macro-F1</div><div class='metric-v'>0.9583</div></div><div class='metric'><div class='metric-k'>Test AUROC (macro)</div><div class='metric-v'>0.9976</div></div><div class='metric'><div class='metric-k'>Test Accuracy</div><div class='metric-v'>0.9583</div></div><div class='metric'><div class='metric-k'>Test LogLoss</div><div class='metric-v'>0.5082</div></div></div>
+  <div class='grid grid-4'><div class='metric'><div class='metric-k'>CV Macro-F1</div><div class='metric-v'>0.9518 ± 0.0140</div></div><div class='metric'><div class='metric-k'>CV AUROC (macro)</div><div class='metric-v'>0.9979 ± 0.0009</div></div><div class='metric'><div class='metric-k'>CV Accuracy</div><div class='metric-v'>0.9521 ± 0.0141</div></div><div class='metric'><div class='metric-k'>CV LogLoss</div><div class='metric-v'>0.4113 ± 0.2928</div></div></div><div style='height:10px;'></div><div class='grid grid-4'><div class='metric'><div class='metric-k'>Test Macro-F1</div><div class='metric-v'>0.9917</div></div><div class='metric'><div class='metric-k'>Test AUROC (macro)</div><div class='metric-v'>0.9993</div></div><div class='metric'><div class='metric-k'>Test Accuracy</div><div class='metric-v'>0.9917</div></div><div class='metric'><div class='metric-k'>Test LogLoss</div><div class='metric-v'>0.3088</div></div></div>
 </section><section class="card">
   <h2>Train (Cross-Validation)</h2>
   
-  <table class='kv'><tr><th>Accuracy</th><td>0.9167 ± 0.0264</td></tr><tr><th>F1 (macro)</th><td>0.9169 ± 0.0262</td></tr><tr><th>AUROC (macro)</th><td>0.9916 ± 0.0025</td></tr><tr><th>AUPRC (macro)</th><td>0.9790 ± 0.0059</td></tr><tr><th>LogLoss</th><td>0.5312 ± 0.3087</td></tr></table><details class="panel">
+  <table class='kv'><tr><th>Accuracy</th><td>0.9521 ± 0.0141</td></tr><tr><th>F1 (macro)</th><td>0.9518 ± 0.0140</td></tr><tr><th>AUROC (macro)</th><td>0.9979 ± 0.0009</td></tr><tr><th>AUPRC (macro)</th><td>0.9944 ± 0.0022</td></tr><tr><th>LogLoss</th><td>0.4113 ± 0.2928</td></tr></table><details class="panel">
   <summary><span class="summary-title">Per-fold metrics</span></summary>
-  <div class="panel-body"><table class='kv'><tr><th>fold</th><th>accuracy</th><th>f1_macro</th></tr><tr><td>1</td><td>0.8958</td><td>0.8960</td></tr><tr><td>2</td><td>0.9062</td><td>0.9061</td></tr><tr><td>3</td><td>0.9688</td><td>0.9685</td></tr><tr><td>4</td><td>0.9062</td><td>0.9088</td></tr><tr><td>5</td><td>0.9062</td><td>0.9052</td></tr></table></div>
+  <div class="panel-body"><table class='kv'><tr><th>fold</th><th>accuracy</th><th>f1_macro</th></tr><tr><td>1</td><td>0.9688</td><td>0.9687</td></tr><tr><td>2</td><td>0.9479</td><td>0.9481</td></tr><tr><td>3</td><td>0.9583</td><td>0.9583</td></tr><tr><td>4</td><td>0.9583</td><td>0.9568</td></tr><tr><td>5</td><td>0.9271</td><td>0.9270</td></tr></table></div>
 </details><section class="card">
   <h2>Gene-set optimization</h2>
   
-  <table class='kv'><tr><th>Consensus size</th><td>34</td></tr><tr><th>Param:min features</th><td>20</td></tr><tr><th>Param:subset fracs</th><td><ul style='margin:0; padding-left:18px;'><li>0.0500</li><li>0.1000</li><li>0.2000</li><li>0.3000</li></ul></td></tr><tr><th>Param:inner splits</th><td>—</td></tr><tr><th>Param:consensus min frac</th><td>0.6000</td></tr><tr><th>Param:consensus min folds</th><td>2</td></tr><tr><th>Param:consensus min genes</th><td>20</td></tr><tr><th>Param:consensus top n</th><td>—</td></tr></table>
+  <table class='kv'><tr><th>Consensus size</th><td>39</td></tr><tr><th>Param:min features</th><td>20</td></tr><tr><th>Param:subset fracs</th><td><ul style='margin:0; padding-left:18px;'><li>0.0500</li><li>0.1000</li><li>0.2000</li><li>0.3000</li></ul></td></tr><tr><th>Param:inner splits</th><td>—</td></tr><tr><th>Param:consensus min frac</th><td>0.6000</td></tr><tr><th>Param:consensus min folds</th><td>2</td></tr><tr><th>Param:consensus min genes</th><td>20</td></tr><tr><th>Param:consensus top n</th><td>—</td></tr></table>
 </section><details class="panel">
   <summary><span class="summary-title">Top genes by fold-frequency</span></summary>
   <div class="panel-body"><div class="figure-toolbar">
@@ -829,11 +838,11 @@ code{
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2026-05-09T13:32:54.422927</dc:date>
+    <dc:date>2026-05-12T18:22:39.967464</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
-      <dc:title>Matplotlib v3.9.1, https://matplotlib.org/</dc:title>
+      <dc:title>Matplotlib v3.9.2, https://matplotlib.org/</dc:title>
      </cc:Agent>
     </dc:creator>
    </cc:Work>
@@ -866,7 +875,7 @@ L 77.546626 168.978125
 L 77.546626 29.301935 
 L 58.191989 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_4">
     <path d="M 82.385285 168.978125 
@@ -874,7 +883,7 @@ L 101.739923 168.978125
 L 101.739923 29.301935 
 L 82.385285 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_5">
     <path d="M 106.578582 168.978125 
@@ -882,7 +891,7 @@ L 125.933219 168.978125
 L 125.933219 29.301935 
 L 106.578582 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_6">
     <path d="M 130.771878 168.978125 
@@ -890,7 +899,7 @@ L 150.126516 168.978125
 L 150.126516 29.301935 
 L 130.771878 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_7">
     <path d="M 154.965175 168.978125 
@@ -898,7 +907,7 @@ L 174.319812 168.978125
 L 174.319812 29.301935 
 L 154.965175 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_8">
     <path d="M 179.158472 168.978125 
@@ -906,7 +915,7 @@ L 198.513109 168.978125
 L 198.513109 29.301935 
 L 179.158472 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_9">
     <path d="M 203.351768 168.978125 
@@ -914,7 +923,7 @@ L 222.706406 168.978125
 L 222.706406 29.301935 
 L 203.351768 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_10">
     <path d="M 227.545065 168.978125 
@@ -922,7 +931,7 @@ L 246.899702 168.978125
 L 246.899702 29.301935 
 L 227.545065 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_11">
     <path d="M 251.738361 168.978125 
@@ -930,7 +939,7 @@ L 271.092999 168.978125
 L 271.092999 29.301935 
 L 251.738361 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_12">
     <path d="M 275.931658 168.978125 
@@ -938,7 +947,7 @@ L 295.286295 168.978125
 L 295.286295 29.301935 
 L 275.931658 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_13">
     <path d="M 300.124955 168.978125 
@@ -946,7 +955,7 @@ L 319.479592 168.978125
 L 319.479592 29.301935 
 L 300.124955 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_14">
     <path d="M 324.318251 168.978125 
@@ -954,7 +963,7 @@ L 343.672889 168.978125
 L 343.672889 29.301935 
 L 324.318251 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_15">
     <path d="M 348.511548 168.978125 
@@ -962,7 +971,7 @@ L 367.866185 168.978125
 L 367.866185 29.301935 
 L 348.511548 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_16">
     <path d="M 372.704844 168.978125 
@@ -970,70 +979,70 @@ L 392.059482 168.978125
 L 392.059482 29.301935 
 L 372.704844 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_17">
     <path d="M 396.898141 168.978125 
 L 416.252778 168.978125 
-L 416.252778 57.237173 
-L 396.898141 57.237173 
+L 416.252778 29.301935 
+L 396.898141 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_18">
     <path d="M 421.091438 168.978125 
 L 440.446075 168.978125 
-L 440.446075 57.237173 
-L 421.091438 57.237173 
+L 440.446075 29.301935 
+L 421.091438 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_19">
     <path d="M 445.284734 168.978125 
 L 464.639372 168.978125 
-L 464.639372 57.237173 
-L 445.284734 57.237173 
+L 464.639372 29.301935 
+L 445.284734 29.301935 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_20">
     <path d="M 469.478031 168.978125 
 L 488.832668 168.978125 
-L 488.832668 85.172411 
-L 469.478031 85.172411 
+L 488.832668 57.237173 
+L 469.478031 57.237173 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_21">
     <path d="M 493.671327 168.978125 
 L 513.025965 168.978125 
-L 513.025965 85.172411 
-L 493.671327 85.172411 
+L 513.025965 57.237173 
+L 493.671327 57.237173 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="patch_22">
     <path d="M 517.864624 168.978125 
 L 537.219261 168.978125 
-L 537.219261 85.172411 
-L 517.864624 85.172411 
+L 537.219261 57.237173 
+L 517.864624 57.237173 
 z
-" clip-path="url(#p212d5c196e)" style="fill: #1f77b4"/>
+" clip-path="url(#p422a38c00c)" style="fill: #1f77b4"/>
    </g>
    <g id="matplotlib.axis_1">
     <g id="xtick_1">
      <g id="line2d_1">
       <defs>
-       <path id="md6110d79f8" d="M 0 0 
+       <path id="mb2a852cba1" d="M 0 0 
 L 0 3.5 
 " style="stroke: #000000; stroke-width: 0.8"/>
       </defs>
       <g>
-       <use xlink:href="#md6110d79f8" x="67.869307" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mb2a852cba1" x="67.869307" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_1">
-      <!-- ENSG00000000197 -->
+      <!-- ENSG00000000156 -->
       <g transform="translate(70.628682 273.8625) rotate(-90) scale(0.1 -0.1)">
        <defs>
         <path id="DejaVuSans-45" d="M 628 4666 
@@ -1155,147 +1164,6 @@ L 794 0
 L 794 531 
 z
 " transform="scale(0.015625)"/>
-        <path id="DejaVuSans-39" d="M 703 97 
-L 703 672 
-Q 941 559 1184 500 
-Q 1428 441 1663 441 
-Q 2288 441 2617 861 
-Q 2947 1281 2994 2138 
-Q 2813 1869 2534 1725 
-Q 2256 1581 1919 1581 
-Q 1219 1581 811 2004 
-Q 403 2428 403 3163 
-Q 403 3881 828 4315 
-Q 1253 4750 1959 4750 
-Q 2769 4750 3195 4129 
-Q 3622 3509 3622 2328 
-Q 3622 1225 3098 567 
-Q 2575 -91 1691 -91 
-Q 1453 -91 1209 -44 
-Q 966 3 703 97 
-z
-M 1959 2075 
-Q 2384 2075 2632 2365 
-Q 2881 2656 2881 3163 
-Q 2881 3666 2632 3958 
-Q 2384 4250 1959 4250 
-Q 1534 4250 1286 3958 
-Q 1038 3666 1038 3163 
-Q 1038 2656 1286 2365 
-Q 1534 2075 1959 2075 
-z
-" transform="scale(0.015625)"/>
-        <path id="DejaVuSans-37" d="M 525 4666 
-L 3525 4666 
-L 3525 4397 
-L 1831 0 
-L 1172 0 
-L 2766 4134 
-L 525 4134 
-L 525 4666 
-z
-" transform="scale(0.015625)"/>
-       </defs>
-       <use xlink:href="#DejaVuSans-45"/>
-       <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
-       <use xlink:href="#DejaVuSans-53" x="137.988281"/>
-       <use xlink:href="#DejaVuSans-47" x="201.464844"/>
-       <use xlink:href="#DejaVuSans-30" x="278.955078"/>
-       <use xlink:href="#DejaVuSans-30" x="342.578125"/>
-       <use xlink:href="#DejaVuSans-30" x="406.201172"/>
-       <use xlink:href="#DejaVuSans-30" x="469.824219"/>
-       <use xlink:href="#DejaVuSans-30" x="533.447266"/>
-       <use xlink:href="#DejaVuSans-30" x="597.070312"/>
-       <use xlink:href="#DejaVuSans-30" x="660.693359"/>
-       <use xlink:href="#DejaVuSans-30" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-31" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-39" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-37" x="915.185547"/>
-      </g>
-     </g>
-    </g>
-    <g id="xtick_2">
-     <g id="line2d_2">
-      <g>
-       <use xlink:href="#md6110d79f8" x="92.062604" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
-      </g>
-     </g>
-     <g id="text_2">
-      <!-- ENSG00000000244 -->
-      <g transform="translate(94.821979 273.8625) rotate(-90) scale(0.1 -0.1)">
-       <defs>
-        <path id="DejaVuSans-32" d="M 1228 531 
-L 3431 531 
-L 3431 0 
-L 469 0 
-L 469 531 
-Q 828 903 1448 1529 
-Q 2069 2156 2228 2338 
-Q 2531 2678 2651 2914 
-Q 2772 3150 2772 3378 
-Q 2772 3750 2511 3984 
-Q 2250 4219 1831 4219 
-Q 1534 4219 1204 4116 
-Q 875 4013 500 3803 
-L 500 4441 
-Q 881 4594 1212 4672 
-Q 1544 4750 1819 4750 
-Q 2544 4750 2975 4387 
-Q 3406 4025 3406 3419 
-Q 3406 3131 3298 2873 
-Q 3191 2616 2906 2266 
-Q 2828 2175 2409 1742 
-Q 1991 1309 1228 531 
-z
-" transform="scale(0.015625)"/>
-        <path id="DejaVuSans-34" d="M 2419 4116 
-L 825 1625 
-L 2419 1625 
-L 2419 4116 
-z
-M 2253 4666 
-L 3047 4666 
-L 3047 1625 
-L 3713 1625 
-L 3713 1100 
-L 3047 1100 
-L 3047 0 
-L 2419 0 
-L 2419 1100 
-L 313 1100 
-L 313 1709 
-L 2253 4666 
-z
-" transform="scale(0.015625)"/>
-       </defs>
-       <use xlink:href="#DejaVuSans-45"/>
-       <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
-       <use xlink:href="#DejaVuSans-53" x="137.988281"/>
-       <use xlink:href="#DejaVuSans-47" x="201.464844"/>
-       <use xlink:href="#DejaVuSans-30" x="278.955078"/>
-       <use xlink:href="#DejaVuSans-30" x="342.578125"/>
-       <use xlink:href="#DejaVuSans-30" x="406.201172"/>
-       <use xlink:href="#DejaVuSans-30" x="469.824219"/>
-       <use xlink:href="#DejaVuSans-30" x="533.447266"/>
-       <use xlink:href="#DejaVuSans-30" x="597.070312"/>
-       <use xlink:href="#DejaVuSans-30" x="660.693359"/>
-       <use xlink:href="#DejaVuSans-30" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-32" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-34" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-34" x="915.185547"/>
-      </g>
-     </g>
-    </g>
-    <g id="xtick_3">
-     <g id="line2d_3">
-      <g>
-       <use xlink:href="#md6110d79f8" x="116.2559" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
-      </g>
-     </g>
-     <g id="text_3">
-      <!-- ENSG00000000253 -->
-      <g transform="translate(119.015275 273.8625) rotate(-90) scale(0.1 -0.1)">
-       <defs>
         <path id="DejaVuSans-35" d="M 691 4666 
 L 3169 4666 
 L 3169 4134 
@@ -1321,6 +1189,65 @@ Q 953 2441 691 2322
 L 691 4666 
 z
 " transform="scale(0.015625)"/>
+        <path id="DejaVuSans-36" d="M 2113 2584 
+Q 1688 2584 1439 2293 
+Q 1191 2003 1191 1497 
+Q 1191 994 1439 701 
+Q 1688 409 2113 409 
+Q 2538 409 2786 701 
+Q 3034 994 3034 1497 
+Q 3034 2003 2786 2293 
+Q 2538 2584 2113 2584 
+z
+M 3366 4563 
+L 3366 3988 
+Q 3128 4100 2886 4159 
+Q 2644 4219 2406 4219 
+Q 1781 4219 1451 3797 
+Q 1122 3375 1075 2522 
+Q 1259 2794 1537 2939 
+Q 1816 3084 2150 3084 
+Q 2853 3084 3261 2657 
+Q 3669 2231 3669 1497 
+Q 3669 778 3244 343 
+Q 2819 -91 2113 -91 
+Q 1303 -91 875 529 
+Q 447 1150 447 2328 
+Q 447 3434 972 4092 
+Q 1497 4750 2381 4750 
+Q 2619 4750 2861 4703 
+Q 3103 4656 3366 4563 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-45"/>
+       <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
+       <use xlink:href="#DejaVuSans-53" x="137.988281"/>
+       <use xlink:href="#DejaVuSans-47" x="201.464844"/>
+       <use xlink:href="#DejaVuSans-30" x="278.955078"/>
+       <use xlink:href="#DejaVuSans-30" x="342.578125"/>
+       <use xlink:href="#DejaVuSans-30" x="406.201172"/>
+       <use xlink:href="#DejaVuSans-30" x="469.824219"/>
+       <use xlink:href="#DejaVuSans-30" x="533.447266"/>
+       <use xlink:href="#DejaVuSans-30" x="597.070312"/>
+       <use xlink:href="#DejaVuSans-30" x="660.693359"/>
+       <use xlink:href="#DejaVuSans-30" x="724.316406"/>
+       <use xlink:href="#DejaVuSans-31" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-35" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-36" x="915.185547"/>
+      </g>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_2">
+      <g>
+       <use xlink:href="#mb2a852cba1" x="92.062604" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_2">
+      <!-- ENSG00000000355 -->
+      <g transform="translate(94.821979 273.8625) rotate(-90) scale(0.1 -0.1)">
+       <defs>
         <path id="DejaVuSans-33" d="M 2597 2516 
 Q 3050 2419 3304 2112 
 Q 3559 1806 3559 1356 
@@ -1366,21 +1293,220 @@ z
        <use xlink:href="#DejaVuSans-30" x="597.070312"/>
        <use xlink:href="#DejaVuSans-30" x="660.693359"/>
        <use xlink:href="#DejaVuSans-30" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-32" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-33" x="787.939453"/>
        <use xlink:href="#DejaVuSans-35" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-33" x="915.185547"/>
+       <use xlink:href="#DejaVuSans-35" x="915.185547"/>
+      </g>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_3">
+      <g>
+       <use xlink:href="#mb2a852cba1" x="116.2559" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_3">
+      <!-- ENSG00000000602 -->
+      <g transform="translate(119.015275 273.8625) rotate(-90) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-32" d="M 1228 531 
+L 3431 531 
+L 3431 0 
+L 469 0 
+L 469 531 
+Q 828 903 1448 1529 
+Q 2069 2156 2228 2338 
+Q 2531 2678 2651 2914 
+Q 2772 3150 2772 3378 
+Q 2772 3750 2511 3984 
+Q 2250 4219 1831 4219 
+Q 1534 4219 1204 4116 
+Q 875 4013 500 3803 
+L 500 4441 
+Q 881 4594 1212 4672 
+Q 1544 4750 1819 4750 
+Q 2544 4750 2975 4387 
+Q 3406 4025 3406 3419 
+Q 3406 3131 3298 2873 
+Q 3191 2616 2906 2266 
+Q 2828 2175 2409 1742 
+Q 1991 1309 1228 531 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-45"/>
+       <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
+       <use xlink:href="#DejaVuSans-53" x="137.988281"/>
+       <use xlink:href="#DejaVuSans-47" x="201.464844"/>
+       <use xlink:href="#DejaVuSans-30" x="278.955078"/>
+       <use xlink:href="#DejaVuSans-30" x="342.578125"/>
+       <use xlink:href="#DejaVuSans-30" x="406.201172"/>
+       <use xlink:href="#DejaVuSans-30" x="469.824219"/>
+       <use xlink:href="#DejaVuSans-30" x="533.447266"/>
+       <use xlink:href="#DejaVuSans-30" x="597.070312"/>
+       <use xlink:href="#DejaVuSans-30" x="660.693359"/>
+       <use xlink:href="#DejaVuSans-30" x="724.316406"/>
+       <use xlink:href="#DejaVuSans-36" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-30" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-32" x="915.185547"/>
       </g>
      </g>
     </g>
     <g id="xtick_4">
      <g id="line2d_4">
       <g>
-       <use xlink:href="#md6110d79f8" x="140.449197" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mb2a852cba1" x="140.449197" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_4">
-      <!-- ENSG00000000358 -->
+      <!-- ENSG00000000720 -->
       <g transform="translate(143.208572 273.8625) rotate(-90) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-37" d="M 525 4666 
+L 3525 4666 
+L 3525 4397 
+L 1831 0 
+L 1172 0 
+L 2766 4134 
+L 525 4134 
+L 525 4666 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-45"/>
+       <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
+       <use xlink:href="#DejaVuSans-53" x="137.988281"/>
+       <use xlink:href="#DejaVuSans-47" x="201.464844"/>
+       <use xlink:href="#DejaVuSans-30" x="278.955078"/>
+       <use xlink:href="#DejaVuSans-30" x="342.578125"/>
+       <use xlink:href="#DejaVuSans-30" x="406.201172"/>
+       <use xlink:href="#DejaVuSans-30" x="469.824219"/>
+       <use xlink:href="#DejaVuSans-30" x="533.447266"/>
+       <use xlink:href="#DejaVuSans-30" x="597.070312"/>
+       <use xlink:href="#DejaVuSans-30" x="660.693359"/>
+       <use xlink:href="#DejaVuSans-30" x="724.316406"/>
+       <use xlink:href="#DejaVuSans-37" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-32" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-30" x="915.185547"/>
+      </g>
+     </g>
+    </g>
+    <g id="xtick_5">
+     <g id="line2d_5">
+      <g>
+       <use xlink:href="#mb2a852cba1" x="164.642494" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_5">
+      <!-- ENSG00000000922 -->
+      <g transform="translate(167.401869 273.8625) rotate(-90) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-39" d="M 703 97 
+L 703 672 
+Q 941 559 1184 500 
+Q 1428 441 1663 441 
+Q 2288 441 2617 861 
+Q 2947 1281 2994 2138 
+Q 2813 1869 2534 1725 
+Q 2256 1581 1919 1581 
+Q 1219 1581 811 2004 
+Q 403 2428 403 3163 
+Q 403 3881 828 4315 
+Q 1253 4750 1959 4750 
+Q 2769 4750 3195 4129 
+Q 3622 3509 3622 2328 
+Q 3622 1225 3098 567 
+Q 2575 -91 1691 -91 
+Q 1453 -91 1209 -44 
+Q 966 3 703 97 
+z
+M 1959 2075 
+Q 2384 2075 2632 2365 
+Q 2881 2656 2881 3163 
+Q 2881 3666 2632 3958 
+Q 2384 4250 1959 4250 
+Q 1534 4250 1286 3958 
+Q 1038 3666 1038 3163 
+Q 1038 2656 1286 2365 
+Q 1534 2075 1959 2075 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-45"/>
+       <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
+       <use xlink:href="#DejaVuSans-53" x="137.988281"/>
+       <use xlink:href="#DejaVuSans-47" x="201.464844"/>
+       <use xlink:href="#DejaVuSans-30" x="278.955078"/>
+       <use xlink:href="#DejaVuSans-30" x="342.578125"/>
+       <use xlink:href="#DejaVuSans-30" x="406.201172"/>
+       <use xlink:href="#DejaVuSans-30" x="469.824219"/>
+       <use xlink:href="#DejaVuSans-30" x="533.447266"/>
+       <use xlink:href="#DejaVuSans-30" x="597.070312"/>
+       <use xlink:href="#DejaVuSans-30" x="660.693359"/>
+       <use xlink:href="#DejaVuSans-30" x="724.316406"/>
+       <use xlink:href="#DejaVuSans-39" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-32" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-32" x="915.185547"/>
+      </g>
+     </g>
+    </g>
+    <g id="xtick_6">
+     <g id="line2d_6">
+      <g>
+       <use xlink:href="#mb2a852cba1" x="188.83579" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_6">
+      <!-- ENSG00000001024 -->
+      <g transform="translate(191.595165 273.8625) rotate(-90) scale(0.1 -0.1)">
+       <defs>
+        <path id="DejaVuSans-34" d="M 2419 4116 
+L 825 1625 
+L 2419 1625 
+L 2419 4116 
+z
+M 2253 4666 
+L 3047 4666 
+L 3047 1625 
+L 3713 1625 
+L 3713 1100 
+L 3047 1100 
+L 3047 0 
+L 2419 0 
+L 2419 1100 
+L 313 1100 
+L 313 1709 
+L 2253 4666 
+z
+" transform="scale(0.015625)"/>
+       </defs>
+       <use xlink:href="#DejaVuSans-45"/>
+       <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
+       <use xlink:href="#DejaVuSans-53" x="137.988281"/>
+       <use xlink:href="#DejaVuSans-47" x="201.464844"/>
+       <use xlink:href="#DejaVuSans-30" x="278.955078"/>
+       <use xlink:href="#DejaVuSans-30" x="342.578125"/>
+       <use xlink:href="#DejaVuSans-30" x="406.201172"/>
+       <use xlink:href="#DejaVuSans-30" x="469.824219"/>
+       <use xlink:href="#DejaVuSans-30" x="533.447266"/>
+       <use xlink:href="#DejaVuSans-30" x="597.070312"/>
+       <use xlink:href="#DejaVuSans-30" x="660.693359"/>
+       <use xlink:href="#DejaVuSans-31" x="724.316406"/>
+       <use xlink:href="#DejaVuSans-30" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-32" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-34" x="915.185547"/>
+      </g>
+     </g>
+    </g>
+    <g id="xtick_7">
+     <g id="line2d_7">
+      <g>
+       <use xlink:href="#mb2a852cba1" x="213.029087" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+      </g>
+     </g>
+     <g id="text_7">
+      <!-- ENSG00000001028 -->
+      <g transform="translate(215.788462 273.8625) rotate(-90) scale(0.1 -0.1)">
        <defs>
         <path id="DejaVuSans-38" d="M 2034 2216 
 Q 1584 2216 1326 1975 
@@ -1433,134 +1559,21 @@ z
        <use xlink:href="#DejaVuSans-30" x="533.447266"/>
        <use xlink:href="#DejaVuSans-30" x="597.070312"/>
        <use xlink:href="#DejaVuSans-30" x="660.693359"/>
-       <use xlink:href="#DejaVuSans-30" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-33" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-35" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-31" x="724.316406"/>
+       <use xlink:href="#DejaVuSans-30" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-32" x="851.5625"/>
        <use xlink:href="#DejaVuSans-38" x="915.185547"/>
-      </g>
-     </g>
-    </g>
-    <g id="xtick_5">
-     <g id="line2d_5">
-      <g>
-       <use xlink:href="#md6110d79f8" x="164.642494" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
-      </g>
-     </g>
-     <g id="text_5">
-      <!-- ENSG00000000651 -->
-      <g transform="translate(167.401869 273.8625) rotate(-90) scale(0.1 -0.1)">
-       <defs>
-        <path id="DejaVuSans-36" d="M 2113 2584 
-Q 1688 2584 1439 2293 
-Q 1191 2003 1191 1497 
-Q 1191 994 1439 701 
-Q 1688 409 2113 409 
-Q 2538 409 2786 701 
-Q 3034 994 3034 1497 
-Q 3034 2003 2786 2293 
-Q 2538 2584 2113 2584 
-z
-M 3366 4563 
-L 3366 3988 
-Q 3128 4100 2886 4159 
-Q 2644 4219 2406 4219 
-Q 1781 4219 1451 3797 
-Q 1122 3375 1075 2522 
-Q 1259 2794 1537 2939 
-Q 1816 3084 2150 3084 
-Q 2853 3084 3261 2657 
-Q 3669 2231 3669 1497 
-Q 3669 778 3244 343 
-Q 2819 -91 2113 -91 
-Q 1303 -91 875 529 
-Q 447 1150 447 2328 
-Q 447 3434 972 4092 
-Q 1497 4750 2381 4750 
-Q 2619 4750 2861 4703 
-Q 3103 4656 3366 4563 
-z
-" transform="scale(0.015625)"/>
-       </defs>
-       <use xlink:href="#DejaVuSans-45"/>
-       <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
-       <use xlink:href="#DejaVuSans-53" x="137.988281"/>
-       <use xlink:href="#DejaVuSans-47" x="201.464844"/>
-       <use xlink:href="#DejaVuSans-30" x="278.955078"/>
-       <use xlink:href="#DejaVuSans-30" x="342.578125"/>
-       <use xlink:href="#DejaVuSans-30" x="406.201172"/>
-       <use xlink:href="#DejaVuSans-30" x="469.824219"/>
-       <use xlink:href="#DejaVuSans-30" x="533.447266"/>
-       <use xlink:href="#DejaVuSans-30" x="597.070312"/>
-       <use xlink:href="#DejaVuSans-30" x="660.693359"/>
-       <use xlink:href="#DejaVuSans-30" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-36" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-35" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-31" x="915.185547"/>
-      </g>
-     </g>
-    </g>
-    <g id="xtick_6">
-     <g id="line2d_6">
-      <g>
-       <use xlink:href="#md6110d79f8" x="188.83579" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
-      </g>
-     </g>
-     <g id="text_6">
-      <!-- ENSG00000001063 -->
-      <g transform="translate(191.595165 273.8625) rotate(-90) scale(0.1 -0.1)">
-       <use xlink:href="#DejaVuSans-45"/>
-       <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
-       <use xlink:href="#DejaVuSans-53" x="137.988281"/>
-       <use xlink:href="#DejaVuSans-47" x="201.464844"/>
-       <use xlink:href="#DejaVuSans-30" x="278.955078"/>
-       <use xlink:href="#DejaVuSans-30" x="342.578125"/>
-       <use xlink:href="#DejaVuSans-30" x="406.201172"/>
-       <use xlink:href="#DejaVuSans-30" x="469.824219"/>
-       <use xlink:href="#DejaVuSans-30" x="533.447266"/>
-       <use xlink:href="#DejaVuSans-30" x="597.070312"/>
-       <use xlink:href="#DejaVuSans-30" x="660.693359"/>
-       <use xlink:href="#DejaVuSans-31" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-30" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-36" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-33" x="915.185547"/>
-      </g>
-     </g>
-    </g>
-    <g id="xtick_7">
-     <g id="line2d_7">
-      <g>
-       <use xlink:href="#md6110d79f8" x="213.029087" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
-      </g>
-     </g>
-     <g id="text_7">
-      <!-- ENSG00000001095 -->
-      <g transform="translate(215.788462 273.8625) rotate(-90) scale(0.1 -0.1)">
-       <use xlink:href="#DejaVuSans-45"/>
-       <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
-       <use xlink:href="#DejaVuSans-53" x="137.988281"/>
-       <use xlink:href="#DejaVuSans-47" x="201.464844"/>
-       <use xlink:href="#DejaVuSans-30" x="278.955078"/>
-       <use xlink:href="#DejaVuSans-30" x="342.578125"/>
-       <use xlink:href="#DejaVuSans-30" x="406.201172"/>
-       <use xlink:href="#DejaVuSans-30" x="469.824219"/>
-       <use xlink:href="#DejaVuSans-30" x="533.447266"/>
-       <use xlink:href="#DejaVuSans-30" x="597.070312"/>
-       <use xlink:href="#DejaVuSans-30" x="660.693359"/>
-       <use xlink:href="#DejaVuSans-31" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-30" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-39" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-35" x="915.185547"/>
       </g>
      </g>
     </g>
     <g id="xtick_8">
      <g id="line2d_8">
       <g>
-       <use xlink:href="#md6110d79f8" x="237.222383" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mb2a852cba1" x="237.222383" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_8">
-      <!-- ENSG00000001096 -->
+      <!-- ENSG00000001111 -->
       <g transform="translate(239.981758 273.8625) rotate(-90) scale(0.1 -0.1)">
        <use xlink:href="#DejaVuSans-45"/>
        <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
@@ -1574,20 +1587,20 @@ z
        <use xlink:href="#DejaVuSans-30" x="597.070312"/>
        <use xlink:href="#DejaVuSans-30" x="660.693359"/>
        <use xlink:href="#DejaVuSans-31" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-30" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-39" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-36" x="915.185547"/>
+       <use xlink:href="#DejaVuSans-31" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-31" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-31" x="915.185547"/>
       </g>
      </g>
     </g>
     <g id="xtick_9">
      <g id="line2d_9">
       <g>
-       <use xlink:href="#md6110d79f8" x="261.41568" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mb2a852cba1" x="261.41568" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_9">
-      <!-- ENSG00000001840 -->
+      <!-- ENSG00000001167 -->
       <g transform="translate(264.175055 273.8625) rotate(-90) scale(0.1 -0.1)">
        <use xlink:href="#DejaVuSans-45"/>
        <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
@@ -1601,20 +1614,20 @@ z
        <use xlink:href="#DejaVuSans-30" x="597.070312"/>
        <use xlink:href="#DejaVuSans-30" x="660.693359"/>
        <use xlink:href="#DejaVuSans-31" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-38" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-34" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-30" x="915.185547"/>
+       <use xlink:href="#DejaVuSans-31" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-36" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-37" x="915.185547"/>
       </g>
      </g>
     </g>
     <g id="xtick_10">
      <g id="line2d_10">
       <g>
-       <use xlink:href="#md6110d79f8" x="285.608977" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mb2a852cba1" x="285.608977" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_10">
-      <!-- ENSG00000001989 -->
+      <!-- ENSG00000001279 -->
       <g transform="translate(288.368352 273.8625) rotate(-90) scale(0.1 -0.1)">
        <use xlink:href="#DejaVuSans-45"/>
        <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
@@ -1628,8 +1641,8 @@ z
        <use xlink:href="#DejaVuSans-30" x="597.070312"/>
        <use xlink:href="#DejaVuSans-30" x="660.693359"/>
        <use xlink:href="#DejaVuSans-31" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-39" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-38" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-32" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-37" x="851.5625"/>
        <use xlink:href="#DejaVuSans-39" x="915.185547"/>
       </g>
      </g>
@@ -1637,11 +1650,11 @@ z
     <g id="xtick_11">
      <g id="line2d_11">
       <g>
-       <use xlink:href="#md6110d79f8" x="309.802273" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mb2a852cba1" x="309.802273" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_11">
-      <!-- ENSG00000002048 -->
+      <!-- ENSG00000001570 -->
       <g transform="translate(312.561648 273.8625) rotate(-90) scale(0.1 -0.1)">
        <use xlink:href="#DejaVuSans-45"/>
        <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
@@ -1654,21 +1667,21 @@ z
        <use xlink:href="#DejaVuSans-30" x="533.447266"/>
        <use xlink:href="#DejaVuSans-30" x="597.070312"/>
        <use xlink:href="#DejaVuSans-30" x="660.693359"/>
-       <use xlink:href="#DejaVuSans-32" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-30" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-34" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-38" x="915.185547"/>
+       <use xlink:href="#DejaVuSans-31" x="724.316406"/>
+       <use xlink:href="#DejaVuSans-35" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-37" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-30" x="915.185547"/>
       </g>
      </g>
     </g>
     <g id="xtick_12">
      <g id="line2d_12">
       <g>
-       <use xlink:href="#md6110d79f8" x="333.99557" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mb2a852cba1" x="333.99557" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_12">
-      <!-- ENSG00000002059 -->
+      <!-- ENSG00000001623 -->
       <g transform="translate(336.754945 273.8625) rotate(-90) scale(0.1 -0.1)">
        <use xlink:href="#DejaVuSans-45"/>
        <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
@@ -1681,21 +1694,21 @@ z
        <use xlink:href="#DejaVuSans-30" x="533.447266"/>
        <use xlink:href="#DejaVuSans-30" x="597.070312"/>
        <use xlink:href="#DejaVuSans-30" x="660.693359"/>
-       <use xlink:href="#DejaVuSans-32" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-30" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-35" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-39" x="915.185547"/>
+       <use xlink:href="#DejaVuSans-31" x="724.316406"/>
+       <use xlink:href="#DejaVuSans-36" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-32" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-33" x="915.185547"/>
       </g>
      </g>
     </g>
     <g id="xtick_13">
      <g id="line2d_13">
       <g>
-       <use xlink:href="#md6110d79f8" x="358.188867" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mb2a852cba1" x="358.188867" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_13">
-      <!-- ENSG00000002095 -->
+      <!-- ENSG00000001809 -->
       <g transform="translate(360.948242 273.8625) rotate(-90) scale(0.1 -0.1)">
        <use xlink:href="#DejaVuSans-45"/>
        <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
@@ -1708,21 +1721,21 @@ z
        <use xlink:href="#DejaVuSans-30" x="533.447266"/>
        <use xlink:href="#DejaVuSans-30" x="597.070312"/>
        <use xlink:href="#DejaVuSans-30" x="660.693359"/>
-       <use xlink:href="#DejaVuSans-32" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-30" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-39" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-35" x="915.185547"/>
+       <use xlink:href="#DejaVuSans-31" x="724.316406"/>
+       <use xlink:href="#DejaVuSans-38" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-30" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-39" x="915.185547"/>
       </g>
      </g>
     </g>
     <g id="xtick_14">
      <g id="line2d_14">
       <g>
-       <use xlink:href="#md6110d79f8" x="382.382163" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mb2a852cba1" x="382.382163" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_14">
-      <!-- ENSG00000002330 -->
+      <!-- ENSG00000001962 -->
       <g transform="translate(385.141538 273.8625) rotate(-90) scale(0.1 -0.1)">
        <use xlink:href="#DejaVuSans-45"/>
        <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
@@ -1735,21 +1748,21 @@ z
        <use xlink:href="#DejaVuSans-30" x="533.447266"/>
        <use xlink:href="#DejaVuSans-30" x="597.070312"/>
        <use xlink:href="#DejaVuSans-30" x="660.693359"/>
-       <use xlink:href="#DejaVuSans-32" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-33" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-33" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-30" x="915.185547"/>
+       <use xlink:href="#DejaVuSans-31" x="724.316406"/>
+       <use xlink:href="#DejaVuSans-39" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-36" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-32" x="915.185547"/>
       </g>
      </g>
     </g>
     <g id="xtick_15">
      <g id="line2d_15">
       <g>
-       <use xlink:href="#md6110d79f8" x="406.57546" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mb2a852cba1" x="406.57546" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_15">
-      <!-- ENSG00000001702 -->
+      <!-- ENSG00000001964 -->
       <g transform="translate(409.334835 273.8625) rotate(-90) scale(0.1 -0.1)">
        <use xlink:href="#DejaVuSans-45"/>
        <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
@@ -1763,20 +1776,20 @@ z
        <use xlink:href="#DejaVuSans-30" x="597.070312"/>
        <use xlink:href="#DejaVuSans-30" x="660.693359"/>
        <use xlink:href="#DejaVuSans-31" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-37" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-30" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-32" x="915.185547"/>
+       <use xlink:href="#DejaVuSans-39" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-36" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-34" x="915.185547"/>
       </g>
      </g>
     </g>
     <g id="xtick_16">
      <g id="line2d_16">
       <g>
-       <use xlink:href="#md6110d79f8" x="430.768756" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mb2a852cba1" x="430.768756" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_16">
-      <!-- ENSG00000002054 -->
+      <!-- ENSG00000002169 -->
       <g transform="translate(433.528131 273.8625) rotate(-90) scale(0.1 -0.1)">
        <use xlink:href="#DejaVuSans-45"/>
        <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
@@ -1790,20 +1803,20 @@ z
        <use xlink:href="#DejaVuSans-30" x="597.070312"/>
        <use xlink:href="#DejaVuSans-30" x="660.693359"/>
        <use xlink:href="#DejaVuSans-32" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-30" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-35" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-34" x="915.185547"/>
+       <use xlink:href="#DejaVuSans-31" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-36" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-39" x="915.185547"/>
       </g>
      </g>
     </g>
     <g id="xtick_17">
      <g id="line2d_17">
       <g>
-       <use xlink:href="#md6110d79f8" x="454.962053" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mb2a852cba1" x="454.962053" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_17">
-      <!-- ENSG00000002187 -->
+      <!-- ENSG00000002231 -->
       <g transform="translate(457.721428 273.8625) rotate(-90) scale(0.1 -0.1)">
        <use xlink:href="#DejaVuSans-45"/>
        <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
@@ -1817,20 +1830,20 @@ z
        <use xlink:href="#DejaVuSans-30" x="597.070312"/>
        <use xlink:href="#DejaVuSans-30" x="660.693359"/>
        <use xlink:href="#DejaVuSans-32" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-31" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-38" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-37" x="915.185547"/>
+       <use xlink:href="#DejaVuSans-32" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-33" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-31" x="915.185547"/>
       </g>
      </g>
     </g>
     <g id="xtick_18">
      <g id="line2d_18">
       <g>
-       <use xlink:href="#md6110d79f8" x="479.15535" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mb2a852cba1" x="479.15535" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_18">
-      <!-- ENSG00000000149 -->
+      <!-- ENSG00000001396 -->
       <g transform="translate(481.914725 273.8625) rotate(-90) scale(0.1 -0.1)">
        <use xlink:href="#DejaVuSans-45"/>
        <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
@@ -1843,21 +1856,21 @@ z
        <use xlink:href="#DejaVuSans-30" x="533.447266"/>
        <use xlink:href="#DejaVuSans-30" x="597.070312"/>
        <use xlink:href="#DejaVuSans-30" x="660.693359"/>
-       <use xlink:href="#DejaVuSans-30" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-31" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-34" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-39" x="915.185547"/>
+       <use xlink:href="#DejaVuSans-31" x="724.316406"/>
+       <use xlink:href="#DejaVuSans-33" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-39" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-36" x="915.185547"/>
       </g>
      </g>
     </g>
     <g id="xtick_19">
      <g id="line2d_19">
       <g>
-       <use xlink:href="#md6110d79f8" x="503.348646" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mb2a852cba1" x="503.348646" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_19">
-      <!-- ENSG00000000256 -->
+      <!-- ENSG00000001676 -->
       <g transform="translate(506.108021 273.8625) rotate(-90) scale(0.1 -0.1)">
        <use xlink:href="#DejaVuSans-45"/>
        <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
@@ -1870,9 +1883,9 @@ z
        <use xlink:href="#DejaVuSans-30" x="533.447266"/>
        <use xlink:href="#DejaVuSans-30" x="597.070312"/>
        <use xlink:href="#DejaVuSans-30" x="660.693359"/>
-       <use xlink:href="#DejaVuSans-30" x="724.316406"/>
-       <use xlink:href="#DejaVuSans-32" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-35" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-31" x="724.316406"/>
+       <use xlink:href="#DejaVuSans-36" x="787.939453"/>
+       <use xlink:href="#DejaVuSans-37" x="851.5625"/>
        <use xlink:href="#DejaVuSans-36" x="915.185547"/>
       </g>
      </g>
@@ -1880,11 +1893,11 @@ z
     <g id="xtick_20">
      <g id="line2d_20">
       <g>
-       <use xlink:href="#md6110d79f8" x="527.541943" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#mb2a852cba1" x="527.541943" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_20">
-      <!-- ENSG00000000886 -->
+      <!-- ENSG00000001871 -->
       <g transform="translate(530.301318 273.8625) rotate(-90) scale(0.1 -0.1)">
        <use xlink:href="#DejaVuSans-45"/>
        <use xlink:href="#DejaVuSans-4e" x="63.183594"/>
@@ -1897,10 +1910,10 @@ z
        <use xlink:href="#DejaVuSans-30" x="533.447266"/>
        <use xlink:href="#DejaVuSans-30" x="597.070312"/>
        <use xlink:href="#DejaVuSans-30" x="660.693359"/>
-       <use xlink:href="#DejaVuSans-30" x="724.316406"/>
+       <use xlink:href="#DejaVuSans-31" x="724.316406"/>
        <use xlink:href="#DejaVuSans-38" x="787.939453"/>
-       <use xlink:href="#DejaVuSans-38" x="851.5625"/>
-       <use xlink:href="#DejaVuSans-36" x="915.185547"/>
+       <use xlink:href="#DejaVuSans-37" x="851.5625"/>
+       <use xlink:href="#DejaVuSans-31" x="915.185547"/>
       </g>
      </g>
     </g>
@@ -1909,12 +1922,12 @@ z
     <g id="ytick_1">
      <g id="line2d_21">
       <defs>
-       <path id="mb4974fe720" d="M 0 0 
+       <path id="m5ad095cd93" d="M 0 0 
 L -3.5 0 
 " style="stroke: #000000; stroke-width: 0.8"/>
       </defs>
       <g>
-       <use xlink:href="#mb4974fe720" x="34.240625" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#m5ad095cd93" x="34.240625" y="168.978125" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_21">
@@ -1927,7 +1940,7 @@ L -3.5 0
     <g id="ytick_2">
      <g id="line2d_22">
       <g>
-       <use xlink:href="#mb4974fe720" x="34.240625" y="141.042887" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#m5ad095cd93" x="34.240625" y="141.042887" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_22">
@@ -1940,7 +1953,7 @@ L -3.5 0
     <g id="ytick_3">
      <g id="line2d_23">
       <g>
-       <use xlink:href="#mb4974fe720" x="34.240625" y="113.107649" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#m5ad095cd93" x="34.240625" y="113.107649" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_23">
@@ -1953,7 +1966,7 @@ L -3.5 0
     <g id="ytick_4">
      <g id="line2d_24">
       <g>
-       <use xlink:href="#mb4974fe720" x="34.240625" y="85.172411" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#m5ad095cd93" x="34.240625" y="85.172411" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_24">
@@ -1966,7 +1979,7 @@ L -3.5 0
     <g id="ytick_5">
      <g id="line2d_25">
       <g>
-       <use xlink:href="#mb4974fe720" x="34.240625" y="57.237173" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#m5ad095cd93" x="34.240625" y="57.237173" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_25">
@@ -1979,7 +1992,7 @@ L -3.5 0
     <g id="ytick_6">
      <g id="line2d_26">
       <g>
-       <use xlink:href="#mb4974fe720" x="34.240625" y="29.301935" style="stroke: #000000; stroke-width: 0.8"/>
+       <use xlink:href="#m5ad095cd93" x="34.240625" y="29.301935" style="stroke: #000000; stroke-width: 0.8"/>
       </g>
      </g>
      <g id="text_26">
@@ -2442,7 +2455,7 @@ z
   </g>
  </g>
  <defs>
-  <clipPath id="p212d5c196e">
+  <clipPath id="p422a38c00c">
    <rect x="34.240625" y="22.318125" width="526.93" height="146.66"/>
   </clipPath>
  </defs>
@@ -2451,213 +2464,238 @@ z
   </div>
 </div><div class='muted small' style='margin:6px 0 0 0;'>Frequency across CV folds</div></div>
 </details><details class="panel">
-  <summary><span class="summary-title">Consensus genes</span><span class='badge'>34</span></summary>
-  <div class="panel-body"><div class="toolbar"><input class="input" type="search" placeholder="Search…" data-target="geneset_consensus" /><button class="btn" type="button" data-chip-toggle="geneset_consensus" data-mode="id">Show symbols</button><button class="btn" data-copy="geneset_consensus">Copy list</button><span class="muted small">34 items</span></div><textarea class="hidden" id="geneset_consensus__data">ENSG00000000197	ENSG00000000197
-ENSG00000000244	ENSG00000000244
-ENSG00000000253	ENSG00000000253
-ENSG00000000358	ENSG00000000358
-ENSG00000000651	ENSG00000000651
-ENSG00000001063	ENSG00000001063
-ENSG00000001095	ENSG00000001095
-ENSG00000001096	ENSG00000001096
-ENSG00000001840	ENSG00000001840
-ENSG00000001989	ENSG00000001989
-ENSG00000002048	ENSG00000002048
-ENSG00000002059	ENSG00000002059
-ENSG00000002095	ENSG00000002095
-ENSG00000002330	BAD
-ENSG00000001702	ENSG00000001702
-ENSG00000002054	ENSG00000002054
-ENSG00000002187	ENSG00000002187
-ENSG00000000149	ENSG00000000149
-ENSG00000000256	ENSG00000000256
-ENSG00000000886	ENSG00000000886
-ENSG00000001219	ENSG00000001219
-ENSG00000001245	ENSG00000001245
-ENSG00000001677	ENSG00000001677
-ENSG00000001788	ENSG00000001788
-ENSG00000002039	ENSG00000002039
-ENSG00000002121	ENSG00000002121
-ENSG00000002345	ENSG00000002345
-ENSG00000000400	ENSG00000000400
-ENSG00000000593	ENSG00000000593
-ENSG00000000670	ENSG00000000670
-ENSG00000001328	ENSG00000001328
-ENSG00000001639	ENSG00000001639
-ENSG00000002094	ENSG00000002094
-ENSG00000002399	ENSG00000002399</textarea><div class='chips' id='geneset_consensus'><span class='chip gene-chip' data-id='ENSG00000000197' data-symbol='ENSG00000000197' data-search='ENSG00000000197 ENSG00000000197'><code>ENSG00000000197</code></span><span class='chip gene-chip' data-id='ENSG00000000244' data-symbol='ENSG00000000244' data-search='ENSG00000000244 ENSG00000000244'><code>ENSG00000000244</code></span><span class='chip gene-chip' data-id='ENSG00000000253' data-symbol='ENSG00000000253' data-search='ENSG00000000253 ENSG00000000253'><code>ENSG00000000253</code></span><span class='chip gene-chip' data-id='ENSG00000000358' data-symbol='ENSG00000000358' data-search='ENSG00000000358 ENSG00000000358'><code>ENSG00000000358</code></span><span class='chip gene-chip' data-id='ENSG00000000651' data-symbol='ENSG00000000651' data-search='ENSG00000000651 ENSG00000000651'><code>ENSG00000000651</code></span><span class='chip gene-chip' data-id='ENSG00000001063' data-symbol='ENSG00000001063' data-search='ENSG00000001063 ENSG00000001063'><code>ENSG00000001063</code></span><span class='chip gene-chip' data-id='ENSG00000001095' data-symbol='ENSG00000001095' data-search='ENSG00000001095 ENSG00000001095'><code>ENSG00000001095</code></span><span class='chip gene-chip' data-id='ENSG00000001096' data-symbol='ENSG00000001096' data-search='ENSG00000001096 ENSG00000001096'><code>ENSG00000001096</code></span><span class='chip gene-chip' data-id='ENSG00000001840' data-symbol='ENSG00000001840' data-search='ENSG00000001840 ENSG00000001840'><code>ENSG00000001840</code></span><span class='chip gene-chip' data-id='ENSG00000001989' data-symbol='ENSG00000001989' data-search='ENSG00000001989 ENSG00000001989'><code>ENSG00000001989</code></span><span class='chip gene-chip' data-id='ENSG00000002048' data-symbol='ENSG00000002048' data-search='ENSG00000002048 ENSG00000002048'><code>ENSG00000002048</code></span><span class='chip gene-chip' data-id='ENSG00000002059' data-symbol='ENSG00000002059' data-search='ENSG00000002059 ENSG00000002059'><code>ENSG00000002059</code></span><span class='chip gene-chip' data-id='ENSG00000002095' data-symbol='ENSG00000002095' data-search='ENSG00000002095 ENSG00000002095'><code>ENSG00000002095</code></span><span class='chip gene-chip' data-id='ENSG00000002330' data-symbol='BAD' data-search='ENSG00000002330 BAD'><code>ENSG00000002330</code></span><span class='chip gene-chip' data-id='ENSG00000001702' data-symbol='ENSG00000001702' data-search='ENSG00000001702 ENSG00000001702'><code>ENSG00000001702</code></span><span class='chip gene-chip' data-id='ENSG00000002054' data-symbol='ENSG00000002054' data-search='ENSG00000002054 ENSG00000002054'><code>ENSG00000002054</code></span><span class='chip gene-chip' data-id='ENSG00000002187' data-symbol='ENSG00000002187' data-search='ENSG00000002187 ENSG00000002187'><code>ENSG00000002187</code></span><span class='chip gene-chip' data-id='ENSG00000000149' data-symbol='ENSG00000000149' data-search='ENSG00000000149 ENSG00000000149'><code>ENSG00000000149</code></span><span class='chip gene-chip' data-id='ENSG00000000256' data-symbol='ENSG00000000256' data-search='ENSG00000000256 ENSG00000000256'><code>ENSG00000000256</code></span><span class='chip gene-chip' data-id='ENSG00000000886' data-symbol='ENSG00000000886' data-search='ENSG00000000886 ENSG00000000886'><code>ENSG00000000886</code></span><span class='chip gene-chip' data-id='ENSG00000001219' data-symbol='ENSG00000001219' data-search='ENSG00000001219 ENSG00000001219'><code>ENSG00000001219</code></span><span class='chip gene-chip' data-id='ENSG00000001245' data-symbol='ENSG00000001245' data-search='ENSG00000001245 ENSG00000001245'><code>ENSG00000001245</code></span><span class='chip gene-chip' data-id='ENSG00000001677' data-symbol='ENSG00000001677' data-search='ENSG00000001677 ENSG00000001677'><code>ENSG00000001677</code></span><span class='chip gene-chip' data-id='ENSG00000001788' data-symbol='ENSG00000001788' data-search='ENSG00000001788 ENSG00000001788'><code>ENSG00000001788</code></span><span class='chip gene-chip' data-id='ENSG00000002039' data-symbol='ENSG00000002039' data-search='ENSG00000002039 ENSG00000002039'><code>ENSG00000002039</code></span><span class='chip gene-chip' data-id='ENSG00000002121' data-symbol='ENSG00000002121' data-search='ENSG00000002121 ENSG00000002121'><code>ENSG00000002121</code></span><span class='chip gene-chip' data-id='ENSG00000002345' data-symbol='ENSG00000002345' data-search='ENSG00000002345 ENSG00000002345'><code>ENSG00000002345</code></span><span class='chip gene-chip' data-id='ENSG00000000400' data-symbol='ENSG00000000400' data-search='ENSG00000000400 ENSG00000000400'><code>ENSG00000000400</code></span><span class='chip gene-chip' data-id='ENSG00000000593' data-symbol='ENSG00000000593' data-search='ENSG00000000593 ENSG00000000593'><code>ENSG00000000593</code></span><span class='chip gene-chip' data-id='ENSG00000000670' data-symbol='ENSG00000000670' data-search='ENSG00000000670 ENSG00000000670'><code>ENSG00000000670</code></span><span class='chip gene-chip' data-id='ENSG00000001328' data-symbol='ENSG00000001328' data-search='ENSG00000001328 ENSG00000001328'><code>ENSG00000001328</code></span><span class='chip gene-chip' data-id='ENSG00000001639' data-symbol='ENSG00000001639' data-search='ENSG00000001639 ENSG00000001639'><code>ENSG00000001639</code></span><span class='chip gene-chip' data-id='ENSG00000002094' data-symbol='ENSG00000002094' data-search='ENSG00000002094 ENSG00000002094'><code>ENSG00000002094</code></span><span class='chip gene-chip' data-id='ENSG00000002399' data-symbol='ENSG00000002399' data-search='ENSG00000002399 ENSG00000002399'><code>ENSG00000002399</code></span></div></div>
+  <summary><span class="summary-title">Consensus genes</span><span class='badge'>39</span></summary>
+  <div class="panel-body"><div class="toolbar"><input class="input" type="search" placeholder="Search…" data-target="geneset_consensus" /><button class="btn" type="button" data-chip-toggle="geneset_consensus" data-mode="id">Show symbols</button><button class="btn" data-copy="geneset_consensus">Copy list</button><span class="muted small">39 items</span></div><textarea class="hidden" id="geneset_consensus__data">ENSG00000000156	ENSG00000000156
+ENSG00000000355	ENSG00000000355
+ENSG00000000602	ENSG00000000602
+ENSG00000000720	ENSG00000000720
+ENSG00000000922	ENSG00000000922
+ENSG00000001024	ENSG00000001024
+ENSG00000001028	ENSG00000001028
+ENSG00000001111	ENSG00000001111
+ENSG00000001167	NFYA
+ENSG00000001279	ENSG00000001279
+ENSG00000001570	ENSG00000001570
+ENSG00000001623	ENSG00000001623
+ENSG00000001809	ENSG00000001809
+ENSG00000001962	ENSG00000001962
+ENSG00000001964	ENSG00000001964
+ENSG00000002169	ENSG00000002169
+ENSG00000002231	ENSG00000002231
+ENSG00000001396	ENSG00000001396
+ENSG00000001676	ENSG00000001676
+ENSG00000001871	ENSG00000001871
+ENSG00000002011	ENSG00000002011
+ENSG00000002101	ENSG00000002101
+ENSG00000002381	ENSG00000002381
+ENSG00000000586	ENSG00000000586
+ENSG00000000621	ENSG00000000621
+ENSG00000001904	ENSG00000001904
+ENSG00000000116	ENSG00000000116
+ENSG00000000206	ENSG00000000206
+ENSG00000000249	ENSG00000000249
+ENSG00000000349	ENSG00000000349
+ENSG00000000396	ENSG00000000396
+ENSG00000000520	ENSG00000000520
+ENSG00000000730	ENSG00000000730
+ENSG00000000805	ENSG00000000805
+ENSG00000000812	ENSG00000000812
+ENSG00000000831	ENSG00000000831
+ENSG00000001211	ENSG00000001211
+ENSG00000001497	LAS1L
+ENSG00000002235	ENSG00000002235</textarea><div class='chips' id='geneset_consensus'><span class='chip gene-chip' data-id='ENSG00000000156' data-symbol='ENSG00000000156' data-search='ENSG00000000156 ENSG00000000156'><code>ENSG00000000156</code></span><span class='chip gene-chip' data-id='ENSG00000000355' data-symbol='ENSG00000000355' data-search='ENSG00000000355 ENSG00000000355'><code>ENSG00000000355</code></span><span class='chip gene-chip' data-id='ENSG00000000602' data-symbol='ENSG00000000602' data-search='ENSG00000000602 ENSG00000000602'><code>ENSG00000000602</code></span><span class='chip gene-chip' data-id='ENSG00000000720' data-symbol='ENSG00000000720' data-search='ENSG00000000720 ENSG00000000720'><code>ENSG00000000720</code></span><span class='chip gene-chip' data-id='ENSG00000000922' data-symbol='ENSG00000000922' data-search='ENSG00000000922 ENSG00000000922'><code>ENSG00000000922</code></span><span class='chip gene-chip' data-id='ENSG00000001024' data-symbol='ENSG00000001024' data-search='ENSG00000001024 ENSG00000001024'><code>ENSG00000001024</code></span><span class='chip gene-chip' data-id='ENSG00000001028' data-symbol='ENSG00000001028' data-search='ENSG00000001028 ENSG00000001028'><code>ENSG00000001028</code></span><span class='chip gene-chip' data-id='ENSG00000001111' data-symbol='ENSG00000001111' data-search='ENSG00000001111 ENSG00000001111'><code>ENSG00000001111</code></span><span class='chip gene-chip' data-id='ENSG00000001167' data-symbol='NFYA' data-search='ENSG00000001167 NFYA'><code>ENSG00000001167</code></span><span class='chip gene-chip' data-id='ENSG00000001279' data-symbol='ENSG00000001279' data-search='ENSG00000001279 ENSG00000001279'><code>ENSG00000001279</code></span><span class='chip gene-chip' data-id='ENSG00000001570' data-symbol='ENSG00000001570' data-search='ENSG00000001570 ENSG00000001570'><code>ENSG00000001570</code></span><span class='chip gene-chip' data-id='ENSG00000001623' data-symbol='ENSG00000001623' data-search='ENSG00000001623 ENSG00000001623'><code>ENSG00000001623</code></span><span class='chip gene-chip' data-id='ENSG00000001809' data-symbol='ENSG00000001809' data-search='ENSG00000001809 ENSG00000001809'><code>ENSG00000001809</code></span><span class='chip gene-chip' data-id='ENSG00000001962' data-symbol='ENSG00000001962' data-search='ENSG00000001962 ENSG00000001962'><code>ENSG00000001962</code></span><span class='chip gene-chip' data-id='ENSG00000001964' data-symbol='ENSG00000001964' data-search='ENSG00000001964 ENSG00000001964'><code>ENSG00000001964</code></span><span class='chip gene-chip' data-id='ENSG00000002169' data-symbol='ENSG00000002169' data-search='ENSG00000002169 ENSG00000002169'><code>ENSG00000002169</code></span><span class='chip gene-chip' data-id='ENSG00000002231' data-symbol='ENSG00000002231' data-search='ENSG00000002231 ENSG00000002231'><code>ENSG00000002231</code></span><span class='chip gene-chip' data-id='ENSG00000001396' data-symbol='ENSG00000001396' data-search='ENSG00000001396 ENSG00000001396'><code>ENSG00000001396</code></span><span class='chip gene-chip' data-id='ENSG00000001676' data-symbol='ENSG00000001676' data-search='ENSG00000001676 ENSG00000001676'><code>ENSG00000001676</code></span><span class='chip gene-chip' data-id='ENSG00000001871' data-symbol='ENSG00000001871' data-search='ENSG00000001871 ENSG00000001871'><code>ENSG00000001871</code></span><span class='chip gene-chip' data-id='ENSG00000002011' data-symbol='ENSG00000002011' data-search='ENSG00000002011 ENSG00000002011'><code>ENSG00000002011</code></span><span class='chip gene-chip' data-id='ENSG00000002101' data-symbol='ENSG00000002101' data-search='ENSG00000002101 ENSG00000002101'><code>ENSG00000002101</code></span><span class='chip gene-chip' data-id='ENSG00000002381' data-symbol='ENSG00000002381' data-search='ENSG00000002381 ENSG00000002381'><code>ENSG00000002381</code></span><span class='chip gene-chip' data-id='ENSG00000000586' data-symbol='ENSG00000000586' data-search='ENSG00000000586 ENSG00000000586'><code>ENSG00000000586</code></span><span class='chip gene-chip' data-id='ENSG00000000621' data-symbol='ENSG00000000621' data-search='ENSG00000000621 ENSG00000000621'><code>ENSG00000000621</code></span><span class='chip gene-chip' data-id='ENSG00000001904' data-symbol='ENSG00000001904' data-search='ENSG00000001904 ENSG00000001904'><code>ENSG00000001904</code></span><span class='chip gene-chip' data-id='ENSG00000000116' data-symbol='ENSG00000000116' data-search='ENSG00000000116 ENSG00000000116'><code>ENSG00000000116</code></span><span class='chip gene-chip' data-id='ENSG00000000206' data-symbol='ENSG00000000206' data-search='ENSG00000000206 ENSG00000000206'><code>ENSG00000000206</code></span><span class='chip gene-chip' data-id='ENSG00000000249' data-symbol='ENSG00000000249' data-search='ENSG00000000249 ENSG00000000249'><code>ENSG00000000249</code></span><span class='chip gene-chip' data-id='ENSG00000000349' data-symbol='ENSG00000000349' data-search='ENSG00000000349 ENSG00000000349'><code>ENSG00000000349</code></span><span class='chip gene-chip' data-id='ENSG00000000396' data-symbol='ENSG00000000396' data-search='ENSG00000000396 ENSG00000000396'><code>ENSG00000000396</code></span><span class='chip gene-chip' data-id='ENSG00000000520' data-symbol='ENSG00000000520' data-search='ENSG00000000520 ENSG00000000520'><code>ENSG00000000520</code></span><span class='chip gene-chip' data-id='ENSG00000000730' data-symbol='ENSG00000000730' data-search='ENSG00000000730 ENSG00000000730'><code>ENSG00000000730</code></span><span class='chip gene-chip' data-id='ENSG00000000805' data-symbol='ENSG00000000805' data-search='ENSG00000000805 ENSG00000000805'><code>ENSG00000000805</code></span><span class='chip gene-chip' data-id='ENSG00000000812' data-symbol='ENSG00000000812' data-search='ENSG00000000812 ENSG00000000812'><code>ENSG00000000812</code></span><span class='chip gene-chip' data-id='ENSG00000000831' data-symbol='ENSG00000000831' data-search='ENSG00000000831 ENSG00000000831'><code>ENSG00000000831</code></span><span class='chip gene-chip' data-id='ENSG00000001211' data-symbol='ENSG00000001211' data-search='ENSG00000001211 ENSG00000001211'><code>ENSG00000001211</code></span><span class='chip gene-chip' data-id='ENSG00000001497' data-symbol='LAS1L' data-search='ENSG00000001497 LAS1L'><code>ENSG00000001497</code></span><span class='chip gene-chip' data-id='ENSG00000002235' data-symbol='ENSG00000002235' data-search='ENSG00000002235 ENSG00000002235'><code>ENSG00000002235</code></span></div></div>
 </details><section class="card">
   <h2>Per-fold selected genes</h2>
   
   <details class="panel">
-  <summary><span class="summary-title">Fold 0 (k=20)</span><span class='badge'>20</span></summary>
-  <div class="panel-body"><div class="toolbar"><input class="input" type="search" placeholder="Search…" data-target="geneset_fold_0" /><button class="btn" type="button" data-chip-toggle="geneset_fold_0" data-mode="id">Show symbols</button><button class="btn" data-copy="geneset_fold_0">Copy list</button><span class="muted small">20 items</span></div><textarea class="hidden" id="geneset_fold_0__data">ENSG00000001063	ENSG00000001063
-ENSG00000002095	ENSG00000002095
-ENSG00000000253	ENSG00000000253
-ENSG00000002330	BAD
-ENSG00000002345	ENSG00000002345
-ENSG00000001095	ENSG00000001095
-ENSG00000001989	ENSG00000001989
-ENSG00000000651	ENSG00000000651
-ENSG00000001840	ENSG00000001840
-ENSG00000001096	ENSG00000001096
-ENSG00000000244	ENSG00000000244
-ENSG00000002048	ENSG00000002048
-ENSG00000000670	ENSG00000000670
-ENSG00000000358	ENSG00000000358
-ENSG00000002121	ENSG00000002121
-ENSG00000001702	ENSG00000001702
-ENSG00000001677	ENSG00000001677
-ENSG00000002059	ENSG00000002059
-ENSG00000000197	ENSG00000000197
-ENSG00000002054	ENSG00000002054</textarea><div class='chips' id='geneset_fold_0'><span class='chip gene-chip' data-id='ENSG00000001063' data-symbol='ENSG00000001063' data-search='ENSG00000001063 ENSG00000001063'><code>ENSG00000001063</code></span><span class='chip gene-chip' data-id='ENSG00000002095' data-symbol='ENSG00000002095' data-search='ENSG00000002095 ENSG00000002095'><code>ENSG00000002095</code></span><span class='chip gene-chip' data-id='ENSG00000000253' data-symbol='ENSG00000000253' data-search='ENSG00000000253 ENSG00000000253'><code>ENSG00000000253</code></span><span class='chip gene-chip' data-id='ENSG00000002330' data-symbol='BAD' data-search='ENSG00000002330 BAD'><code>ENSG00000002330</code></span><span class='chip gene-chip' data-id='ENSG00000002345' data-symbol='ENSG00000002345' data-search='ENSG00000002345 ENSG00000002345'><code>ENSG00000002345</code></span><span class='chip gene-chip' data-id='ENSG00000001095' data-symbol='ENSG00000001095' data-search='ENSG00000001095 ENSG00000001095'><code>ENSG00000001095</code></span><span class='chip gene-chip' data-id='ENSG00000001989' data-symbol='ENSG00000001989' data-search='ENSG00000001989 ENSG00000001989'><code>ENSG00000001989</code></span><span class='chip gene-chip' data-id='ENSG00000000651' data-symbol='ENSG00000000651' data-search='ENSG00000000651 ENSG00000000651'><code>ENSG00000000651</code></span><span class='chip gene-chip' data-id='ENSG00000001840' data-symbol='ENSG00000001840' data-search='ENSG00000001840 ENSG00000001840'><code>ENSG00000001840</code></span><span class='chip gene-chip' data-id='ENSG00000001096' data-symbol='ENSG00000001096' data-search='ENSG00000001096 ENSG00000001096'><code>ENSG00000001096</code></span><span class='chip gene-chip' data-id='ENSG00000000244' data-symbol='ENSG00000000244' data-search='ENSG00000000244 ENSG00000000244'><code>ENSG00000000244</code></span><span class='chip gene-chip' data-id='ENSG00000002048' data-symbol='ENSG00000002048' data-search='ENSG00000002048 ENSG00000002048'><code>ENSG00000002048</code></span><span class='chip gene-chip' data-id='ENSG00000000670' data-symbol='ENSG00000000670' data-search='ENSG00000000670 ENSG00000000670'><code>ENSG00000000670</code></span><span class='chip gene-chip' data-id='ENSG00000000358' data-symbol='ENSG00000000358' data-search='ENSG00000000358 ENSG00000000358'><code>ENSG00000000358</code></span><span class='chip gene-chip' data-id='ENSG00000002121' data-symbol='ENSG00000002121' data-search='ENSG00000002121 ENSG00000002121'><code>ENSG00000002121</code></span><span class='chip gene-chip' data-id='ENSG00000001702' data-symbol='ENSG00000001702' data-search='ENSG00000001702 ENSG00000001702'><code>ENSG00000001702</code></span><span class='chip gene-chip' data-id='ENSG00000001677' data-symbol='ENSG00000001677' data-search='ENSG00000001677 ENSG00000001677'><code>ENSG00000001677</code></span><span class='chip gene-chip' data-id='ENSG00000002059' data-symbol='ENSG00000002059' data-search='ENSG00000002059 ENSG00000002059'><code>ENSG00000002059</code></span><span class='chip gene-chip' data-id='ENSG00000000197' data-symbol='ENSG00000000197' data-search='ENSG00000000197 ENSG00000000197'><code>ENSG00000000197</code></span><span class='chip gene-chip' data-id='ENSG00000002054' data-symbol='ENSG00000002054' data-search='ENSG00000002054 ENSG00000002054'><code>ENSG00000002054</code></span></div></div>
+  <summary><span class="summary-title">Fold 0 (k=30)</span><span class='badge'>30</span></summary>
+  <div class="panel-body"><div class="toolbar"><input class="input" type="search" placeholder="Search…" data-target="geneset_fold_0" /><button class="btn" type="button" data-chip-toggle="geneset_fold_0" data-mode="id">Show symbols</button><button class="btn" data-copy="geneset_fold_0">Copy list</button><span class="muted small">30 items</span></div><textarea class="hidden" id="geneset_fold_0__data">ENSG00000001024	ENSG00000001024
+ENSG00000001028	ENSG00000001028
+ENSG00000001962	ENSG00000001962
+ENSG00000000355	ENSG00000000355
+ENSG00000001570	ENSG00000001570
+ENSG00000001964	ENSG00000001964
+ENSG00000001111	ENSG00000001111
+ENSG00000001167	NFYA
+ENSG00000002011	ENSG00000002011
+ENSG00000000156	ENSG00000000156
+ENSG00000001809	ENSG00000001809
+ENSG00000002169	ENSG00000002169
+ENSG00000001279	ENSG00000001279
+ENSG00000001623	ENSG00000001623
+ENSG00000001871	ENSG00000001871
+ENSG00000002231	ENSG00000002231
+ENSG00000000520	ENSG00000000520
+ENSG00000000249	ENSG00000000249
+ENSG00000000812	ENSG00000000812
+ENSG00000002381	ENSG00000002381
+ENSG00000000396	ENSG00000000396
+ENSG00000001396	ENSG00000001396
+ENSG00000002101	ENSG00000002101
+ENSG00000000720	ENSG00000000720
+ENSG00000000602	ENSG00000000602
+ENSG00000000922	ENSG00000000922
+ENSG00000001904	ENSG00000001904
+ENSG00000001676	ENSG00000001676
+ENSG00000000621	ENSG00000000621
+ENSG00000000586	ENSG00000000586</textarea><div class='chips' id='geneset_fold_0'><span class='chip gene-chip' data-id='ENSG00000001024' data-symbol='ENSG00000001024' data-search='ENSG00000001024 ENSG00000001024'><code>ENSG00000001024</code></span><span class='chip gene-chip' data-id='ENSG00000001028' data-symbol='ENSG00000001028' data-search='ENSG00000001028 ENSG00000001028'><code>ENSG00000001028</code></span><span class='chip gene-chip' data-id='ENSG00000001962' data-symbol='ENSG00000001962' data-search='ENSG00000001962 ENSG00000001962'><code>ENSG00000001962</code></span><span class='chip gene-chip' data-id='ENSG00000000355' data-symbol='ENSG00000000355' data-search='ENSG00000000355 ENSG00000000355'><code>ENSG00000000355</code></span><span class='chip gene-chip' data-id='ENSG00000001570' data-symbol='ENSG00000001570' data-search='ENSG00000001570 ENSG00000001570'><code>ENSG00000001570</code></span><span class='chip gene-chip' data-id='ENSG00000001964' data-symbol='ENSG00000001964' data-search='ENSG00000001964 ENSG00000001964'><code>ENSG00000001964</code></span><span class='chip gene-chip' data-id='ENSG00000001111' data-symbol='ENSG00000001111' data-search='ENSG00000001111 ENSG00000001111'><code>ENSG00000001111</code></span><span class='chip gene-chip' data-id='ENSG00000001167' data-symbol='NFYA' data-search='ENSG00000001167 NFYA'><code>ENSG00000001167</code></span><span class='chip gene-chip' data-id='ENSG00000002011' data-symbol='ENSG00000002011' data-search='ENSG00000002011 ENSG00000002011'><code>ENSG00000002011</code></span><span class='chip gene-chip' data-id='ENSG00000000156' data-symbol='ENSG00000000156' data-search='ENSG00000000156 ENSG00000000156'><code>ENSG00000000156</code></span><span class='chip gene-chip' data-id='ENSG00000001809' data-symbol='ENSG00000001809' data-search='ENSG00000001809 ENSG00000001809'><code>ENSG00000001809</code></span><span class='chip gene-chip' data-id='ENSG00000002169' data-symbol='ENSG00000002169' data-search='ENSG00000002169 ENSG00000002169'><code>ENSG00000002169</code></span><span class='chip gene-chip' data-id='ENSG00000001279' data-symbol='ENSG00000001279' data-search='ENSG00000001279 ENSG00000001279'><code>ENSG00000001279</code></span><span class='chip gene-chip' data-id='ENSG00000001623' data-symbol='ENSG00000001623' data-search='ENSG00000001623 ENSG00000001623'><code>ENSG00000001623</code></span><span class='chip gene-chip' data-id='ENSG00000001871' data-symbol='ENSG00000001871' data-search='ENSG00000001871 ENSG00000001871'><code>ENSG00000001871</code></span><span class='chip gene-chip' data-id='ENSG00000002231' data-symbol='ENSG00000002231' data-search='ENSG00000002231 ENSG00000002231'><code>ENSG00000002231</code></span><span class='chip gene-chip' data-id='ENSG00000000520' data-symbol='ENSG00000000520' data-search='ENSG00000000520 ENSG00000000520'><code>ENSG00000000520</code></span><span class='chip gene-chip' data-id='ENSG00000000249' data-symbol='ENSG00000000249' data-search='ENSG00000000249 ENSG00000000249'><code>ENSG00000000249</code></span><span class='chip gene-chip' data-id='ENSG00000000812' data-symbol='ENSG00000000812' data-search='ENSG00000000812 ENSG00000000812'><code>ENSG00000000812</code></span><span class='chip gene-chip' data-id='ENSG00000002381' data-symbol='ENSG00000002381' data-search='ENSG00000002381 ENSG00000002381'><code>ENSG00000002381</code></span><span class='chip gene-chip' data-id='ENSG00000000396' data-symbol='ENSG00000000396' data-search='ENSG00000000396 ENSG00000000396'><code>ENSG00000000396</code></span><span class='chip gene-chip' data-id='ENSG00000001396' data-symbol='ENSG00000001396' data-search='ENSG00000001396 ENSG00000001396'><code>ENSG00000001396</code></span><span class='chip gene-chip' data-id='ENSG00000002101' data-symbol='ENSG00000002101' data-search='ENSG00000002101 ENSG00000002101'><code>ENSG00000002101</code></span><span class='chip gene-chip' data-id='ENSG00000000720' data-symbol='ENSG00000000720' data-search='ENSG00000000720 ENSG00000000720'><code>ENSG00000000720</code></span><span class='chip gene-chip' data-id='ENSG00000000602' data-symbol='ENSG00000000602' data-search='ENSG00000000602 ENSG00000000602'><code>ENSG00000000602</code></span><span class='chip gene-chip' data-id='ENSG00000000922' data-symbol='ENSG00000000922' data-search='ENSG00000000922 ENSG00000000922'><code>ENSG00000000922</code></span><span class='chip gene-chip' data-id='ENSG00000001904' data-symbol='ENSG00000001904' data-search='ENSG00000001904 ENSG00000001904'><code>ENSG00000001904</code></span><span class='chip gene-chip' data-id='ENSG00000001676' data-symbol='ENSG00000001676' data-search='ENSG00000001676 ENSG00000001676'><code>ENSG00000001676</code></span><span class='chip gene-chip' data-id='ENSG00000000621' data-symbol='ENSG00000000621' data-search='ENSG00000000621 ENSG00000000621'><code>ENSG00000000621</code></span><span class='chip gene-chip' data-id='ENSG00000000586' data-symbol='ENSG00000000586' data-search='ENSG00000000586 ENSG00000000586'><code>ENSG00000000586</code></span></div></div>
 </details><details class="panel">
   <summary><span class="summary-title">Fold 1 (k=30)</span><span class='badge'>30</span></summary>
-  <div class="panel-body"><div class="toolbar"><input class="input" type="search" placeholder="Search…" data-target="geneset_fold_1" /><button class="btn" type="button" data-chip-toggle="geneset_fold_1" data-mode="id">Show symbols</button><button class="btn" data-copy="geneset_fold_1">Copy list</button><span class="muted small">30 items</span></div><textarea class="hidden" id="geneset_fold_1__data">ENSG00000002095	ENSG00000002095
-ENSG00000001095	ENSG00000001095
-ENSG00000001328	ENSG00000001328
-ENSG00000001063	ENSG00000001063
-ENSG00000000197	ENSG00000000197
-ENSG00000001096	ENSG00000001096
-ENSG00000001989	ENSG00000001989
-ENSG00000000244	ENSG00000000244
-ENSG00000002187	ENSG00000002187
-ENSG00000002330	BAD
-ENSG00000000253	ENSG00000000253
-ENSG00000001702	ENSG00000001702
-ENSG00000001245	ENSG00000001245
-ENSG00000000149	ENSG00000000149
-ENSG00000001840	ENSG00000001840
-ENSG00000002345	ENSG00000002345
-ENSG00000001219	ENSG00000001219
-ENSG00000002048	ENSG00000002048
-ENSG00000000358	ENSG00000000358
-ENSG00000000593	ENSG00000000593
-ENSG00000000651	ENSG00000000651
-ENSG00000002039	ENSG00000002039
-ENSG00000000886	ENSG00000000886
-ENSG00000002054	ENSG00000002054
-ENSG00000002059	ENSG00000002059
-ENSG00000001788	ENSG00000001788
-ENSG00000000256	ENSG00000000256
-ENSG00000000691	ENSG00000000691
-ENSG00000001639	ENSG00000001639
-ENSG00000002327	ENSG00000002327</textarea><div class='chips' id='geneset_fold_1'><span class='chip gene-chip' data-id='ENSG00000002095' data-symbol='ENSG00000002095' data-search='ENSG00000002095 ENSG00000002095'><code>ENSG00000002095</code></span><span class='chip gene-chip' data-id='ENSG00000001095' data-symbol='ENSG00000001095' data-search='ENSG00000001095 ENSG00000001095'><code>ENSG00000001095</code></span><span class='chip gene-chip' data-id='ENSG00000001328' data-symbol='ENSG00000001328' data-search='ENSG00000001328 ENSG00000001328'><code>ENSG00000001328</code></span><span class='chip gene-chip' data-id='ENSG00000001063' data-symbol='ENSG00000001063' data-search='ENSG00000001063 ENSG00000001063'><code>ENSG00000001063</code></span><span class='chip gene-chip' data-id='ENSG00000000197' data-symbol='ENSG00000000197' data-search='ENSG00000000197 ENSG00000000197'><code>ENSG00000000197</code></span><span class='chip gene-chip' data-id='ENSG00000001096' data-symbol='ENSG00000001096' data-search='ENSG00000001096 ENSG00000001096'><code>ENSG00000001096</code></span><span class='chip gene-chip' data-id='ENSG00000001989' data-symbol='ENSG00000001989' data-search='ENSG00000001989 ENSG00000001989'><code>ENSG00000001989</code></span><span class='chip gene-chip' data-id='ENSG00000000244' data-symbol='ENSG00000000244' data-search='ENSG00000000244 ENSG00000000244'><code>ENSG00000000244</code></span><span class='chip gene-chip' data-id='ENSG00000002187' data-symbol='ENSG00000002187' data-search='ENSG00000002187 ENSG00000002187'><code>ENSG00000002187</code></span><span class='chip gene-chip' data-id='ENSG00000002330' data-symbol='BAD' data-search='ENSG00000002330 BAD'><code>ENSG00000002330</code></span><span class='chip gene-chip' data-id='ENSG00000000253' data-symbol='ENSG00000000253' data-search='ENSG00000000253 ENSG00000000253'><code>ENSG00000000253</code></span><span class='chip gene-chip' data-id='ENSG00000001702' data-symbol='ENSG00000001702' data-search='ENSG00000001702 ENSG00000001702'><code>ENSG00000001702</code></span><span class='chip gene-chip' data-id='ENSG00000001245' data-symbol='ENSG00000001245' data-search='ENSG00000001245 ENSG00000001245'><code>ENSG00000001245</code></span><span class='chip gene-chip' data-id='ENSG00000000149' data-symbol='ENSG00000000149' data-search='ENSG00000000149 ENSG00000000149'><code>ENSG00000000149</code></span><span class='chip gene-chip' data-id='ENSG00000001840' data-symbol='ENSG00000001840' data-search='ENSG00000001840 ENSG00000001840'><code>ENSG00000001840</code></span><span class='chip gene-chip' data-id='ENSG00000002345' data-symbol='ENSG00000002345' data-search='ENSG00000002345 ENSG00000002345'><code>ENSG00000002345</code></span><span class='chip gene-chip' data-id='ENSG00000001219' data-symbol='ENSG00000001219' data-search='ENSG00000001219 ENSG00000001219'><code>ENSG00000001219</code></span><span class='chip gene-chip' data-id='ENSG00000002048' data-symbol='ENSG00000002048' data-search='ENSG00000002048 ENSG00000002048'><code>ENSG00000002048</code></span><span class='chip gene-chip' data-id='ENSG00000000358' data-symbol='ENSG00000000358' data-search='ENSG00000000358 ENSG00000000358'><code>ENSG00000000358</code></span><span class='chip gene-chip' data-id='ENSG00000000593' data-symbol='ENSG00000000593' data-search='ENSG00000000593 ENSG00000000593'><code>ENSG00000000593</code></span><span class='chip gene-chip' data-id='ENSG00000000651' data-symbol='ENSG00000000651' data-search='ENSG00000000651 ENSG00000000651'><code>ENSG00000000651</code></span><span class='chip gene-chip' data-id='ENSG00000002039' data-symbol='ENSG00000002039' data-search='ENSG00000002039 ENSG00000002039'><code>ENSG00000002039</code></span><span class='chip gene-chip' data-id='ENSG00000000886' data-symbol='ENSG00000000886' data-search='ENSG00000000886 ENSG00000000886'><code>ENSG00000000886</code></span><span class='chip gene-chip' data-id='ENSG00000002054' data-symbol='ENSG00000002054' data-search='ENSG00000002054 ENSG00000002054'><code>ENSG00000002054</code></span><span class='chip gene-chip' data-id='ENSG00000002059' data-symbol='ENSG00000002059' data-search='ENSG00000002059 ENSG00000002059'><code>ENSG00000002059</code></span><span class='chip gene-chip' data-id='ENSG00000001788' data-symbol='ENSG00000001788' data-search='ENSG00000001788 ENSG00000001788'><code>ENSG00000001788</code></span><span class='chip gene-chip' data-id='ENSG00000000256' data-symbol='ENSG00000000256' data-search='ENSG00000000256 ENSG00000000256'><code>ENSG00000000256</code></span><span class='chip gene-chip' data-id='ENSG00000000691' data-symbol='ENSG00000000691' data-search='ENSG00000000691 ENSG00000000691'><code>ENSG00000000691</code></span><span class='chip gene-chip' data-id='ENSG00000001639' data-symbol='ENSG00000001639' data-search='ENSG00000001639 ENSG00000001639'><code>ENSG00000001639</code></span><span class='chip gene-chip' data-id='ENSG00000002327' data-symbol='ENSG00000002327' data-search='ENSG00000002327 ENSG00000002327'><code>ENSG00000002327</code></span></div></div>
+  <div class="panel-body"><div class="toolbar"><input class="input" type="search" placeholder="Search…" data-target="geneset_fold_1" /><button class="btn" type="button" data-chip-toggle="geneset_fold_1" data-mode="id">Show symbols</button><button class="btn" data-copy="geneset_fold_1">Copy list</button><span class="muted small">30 items</span></div><textarea class="hidden" id="geneset_fold_1__data">ENSG00000001279	ENSG00000001279
+ENSG00000001028	ENSG00000001028
+ENSG00000001024	ENSG00000001024
+ENSG00000001964	ENSG00000001964
+ENSG00000000720	ENSG00000000720
+ENSG00000001167	NFYA
+ENSG00000001809	ENSG00000001809
+ENSG00000001714	ENSG00000001714
+ENSG00000000922	ENSG00000000922
+ENSG00000000355	ENSG00000000355
+ENSG00000001570	ENSG00000001570
+ENSG00000001623	ENSG00000001623
+ENSG00000002169	ENSG00000002169
+ENSG00000000156	ENSG00000000156
+ENSG00000001871	ENSG00000001871
+ENSG00000002011	ENSG00000002011
+ENSG00000002381	ENSG00000002381
+ENSG00000002231	ENSG00000002231
+ENSG00000000730	ENSG00000000730
+ENSG00000001111	ENSG00000001111
+ENSG00000001962	ENSG00000001962
+ENSG00000002101	ENSG00000002101
+ENSG00000000602	ENSG00000000602
+ENSG00000001676	ENSG00000001676
+ENSG00000000206	ENSG00000000206
+ENSG00000000621	ENSG00000000621
+ENSG00000000349	ENSG00000000349
+ENSG00000000831	ENSG00000000831
+ENSG00000001396	ENSG00000001396
+ENSG00000000586	ENSG00000000586</textarea><div class='chips' id='geneset_fold_1'><span class='chip gene-chip' data-id='ENSG00000001279' data-symbol='ENSG00000001279' data-search='ENSG00000001279 ENSG00000001279'><code>ENSG00000001279</code></span><span class='chip gene-chip' data-id='ENSG00000001028' data-symbol='ENSG00000001028' data-search='ENSG00000001028 ENSG00000001028'><code>ENSG00000001028</code></span><span class='chip gene-chip' data-id='ENSG00000001024' data-symbol='ENSG00000001024' data-search='ENSG00000001024 ENSG00000001024'><code>ENSG00000001024</code></span><span class='chip gene-chip' data-id='ENSG00000001964' data-symbol='ENSG00000001964' data-search='ENSG00000001964 ENSG00000001964'><code>ENSG00000001964</code></span><span class='chip gene-chip' data-id='ENSG00000000720' data-symbol='ENSG00000000720' data-search='ENSG00000000720 ENSG00000000720'><code>ENSG00000000720</code></span><span class='chip gene-chip' data-id='ENSG00000001167' data-symbol='NFYA' data-search='ENSG00000001167 NFYA'><code>ENSG00000001167</code></span><span class='chip gene-chip' data-id='ENSG00000001809' data-symbol='ENSG00000001809' data-search='ENSG00000001809 ENSG00000001809'><code>ENSG00000001809</code></span><span class='chip gene-chip' data-id='ENSG00000001714' data-symbol='ENSG00000001714' data-search='ENSG00000001714 ENSG00000001714'><code>ENSG00000001714</code></span><span class='chip gene-chip' data-id='ENSG00000000922' data-symbol='ENSG00000000922' data-search='ENSG00000000922 ENSG00000000922'><code>ENSG00000000922</code></span><span class='chip gene-chip' data-id='ENSG00000000355' data-symbol='ENSG00000000355' data-search='ENSG00000000355 ENSG00000000355'><code>ENSG00000000355</code></span><span class='chip gene-chip' data-id='ENSG00000001570' data-symbol='ENSG00000001570' data-search='ENSG00000001570 ENSG00000001570'><code>ENSG00000001570</code></span><span class='chip gene-chip' data-id='ENSG00000001623' data-symbol='ENSG00000001623' data-search='ENSG00000001623 ENSG00000001623'><code>ENSG00000001623</code></span><span class='chip gene-chip' data-id='ENSG00000002169' data-symbol='ENSG00000002169' data-search='ENSG00000002169 ENSG00000002169'><code>ENSG00000002169</code></span><span class='chip gene-chip' data-id='ENSG00000000156' data-symbol='ENSG00000000156' data-search='ENSG00000000156 ENSG00000000156'><code>ENSG00000000156</code></span><span class='chip gene-chip' data-id='ENSG00000001871' data-symbol='ENSG00000001871' data-search='ENSG00000001871 ENSG00000001871'><code>ENSG00000001871</code></span><span class='chip gene-chip' data-id='ENSG00000002011' data-symbol='ENSG00000002011' data-search='ENSG00000002011 ENSG00000002011'><code>ENSG00000002011</code></span><span class='chip gene-chip' data-id='ENSG00000002381' data-symbol='ENSG00000002381' data-search='ENSG00000002381 ENSG00000002381'><code>ENSG00000002381</code></span><span class='chip gene-chip' data-id='ENSG00000002231' data-symbol='ENSG00000002231' data-search='ENSG00000002231 ENSG00000002231'><code>ENSG00000002231</code></span><span class='chip gene-chip' data-id='ENSG00000000730' data-symbol='ENSG00000000730' data-search='ENSG00000000730 ENSG00000000730'><code>ENSG00000000730</code></span><span class='chip gene-chip' data-id='ENSG00000001111' data-symbol='ENSG00000001111' data-search='ENSG00000001111 ENSG00000001111'><code>ENSG00000001111</code></span><span class='chip gene-chip' data-id='ENSG00000001962' data-symbol='ENSG00000001962' data-search='ENSG00000001962 ENSG00000001962'><code>ENSG00000001962</code></span><span class='chip gene-chip' data-id='ENSG00000002101' data-symbol='ENSG00000002101' data-search='ENSG00000002101 ENSG00000002101'><code>ENSG00000002101</code></span><span class='chip gene-chip' data-id='ENSG00000000602' data-symbol='ENSG00000000602' data-search='ENSG00000000602 ENSG00000000602'><code>ENSG00000000602</code></span><span class='chip gene-chip' data-id='ENSG00000001676' data-symbol='ENSG00000001676' data-search='ENSG00000001676 ENSG00000001676'><code>ENSG00000001676</code></span><span class='chip gene-chip' data-id='ENSG00000000206' data-symbol='ENSG00000000206' data-search='ENSG00000000206 ENSG00000000206'><code>ENSG00000000206</code></span><span class='chip gene-chip' data-id='ENSG00000000621' data-symbol='ENSG00000000621' data-search='ENSG00000000621 ENSG00000000621'><code>ENSG00000000621</code></span><span class='chip gene-chip' data-id='ENSG00000000349' data-symbol='ENSG00000000349' data-search='ENSG00000000349 ENSG00000000349'><code>ENSG00000000349</code></span><span class='chip gene-chip' data-id='ENSG00000000831' data-symbol='ENSG00000000831' data-search='ENSG00000000831 ENSG00000000831'><code>ENSG00000000831</code></span><span class='chip gene-chip' data-id='ENSG00000001396' data-symbol='ENSG00000001396' data-search='ENSG00000001396 ENSG00000001396'><code>ENSG00000001396</code></span><span class='chip gene-chip' data-id='ENSG00000000586' data-symbol='ENSG00000000586' data-search='ENSG00000000586 ENSG00000000586'><code>ENSG00000000586</code></span></div></div>
 </details><details class="panel">
   <summary><span class="summary-title">Fold 2 (k=30)</span><span class='badge'>30</span></summary>
-  <div class="panel-body"><div class="toolbar"><input class="input" type="search" placeholder="Search…" data-target="geneset_fold_2" /><button class="btn" type="button" data-chip-toggle="geneset_fold_2" data-mode="id">Show symbols</button><button class="btn" data-copy="geneset_fold_2">Copy list</button><span class="muted small">30 items</span></div><textarea class="hidden" id="geneset_fold_2__data">ENSG00000002330	BAD
-ENSG00000002095	ENSG00000002095
-ENSG00000001063	ENSG00000001063
-ENSG00000001219	ENSG00000001219
-ENSG00000002187	ENSG00000002187
-ENSG00000000400	ENSG00000000400
-ENSG00000002059	ENSG00000002059
-ENSG00000002048	ENSG00000002048
-ENSG00000001095	ENSG00000001095
-ENSG00000001096	ENSG00000001096
-ENSG00000002054	ENSG00000002054
-ENSG00000001989	ENSG00000001989
-ENSG00000001840	ENSG00000001840
-ENSG00000000358	ENSG00000000358
-ENSG00000001788	ENSG00000001788
-ENSG00000000244	ENSG00000000244
-ENSG00000001677	ENSG00000001677
-ENSG00000001245	ENSG00000001245
-ENSG00000001328	ENSG00000001328
-ENSG00000002039	ENSG00000002039
-ENSG00000000197	ENSG00000000197
-ENSG00000000123	ENSG00000000123
-ENSG00000001702	ENSG00000001702
-ENSG00000002399	ENSG00000002399
-ENSG00000002094	ENSG00000002094
-ENSG00000000253	ENSG00000000253
-ENSG00000002121	ENSG00000002121
-ENSG00000000651	ENSG00000000651
-ENSG00000000886	ENSG00000000886
-ENSG00000000256	ENSG00000000256</textarea><div class='chips' id='geneset_fold_2'><span class='chip gene-chip' data-id='ENSG00000002330' data-symbol='BAD' data-search='ENSG00000002330 BAD'><code>ENSG00000002330</code></span><span class='chip gene-chip' data-id='ENSG00000002095' data-symbol='ENSG00000002095' data-search='ENSG00000002095 ENSG00000002095'><code>ENSG00000002095</code></span><span class='chip gene-chip' data-id='ENSG00000001063' data-symbol='ENSG00000001063' data-search='ENSG00000001063 ENSG00000001063'><code>ENSG00000001063</code></span><span class='chip gene-chip' data-id='ENSG00000001219' data-symbol='ENSG00000001219' data-search='ENSG00000001219 ENSG00000001219'><code>ENSG00000001219</code></span><span class='chip gene-chip' data-id='ENSG00000002187' data-symbol='ENSG00000002187' data-search='ENSG00000002187 ENSG00000002187'><code>ENSG00000002187</code></span><span class='chip gene-chip' data-id='ENSG00000000400' data-symbol='ENSG00000000400' data-search='ENSG00000000400 ENSG00000000400'><code>ENSG00000000400</code></span><span class='chip gene-chip' data-id='ENSG00000002059' data-symbol='ENSG00000002059' data-search='ENSG00000002059 ENSG00000002059'><code>ENSG00000002059</code></span><span class='chip gene-chip' data-id='ENSG00000002048' data-symbol='ENSG00000002048' data-search='ENSG00000002048 ENSG00000002048'><code>ENSG00000002048</code></span><span class='chip gene-chip' data-id='ENSG00000001095' data-symbol='ENSG00000001095' data-search='ENSG00000001095 ENSG00000001095'><code>ENSG00000001095</code></span><span class='chip gene-chip' data-id='ENSG00000001096' data-symbol='ENSG00000001096' data-search='ENSG00000001096 ENSG00000001096'><code>ENSG00000001096</code></span><span class='chip gene-chip' data-id='ENSG00000002054' data-symbol='ENSG00000002054' data-search='ENSG00000002054 ENSG00000002054'><code>ENSG00000002054</code></span><span class='chip gene-chip' data-id='ENSG00000001989' data-symbol='ENSG00000001989' data-search='ENSG00000001989 ENSG00000001989'><code>ENSG00000001989</code></span><span class='chip gene-chip' data-id='ENSG00000001840' data-symbol='ENSG00000001840' data-search='ENSG00000001840 ENSG00000001840'><code>ENSG00000001840</code></span><span class='chip gene-chip' data-id='ENSG00000000358' data-symbol='ENSG00000000358' data-search='ENSG00000000358 ENSG00000000358'><code>ENSG00000000358</code></span><span class='chip gene-chip' data-id='ENSG00000001788' data-symbol='ENSG00000001788' data-search='ENSG00000001788 ENSG00000001788'><code>ENSG00000001788</code></span><span class='chip gene-chip' data-id='ENSG00000000244' data-symbol='ENSG00000000244' data-search='ENSG00000000244 ENSG00000000244'><code>ENSG00000000244</code></span><span class='chip gene-chip' data-id='ENSG00000001677' data-symbol='ENSG00000001677' data-search='ENSG00000001677 ENSG00000001677'><code>ENSG00000001677</code></span><span class='chip gene-chip' data-id='ENSG00000001245' data-symbol='ENSG00000001245' data-search='ENSG00000001245 ENSG00000001245'><code>ENSG00000001245</code></span><span class='chip gene-chip' data-id='ENSG00000001328' data-symbol='ENSG00000001328' data-search='ENSG00000001328 ENSG00000001328'><code>ENSG00000001328</code></span><span class='chip gene-chip' data-id='ENSG00000002039' data-symbol='ENSG00000002039' data-search='ENSG00000002039 ENSG00000002039'><code>ENSG00000002039</code></span><span class='chip gene-chip' data-id='ENSG00000000197' data-symbol='ENSG00000000197' data-search='ENSG00000000197 ENSG00000000197'><code>ENSG00000000197</code></span><span class='chip gene-chip' data-id='ENSG00000000123' data-symbol='ENSG00000000123' data-search='ENSG00000000123 ENSG00000000123'><code>ENSG00000000123</code></span><span class='chip gene-chip' data-id='ENSG00000001702' data-symbol='ENSG00000001702' data-search='ENSG00000001702 ENSG00000001702'><code>ENSG00000001702</code></span><span class='chip gene-chip' data-id='ENSG00000002399' data-symbol='ENSG00000002399' data-search='ENSG00000002399 ENSG00000002399'><code>ENSG00000002399</code></span><span class='chip gene-chip' data-id='ENSG00000002094' data-symbol='ENSG00000002094' data-search='ENSG00000002094 ENSG00000002094'><code>ENSG00000002094</code></span><span class='chip gene-chip' data-id='ENSG00000000253' data-symbol='ENSG00000000253' data-search='ENSG00000000253 ENSG00000000253'><code>ENSG00000000253</code></span><span class='chip gene-chip' data-id='ENSG00000002121' data-symbol='ENSG00000002121' data-search='ENSG00000002121 ENSG00000002121'><code>ENSG00000002121</code></span><span class='chip gene-chip' data-id='ENSG00000000651' data-symbol='ENSG00000000651' data-search='ENSG00000000651 ENSG00000000651'><code>ENSG00000000651</code></span><span class='chip gene-chip' data-id='ENSG00000000886' data-symbol='ENSG00000000886' data-search='ENSG00000000886 ENSG00000000886'><code>ENSG00000000886</code></span><span class='chip gene-chip' data-id='ENSG00000000256' data-symbol='ENSG00000000256' data-search='ENSG00000000256 ENSG00000000256'><code>ENSG00000000256</code></span></div></div>
+  <div class="panel-body"><div class="toolbar"><input class="input" type="search" placeholder="Search…" data-target="geneset_fold_2" /><button class="btn" type="button" data-chip-toggle="geneset_fold_2" data-mode="id">Show symbols</button><button class="btn" data-copy="geneset_fold_2">Copy list</button><span class="muted small">30 items</span></div><textarea class="hidden" id="geneset_fold_2__data">ENSG00000001028	ENSG00000001028
+ENSG00000001964	ENSG00000001964
+ENSG00000001024	ENSG00000001024
+ENSG00000001809	ENSG00000001809
+ENSG00000000922	ENSG00000000922
+ENSG00000001167	NFYA
+ENSG00000001623	ENSG00000001623
+ENSG00000001962	ENSG00000001962
+ENSG00000000355	ENSG00000000355
+ENSG00000001570	ENSG00000001570
+ENSG00000001279	ENSG00000001279
+ENSG00000000156	ENSG00000000156
+ENSG00000000602	ENSG00000000602
+ENSG00000000720	ENSG00000000720
+ENSG00000000621	ENSG00000000621
+ENSG00000002169	ENSG00000002169
+ENSG00000001111	ENSG00000001111
+ENSG00000002235	ENSG00000002235
+ENSG00000002101	ENSG00000002101
+ENSG00000001871	ENSG00000001871
+ENSG00000001211	ENSG00000001211
+ENSG00000001904	ENSG00000001904
+ENSG00000000805	ENSG00000000805
+ENSG00000001396	ENSG00000001396
+ENSG00000000586	ENSG00000000586
+ENSG00000000206	ENSG00000000206
+ENSG00000001497	LAS1L
+ENSG00000001676	ENSG00000001676
+ENSG00000002231	ENSG00000002231
+ENSG00000000143	ENSG00000000143</textarea><div class='chips' id='geneset_fold_2'><span class='chip gene-chip' data-id='ENSG00000001028' data-symbol='ENSG00000001028' data-search='ENSG00000001028 ENSG00000001028'><code>ENSG00000001028</code></span><span class='chip gene-chip' data-id='ENSG00000001964' data-symbol='ENSG00000001964' data-search='ENSG00000001964 ENSG00000001964'><code>ENSG00000001964</code></span><span class='chip gene-chip' data-id='ENSG00000001024' data-symbol='ENSG00000001024' data-search='ENSG00000001024 ENSG00000001024'><code>ENSG00000001024</code></span><span class='chip gene-chip' data-id='ENSG00000001809' data-symbol='ENSG00000001809' data-search='ENSG00000001809 ENSG00000001809'><code>ENSG00000001809</code></span><span class='chip gene-chip' data-id='ENSG00000000922' data-symbol='ENSG00000000922' data-search='ENSG00000000922 ENSG00000000922'><code>ENSG00000000922</code></span><span class='chip gene-chip' data-id='ENSG00000001167' data-symbol='NFYA' data-search='ENSG00000001167 NFYA'><code>ENSG00000001167</code></span><span class='chip gene-chip' data-id='ENSG00000001623' data-symbol='ENSG00000001623' data-search='ENSG00000001623 ENSG00000001623'><code>ENSG00000001623</code></span><span class='chip gene-chip' data-id='ENSG00000001962' data-symbol='ENSG00000001962' data-search='ENSG00000001962 ENSG00000001962'><code>ENSG00000001962</code></span><span class='chip gene-chip' data-id='ENSG00000000355' data-symbol='ENSG00000000355' data-search='ENSG00000000355 ENSG00000000355'><code>ENSG00000000355</code></span><span class='chip gene-chip' data-id='ENSG00000001570' data-symbol='ENSG00000001570' data-search='ENSG00000001570 ENSG00000001570'><code>ENSG00000001570</code></span><span class='chip gene-chip' data-id='ENSG00000001279' data-symbol='ENSG00000001279' data-search='ENSG00000001279 ENSG00000001279'><code>ENSG00000001279</code></span><span class='chip gene-chip' data-id='ENSG00000000156' data-symbol='ENSG00000000156' data-search='ENSG00000000156 ENSG00000000156'><code>ENSG00000000156</code></span><span class='chip gene-chip' data-id='ENSG00000000602' data-symbol='ENSG00000000602' data-search='ENSG00000000602 ENSG00000000602'><code>ENSG00000000602</code></span><span class='chip gene-chip' data-id='ENSG00000000720' data-symbol='ENSG00000000720' data-search='ENSG00000000720 ENSG00000000720'><code>ENSG00000000720</code></span><span class='chip gene-chip' data-id='ENSG00000000621' data-symbol='ENSG00000000621' data-search='ENSG00000000621 ENSG00000000621'><code>ENSG00000000621</code></span><span class='chip gene-chip' data-id='ENSG00000002169' data-symbol='ENSG00000002169' data-search='ENSG00000002169 ENSG00000002169'><code>ENSG00000002169</code></span><span class='chip gene-chip' data-id='ENSG00000001111' data-symbol='ENSG00000001111' data-search='ENSG00000001111 ENSG00000001111'><code>ENSG00000001111</code></span><span class='chip gene-chip' data-id='ENSG00000002235' data-symbol='ENSG00000002235' data-search='ENSG00000002235 ENSG00000002235'><code>ENSG00000002235</code></span><span class='chip gene-chip' data-id='ENSG00000002101' data-symbol='ENSG00000002101' data-search='ENSG00000002101 ENSG00000002101'><code>ENSG00000002101</code></span><span class='chip gene-chip' data-id='ENSG00000001871' data-symbol='ENSG00000001871' data-search='ENSG00000001871 ENSG00000001871'><code>ENSG00000001871</code></span><span class='chip gene-chip' data-id='ENSG00000001211' data-symbol='ENSG00000001211' data-search='ENSG00000001211 ENSG00000001211'><code>ENSG00000001211</code></span><span class='chip gene-chip' data-id='ENSG00000001904' data-symbol='ENSG00000001904' data-search='ENSG00000001904 ENSG00000001904'><code>ENSG00000001904</code></span><span class='chip gene-chip' data-id='ENSG00000000805' data-symbol='ENSG00000000805' data-search='ENSG00000000805 ENSG00000000805'><code>ENSG00000000805</code></span><span class='chip gene-chip' data-id='ENSG00000001396' data-symbol='ENSG00000001396' data-search='ENSG00000001396 ENSG00000001396'><code>ENSG00000001396</code></span><span class='chip gene-chip' data-id='ENSG00000000586' data-symbol='ENSG00000000586' data-search='ENSG00000000586 ENSG00000000586'><code>ENSG00000000586</code></span><span class='chip gene-chip' data-id='ENSG00000000206' data-symbol='ENSG00000000206' data-search='ENSG00000000206 ENSG00000000206'><code>ENSG00000000206</code></span><span class='chip gene-chip' data-id='ENSG00000001497' data-symbol='LAS1L' data-search='ENSG00000001497 LAS1L'><code>ENSG00000001497</code></span><span class='chip gene-chip' data-id='ENSG00000001676' data-symbol='ENSG00000001676' data-search='ENSG00000001676 ENSG00000001676'><code>ENSG00000001676</code></span><span class='chip gene-chip' data-id='ENSG00000002231' data-symbol='ENSG00000002231' data-search='ENSG00000002231 ENSG00000002231'><code>ENSG00000002231</code></span><span class='chip gene-chip' data-id='ENSG00000000143' data-symbol='ENSG00000000143' data-search='ENSG00000000143 ENSG00000000143'><code>ENSG00000000143</code></span></div></div>
 </details><details class="panel">
-  <summary><span class="summary-title">Fold 3 (k=20)</span><span class='badge'>20</span></summary>
-  <div class="panel-body"><div class="toolbar"><input class="input" type="search" placeholder="Search…" data-target="geneset_fold_3" /><button class="btn" type="button" data-chip-toggle="geneset_fold_3" data-mode="id">Show symbols</button><button class="btn" data-copy="geneset_fold_3">Copy list</button><span class="muted small">20 items</span></div><textarea class="hidden" id="geneset_fold_3__data">ENSG00000002095	ENSG00000002095
-ENSG00000001096	ENSG00000001096
-ENSG00000001095	ENSG00000001095
-ENSG00000002330	BAD
-ENSG00000001063	ENSG00000001063
-ENSG00000000670	ENSG00000000670
-ENSG00000002048	ENSG00000002048
-ENSG00000001702	ENSG00000001702
-ENSG00000000651	ENSG00000000651
-ENSG00000001989	ENSG00000001989
-ENSG00000000197	ENSG00000000197
-ENSG00000001840	ENSG00000001840
-ENSG00000000149	ENSG00000000149
-ENSG00000000253	ENSG00000000253
-ENSG00000002187	ENSG00000002187
-ENSG00000002059	ENSG00000002059
-ENSG00000000358	ENSG00000000358
-ENSG00000000244	ENSG00000000244
-ENSG00000002121	ENSG00000002121
-ENSG00000002345	ENSG00000002345</textarea><div class='chips' id='geneset_fold_3'><span class='chip gene-chip' data-id='ENSG00000002095' data-symbol='ENSG00000002095' data-search='ENSG00000002095 ENSG00000002095'><code>ENSG00000002095</code></span><span class='chip gene-chip' data-id='ENSG00000001096' data-symbol='ENSG00000001096' data-search='ENSG00000001096 ENSG00000001096'><code>ENSG00000001096</code></span><span class='chip gene-chip' data-id='ENSG00000001095' data-symbol='ENSG00000001095' data-search='ENSG00000001095 ENSG00000001095'><code>ENSG00000001095</code></span><span class='chip gene-chip' data-id='ENSG00000002330' data-symbol='BAD' data-search='ENSG00000002330 BAD'><code>ENSG00000002330</code></span><span class='chip gene-chip' data-id='ENSG00000001063' data-symbol='ENSG00000001063' data-search='ENSG00000001063 ENSG00000001063'><code>ENSG00000001063</code></span><span class='chip gene-chip' data-id='ENSG00000000670' data-symbol='ENSG00000000670' data-search='ENSG00000000670 ENSG00000000670'><code>ENSG00000000670</code></span><span class='chip gene-chip' data-id='ENSG00000002048' data-symbol='ENSG00000002048' data-search='ENSG00000002048 ENSG00000002048'><code>ENSG00000002048</code></span><span class='chip gene-chip' data-id='ENSG00000001702' data-symbol='ENSG00000001702' data-search='ENSG00000001702 ENSG00000001702'><code>ENSG00000001702</code></span><span class='chip gene-chip' data-id='ENSG00000000651' data-symbol='ENSG00000000651' data-search='ENSG00000000651 ENSG00000000651'><code>ENSG00000000651</code></span><span class='chip gene-chip' data-id='ENSG00000001989' data-symbol='ENSG00000001989' data-search='ENSG00000001989 ENSG00000001989'><code>ENSG00000001989</code></span><span class='chip gene-chip' data-id='ENSG00000000197' data-symbol='ENSG00000000197' data-search='ENSG00000000197 ENSG00000000197'><code>ENSG00000000197</code></span><span class='chip gene-chip' data-id='ENSG00000001840' data-symbol='ENSG00000001840' data-search='ENSG00000001840 ENSG00000001840'><code>ENSG00000001840</code></span><span class='chip gene-chip' data-id='ENSG00000000149' data-symbol='ENSG00000000149' data-search='ENSG00000000149 ENSG00000000149'><code>ENSG00000000149</code></span><span class='chip gene-chip' data-id='ENSG00000000253' data-symbol='ENSG00000000253' data-search='ENSG00000000253 ENSG00000000253'><code>ENSG00000000253</code></span><span class='chip gene-chip' data-id='ENSG00000002187' data-symbol='ENSG00000002187' data-search='ENSG00000002187 ENSG00000002187'><code>ENSG00000002187</code></span><span class='chip gene-chip' data-id='ENSG00000002059' data-symbol='ENSG00000002059' data-search='ENSG00000002059 ENSG00000002059'><code>ENSG00000002059</code></span><span class='chip gene-chip' data-id='ENSG00000000358' data-symbol='ENSG00000000358' data-search='ENSG00000000358 ENSG00000000358'><code>ENSG00000000358</code></span><span class='chip gene-chip' data-id='ENSG00000000244' data-symbol='ENSG00000000244' data-search='ENSG00000000244 ENSG00000000244'><code>ENSG00000000244</code></span><span class='chip gene-chip' data-id='ENSG00000002121' data-symbol='ENSG00000002121' data-search='ENSG00000002121 ENSG00000002121'><code>ENSG00000002121</code></span><span class='chip gene-chip' data-id='ENSG00000002345' data-symbol='ENSG00000002345' data-search='ENSG00000002345 ENSG00000002345'><code>ENSG00000002345</code></span></div></div>
+  <summary><span class="summary-title">Fold 3 (k=30)</span><span class='badge'>30</span></summary>
+  <div class="panel-body"><div class="toolbar"><input class="input" type="search" placeholder="Search…" data-target="geneset_fold_3" /><button class="btn" type="button" data-chip-toggle="geneset_fold_3" data-mode="id">Show symbols</button><button class="btn" data-copy="geneset_fold_3">Copy list</button><span class="muted small">30 items</span></div><textarea class="hidden" id="geneset_fold_3__data">ENSG00000001024	ENSG00000001024
+ENSG00000001028	ENSG00000001028
+ENSG00000002231	ENSG00000002231
+ENSG00000001809	ENSG00000001809
+ENSG00000000720	ENSG00000000720
+ENSG00000001167	NFYA
+ENSG00000001964	ENSG00000001964
+ENSG00000001962	ENSG00000001962
+ENSG00000002381	ENSG00000002381
+ENSG00000001570	ENSG00000001570
+ENSG00000001904	ENSG00000001904
+ENSG00000000355	ENSG00000000355
+ENSG00000002011	ENSG00000002011
+ENSG00000001623	ENSG00000001623
+ENSG00000000349	ENSG00000000349
+ENSG00000001396	ENSG00000001396
+ENSG00000001279	ENSG00000001279
+ENSG00000001111	ENSG00000001111
+ENSG00000000922	ENSG00000000922
+ENSG00000000156	ENSG00000000156
+ENSG00000001871	ENSG00000001871
+ENSG00000000116	ENSG00000000116
+ENSG00000000730	ENSG00000000730
+ENSG00000002169	ENSG00000002169
+ENSG00000002235	ENSG00000002235
+ENSG00000000831	ENSG00000000831
+ENSG00000000805	ENSG00000000805
+ENSG00000001497	LAS1L
+ENSG00000000602	ENSG00000000602
+ENSG00000001676	ENSG00000001676</textarea><div class='chips' id='geneset_fold_3'><span class='chip gene-chip' data-id='ENSG00000001024' data-symbol='ENSG00000001024' data-search='ENSG00000001024 ENSG00000001024'><code>ENSG00000001024</code></span><span class='chip gene-chip' data-id='ENSG00000001028' data-symbol='ENSG00000001028' data-search='ENSG00000001028 ENSG00000001028'><code>ENSG00000001028</code></span><span class='chip gene-chip' data-id='ENSG00000002231' data-symbol='ENSG00000002231' data-search='ENSG00000002231 ENSG00000002231'><code>ENSG00000002231</code></span><span class='chip gene-chip' data-id='ENSG00000001809' data-symbol='ENSG00000001809' data-search='ENSG00000001809 ENSG00000001809'><code>ENSG00000001809</code></span><span class='chip gene-chip' data-id='ENSG00000000720' data-symbol='ENSG00000000720' data-search='ENSG00000000720 ENSG00000000720'><code>ENSG00000000720</code></span><span class='chip gene-chip' data-id='ENSG00000001167' data-symbol='NFYA' data-search='ENSG00000001167 NFYA'><code>ENSG00000001167</code></span><span class='chip gene-chip' data-id='ENSG00000001964' data-symbol='ENSG00000001964' data-search='ENSG00000001964 ENSG00000001964'><code>ENSG00000001964</code></span><span class='chip gene-chip' data-id='ENSG00000001962' data-symbol='ENSG00000001962' data-search='ENSG00000001962 ENSG00000001962'><code>ENSG00000001962</code></span><span class='chip gene-chip' data-id='ENSG00000002381' data-symbol='ENSG00000002381' data-search='ENSG00000002381 ENSG00000002381'><code>ENSG00000002381</code></span><span class='chip gene-chip' data-id='ENSG00000001570' data-symbol='ENSG00000001570' data-search='ENSG00000001570 ENSG00000001570'><code>ENSG00000001570</code></span><span class='chip gene-chip' data-id='ENSG00000001904' data-symbol='ENSG00000001904' data-search='ENSG00000001904 ENSG00000001904'><code>ENSG00000001904</code></span><span class='chip gene-chip' data-id='ENSG00000000355' data-symbol='ENSG00000000355' data-search='ENSG00000000355 ENSG00000000355'><code>ENSG00000000355</code></span><span class='chip gene-chip' data-id='ENSG00000002011' data-symbol='ENSG00000002011' data-search='ENSG00000002011 ENSG00000002011'><code>ENSG00000002011</code></span><span class='chip gene-chip' data-id='ENSG00000001623' data-symbol='ENSG00000001623' data-search='ENSG00000001623 ENSG00000001623'><code>ENSG00000001623</code></span><span class='chip gene-chip' data-id='ENSG00000000349' data-symbol='ENSG00000000349' data-search='ENSG00000000349 ENSG00000000349'><code>ENSG00000000349</code></span><span class='chip gene-chip' data-id='ENSG00000001396' data-symbol='ENSG00000001396' data-search='ENSG00000001396 ENSG00000001396'><code>ENSG00000001396</code></span><span class='chip gene-chip' data-id='ENSG00000001279' data-symbol='ENSG00000001279' data-search='ENSG00000001279 ENSG00000001279'><code>ENSG00000001279</code></span><span class='chip gene-chip' data-id='ENSG00000001111' data-symbol='ENSG00000001111' data-search='ENSG00000001111 ENSG00000001111'><code>ENSG00000001111</code></span><span class='chip gene-chip' data-id='ENSG00000000922' data-symbol='ENSG00000000922' data-search='ENSG00000000922 ENSG00000000922'><code>ENSG00000000922</code></span><span class='chip gene-chip' data-id='ENSG00000000156' data-symbol='ENSG00000000156' data-search='ENSG00000000156 ENSG00000000156'><code>ENSG00000000156</code></span><span class='chip gene-chip' data-id='ENSG00000001871' data-symbol='ENSG00000001871' data-search='ENSG00000001871 ENSG00000001871'><code>ENSG00000001871</code></span><span class='chip gene-chip' data-id='ENSG00000000116' data-symbol='ENSG00000000116' data-search='ENSG00000000116 ENSG00000000116'><code>ENSG00000000116</code></span><span class='chip gene-chip' data-id='ENSG00000000730' data-symbol='ENSG00000000730' data-search='ENSG00000000730 ENSG00000000730'><code>ENSG00000000730</code></span><span class='chip gene-chip' data-id='ENSG00000002169' data-symbol='ENSG00000002169' data-search='ENSG00000002169 ENSG00000002169'><code>ENSG00000002169</code></span><span class='chip gene-chip' data-id='ENSG00000002235' data-symbol='ENSG00000002235' data-search='ENSG00000002235 ENSG00000002235'><code>ENSG00000002235</code></span><span class='chip gene-chip' data-id='ENSG00000000831' data-symbol='ENSG00000000831' data-search='ENSG00000000831 ENSG00000000831'><code>ENSG00000000831</code></span><span class='chip gene-chip' data-id='ENSG00000000805' data-symbol='ENSG00000000805' data-search='ENSG00000000805 ENSG00000000805'><code>ENSG00000000805</code></span><span class='chip gene-chip' data-id='ENSG00000001497' data-symbol='LAS1L' data-search='ENSG00000001497 LAS1L'><code>ENSG00000001497</code></span><span class='chip gene-chip' data-id='ENSG00000000602' data-symbol='ENSG00000000602' data-search='ENSG00000000602 ENSG00000000602'><code>ENSG00000000602</code></span><span class='chip gene-chip' data-id='ENSG00000001676' data-symbol='ENSG00000001676' data-search='ENSG00000001676 ENSG00000001676'><code>ENSG00000001676</code></span></div></div>
 </details><details class="panel">
   <summary><span class="summary-title">Fold 4 (k=30)</span><span class='badge'>30</span></summary>
-  <div class="panel-body"><div class="toolbar"><input class="input" type="search" placeholder="Search…" data-target="geneset_fold_4" /><button class="btn" type="button" data-chip-toggle="geneset_fold_4" data-mode="id">Show symbols</button><button class="btn" data-copy="geneset_fold_4">Copy list</button><span class="muted small">30 items</span></div><textarea class="hidden" id="geneset_fold_4__data">ENSG00000000256	ENSG00000000256
-ENSG00000002095	ENSG00000002095
-ENSG00000001063	ENSG00000001063
-ENSG00000001989	ENSG00000001989
-ENSG00000002330	BAD
-ENSG00000001095	ENSG00000001095
-ENSG00000001840	ENSG00000001840
-ENSG00000002054	ENSG00000002054
-ENSG00000001788	ENSG00000001788
-ENSG00000000197	ENSG00000000197
-ENSG00000002187	ENSG00000002187
-ENSG00000000358	ENSG00000000358
-ENSG00000002059	ENSG00000002059
-ENSG00000001096	ENSG00000001096
-ENSG00000002094	ENSG00000002094
-ENSG00000000651	ENSG00000000651
-ENSG00000000149	ENSG00000000149
-ENSG00000001219	ENSG00000001219
-ENSG00000000244	ENSG00000000244
-ENSG00000002048	ENSG00000002048
-ENSG00000001677	ENSG00000001677
-ENSG00000001639	ENSG00000001639
-ENSG00000000886	ENSG00000000886
-ENSG00000000400	ENSG00000000400
-ENSG00000001245	ENSG00000001245
-ENSG00000002039	ENSG00000002039
-ENSG00000002399	ENSG00000002399
-ENSG00000000253	ENSG00000000253
-ENSG00000000593	ENSG00000000593
-ENSG00000000038	ENSG00000000038</textarea><div class='chips' id='geneset_fold_4'><span class='chip gene-chip' data-id='ENSG00000000256' data-symbol='ENSG00000000256' data-search='ENSG00000000256 ENSG00000000256'><code>ENSG00000000256</code></span><span class='chip gene-chip' data-id='ENSG00000002095' data-symbol='ENSG00000002095' data-search='ENSG00000002095 ENSG00000002095'><code>ENSG00000002095</code></span><span class='chip gene-chip' data-id='ENSG00000001063' data-symbol='ENSG00000001063' data-search='ENSG00000001063 ENSG00000001063'><code>ENSG00000001063</code></span><span class='chip gene-chip' data-id='ENSG00000001989' data-symbol='ENSG00000001989' data-search='ENSG00000001989 ENSG00000001989'><code>ENSG00000001989</code></span><span class='chip gene-chip' data-id='ENSG00000002330' data-symbol='BAD' data-search='ENSG00000002330 BAD'><code>ENSG00000002330</code></span><span class='chip gene-chip' data-id='ENSG00000001095' data-symbol='ENSG00000001095' data-search='ENSG00000001095 ENSG00000001095'><code>ENSG00000001095</code></span><span class='chip gene-chip' data-id='ENSG00000001840' data-symbol='ENSG00000001840' data-search='ENSG00000001840 ENSG00000001840'><code>ENSG00000001840</code></span><span class='chip gene-chip' data-id='ENSG00000002054' data-symbol='ENSG00000002054' data-search='ENSG00000002054 ENSG00000002054'><code>ENSG00000002054</code></span><span class='chip gene-chip' data-id='ENSG00000001788' data-symbol='ENSG00000001788' data-search='ENSG00000001788 ENSG00000001788'><code>ENSG00000001788</code></span><span class='chip gene-chip' data-id='ENSG00000000197' data-symbol='ENSG00000000197' data-search='ENSG00000000197 ENSG00000000197'><code>ENSG00000000197</code></span><span class='chip gene-chip' data-id='ENSG00000002187' data-symbol='ENSG00000002187' data-search='ENSG00000002187 ENSG00000002187'><code>ENSG00000002187</code></span><span class='chip gene-chip' data-id='ENSG00000000358' data-symbol='ENSG00000000358' data-search='ENSG00000000358 ENSG00000000358'><code>ENSG00000000358</code></span><span class='chip gene-chip' data-id='ENSG00000002059' data-symbol='ENSG00000002059' data-search='ENSG00000002059 ENSG00000002059'><code>ENSG00000002059</code></span><span class='chip gene-chip' data-id='ENSG00000001096' data-symbol='ENSG00000001096' data-search='ENSG00000001096 ENSG00000001096'><code>ENSG00000001096</code></span><span class='chip gene-chip' data-id='ENSG00000002094' data-symbol='ENSG00000002094' data-search='ENSG00000002094 ENSG00000002094'><code>ENSG00000002094</code></span><span class='chip gene-chip' data-id='ENSG00000000651' data-symbol='ENSG00000000651' data-search='ENSG00000000651 ENSG00000000651'><code>ENSG00000000651</code></span><span class='chip gene-chip' data-id='ENSG00000000149' data-symbol='ENSG00000000149' data-search='ENSG00000000149 ENSG00000000149'><code>ENSG00000000149</code></span><span class='chip gene-chip' data-id='ENSG00000001219' data-symbol='ENSG00000001219' data-search='ENSG00000001219 ENSG00000001219'><code>ENSG00000001219</code></span><span class='chip gene-chip' data-id='ENSG00000000244' data-symbol='ENSG00000000244' data-search='ENSG00000000244 ENSG00000000244'><code>ENSG00000000244</code></span><span class='chip gene-chip' data-id='ENSG00000002048' data-symbol='ENSG00000002048' data-search='ENSG00000002048 ENSG00000002048'><code>ENSG00000002048</code></span><span class='chip gene-chip' data-id='ENSG00000001677' data-symbol='ENSG00000001677' data-search='ENSG00000001677 ENSG00000001677'><code>ENSG00000001677</code></span><span class='chip gene-chip' data-id='ENSG00000001639' data-symbol='ENSG00000001639' data-search='ENSG00000001639 ENSG00000001639'><code>ENSG00000001639</code></span><span class='chip gene-chip' data-id='ENSG00000000886' data-symbol='ENSG00000000886' data-search='ENSG00000000886 ENSG00000000886'><code>ENSG00000000886</code></span><span class='chip gene-chip' data-id='ENSG00000000400' data-symbol='ENSG00000000400' data-search='ENSG00000000400 ENSG00000000400'><code>ENSG00000000400</code></span><span class='chip gene-chip' data-id='ENSG00000001245' data-symbol='ENSG00000001245' data-search='ENSG00000001245 ENSG00000001245'><code>ENSG00000001245</code></span><span class='chip gene-chip' data-id='ENSG00000002039' data-symbol='ENSG00000002039' data-search='ENSG00000002039 ENSG00000002039'><code>ENSG00000002039</code></span><span class='chip gene-chip' data-id='ENSG00000002399' data-symbol='ENSG00000002399' data-search='ENSG00000002399 ENSG00000002399'><code>ENSG00000002399</code></span><span class='chip gene-chip' data-id='ENSG00000000253' data-symbol='ENSG00000000253' data-search='ENSG00000000253 ENSG00000000253'><code>ENSG00000000253</code></span><span class='chip gene-chip' data-id='ENSG00000000593' data-symbol='ENSG00000000593' data-search='ENSG00000000593 ENSG00000000593'><code>ENSG00000000593</code></span><span class='chip gene-chip' data-id='ENSG00000000038' data-symbol='ENSG00000000038' data-search='ENSG00000000038 ENSG00000000038'><code>ENSG00000000038</code></span></div></div>
+  <div class="panel-body"><div class="toolbar"><input class="input" type="search" placeholder="Search…" data-target="geneset_fold_4" /><button class="btn" type="button" data-chip-toggle="geneset_fold_4" data-mode="id">Show symbols</button><button class="btn" data-copy="geneset_fold_4">Copy list</button><span class="muted small">30 items</span></div><textarea class="hidden" id="geneset_fold_4__data">ENSG00000001809	ENSG00000001809
+ENSG00000001211	ENSG00000001211
+ENSG00000001024	ENSG00000001024
+ENSG00000000355	ENSG00000000355
+ENSG00000001028	ENSG00000001028
+ENSG00000001167	NFYA
+ENSG00000000720	ENSG00000000720
+ENSG00000001623	ENSG00000001623
+ENSG00000002101	ENSG00000002101
+ENSG00000001038	ENSG00000001038
+ENSG00000001962	ENSG00000001962
+ENSG00000000156	ENSG00000000156
+ENSG00000001279	ENSG00000001279
+ENSG00000001570	ENSG00000001570
+ENSG00000002169	ENSG00000002169
+ENSG00000000812	ENSG00000000812
+ENSG00000002381	ENSG00000002381
+ENSG00000001964	ENSG00000001964
+ENSG00000002011	ENSG00000002011
+ENSG00000000396	ENSG00000000396
+ENSG00000000602	ENSG00000000602
+ENSG00000000922	ENSG00000000922
+ENSG00000000520	ENSG00000000520
+ENSG00000001400	ENSG00000001400
+ENSG00000001111	ENSG00000001111
+ENSG00000001541	ENSG00000001541
+ENSG00000002231	ENSG00000002231
+ENSG00000002222	ENSG00000002222
+ENSG00000000249	ENSG00000000249
+ENSG00000000116	ENSG00000000116</textarea><div class='chips' id='geneset_fold_4'><span class='chip gene-chip' data-id='ENSG00000001809' data-symbol='ENSG00000001809' data-search='ENSG00000001809 ENSG00000001809'><code>ENSG00000001809</code></span><span class='chip gene-chip' data-id='ENSG00000001211' data-symbol='ENSG00000001211' data-search='ENSG00000001211 ENSG00000001211'><code>ENSG00000001211</code></span><span class='chip gene-chip' data-id='ENSG00000001024' data-symbol='ENSG00000001024' data-search='ENSG00000001024 ENSG00000001024'><code>ENSG00000001024</code></span><span class='chip gene-chip' data-id='ENSG00000000355' data-symbol='ENSG00000000355' data-search='ENSG00000000355 ENSG00000000355'><code>ENSG00000000355</code></span><span class='chip gene-chip' data-id='ENSG00000001028' data-symbol='ENSG00000001028' data-search='ENSG00000001028 ENSG00000001028'><code>ENSG00000001028</code></span><span class='chip gene-chip' data-id='ENSG00000001167' data-symbol='NFYA' data-search='ENSG00000001167 NFYA'><code>ENSG00000001167</code></span><span class='chip gene-chip' data-id='ENSG00000000720' data-symbol='ENSG00000000720' data-search='ENSG00000000720 ENSG00000000720'><code>ENSG00000000720</code></span><span class='chip gene-chip' data-id='ENSG00000001623' data-symbol='ENSG00000001623' data-search='ENSG00000001623 ENSG00000001623'><code>ENSG00000001623</code></span><span class='chip gene-chip' data-id='ENSG00000002101' data-symbol='ENSG00000002101' data-search='ENSG00000002101 ENSG00000002101'><code>ENSG00000002101</code></span><span class='chip gene-chip' data-id='ENSG00000001038' data-symbol='ENSG00000001038' data-search='ENSG00000001038 ENSG00000001038'><code>ENSG00000001038</code></span><span class='chip gene-chip' data-id='ENSG00000001962' data-symbol='ENSG00000001962' data-search='ENSG00000001962 ENSG00000001962'><code>ENSG00000001962</code></span><span class='chip gene-chip' data-id='ENSG00000000156' data-symbol='ENSG00000000156' data-search='ENSG00000000156 ENSG00000000156'><code>ENSG00000000156</code></span><span class='chip gene-chip' data-id='ENSG00000001279' data-symbol='ENSG00000001279' data-search='ENSG00000001279 ENSG00000001279'><code>ENSG00000001279</code></span><span class='chip gene-chip' data-id='ENSG00000001570' data-symbol='ENSG00000001570' data-search='ENSG00000001570 ENSG00000001570'><code>ENSG00000001570</code></span><span class='chip gene-chip' data-id='ENSG00000002169' data-symbol='ENSG00000002169' data-search='ENSG00000002169 ENSG00000002169'><code>ENSG00000002169</code></span><span class='chip gene-chip' data-id='ENSG00000000812' data-symbol='ENSG00000000812' data-search='ENSG00000000812 ENSG00000000812'><code>ENSG00000000812</code></span><span class='chip gene-chip' data-id='ENSG00000002381' data-symbol='ENSG00000002381' data-search='ENSG00000002381 ENSG00000002381'><code>ENSG00000002381</code></span><span class='chip gene-chip' data-id='ENSG00000001964' data-symbol='ENSG00000001964' data-search='ENSG00000001964 ENSG00000001964'><code>ENSG00000001964</code></span><span class='chip gene-chip' data-id='ENSG00000002011' data-symbol='ENSG00000002011' data-search='ENSG00000002011 ENSG00000002011'><code>ENSG00000002011</code></span><span class='chip gene-chip' data-id='ENSG00000000396' data-symbol='ENSG00000000396' data-search='ENSG00000000396 ENSG00000000396'><code>ENSG00000000396</code></span><span class='chip gene-chip' data-id='ENSG00000000602' data-symbol='ENSG00000000602' data-search='ENSG00000000602 ENSG00000000602'><code>ENSG00000000602</code></span><span class='chip gene-chip' data-id='ENSG00000000922' data-symbol='ENSG00000000922' data-search='ENSG00000000922 ENSG00000000922'><code>ENSG00000000922</code></span><span class='chip gene-chip' data-id='ENSG00000000520' data-symbol='ENSG00000000520' data-search='ENSG00000000520 ENSG00000000520'><code>ENSG00000000520</code></span><span class='chip gene-chip' data-id='ENSG00000001400' data-symbol='ENSG00000001400' data-search='ENSG00000001400 ENSG00000001400'><code>ENSG00000001400</code></span><span class='chip gene-chip' data-id='ENSG00000001111' data-symbol='ENSG00000001111' data-search='ENSG00000001111 ENSG00000001111'><code>ENSG00000001111</code></span><span class='chip gene-chip' data-id='ENSG00000001541' data-symbol='ENSG00000001541' data-search='ENSG00000001541 ENSG00000001541'><code>ENSG00000001541</code></span><span class='chip gene-chip' data-id='ENSG00000002231' data-symbol='ENSG00000002231' data-search='ENSG00000002231 ENSG00000002231'><code>ENSG00000002231</code></span><span class='chip gene-chip' data-id='ENSG00000002222' data-symbol='ENSG00000002222' data-search='ENSG00000002222 ENSG00000002222'><code>ENSG00000002222</code></span><span class='chip gene-chip' data-id='ENSG00000000249' data-symbol='ENSG00000000249' data-search='ENSG00000000249 ENSG00000000249'><code>ENSG00000000249</code></span><span class='chip gene-chip' data-id='ENSG00000000116' data-symbol='ENSG00000000116' data-search='ENSG00000000116 ENSG00000000116'><code>ENSG00000000116</code></span></div></div>
 </details>
 </section>
 </section><section class="card">
   <h2>Test (Holdout)</h2>
   
-  <table class='kv'><tr><th>class</th><th>precision</th><th>recall</th><th>f1</th><th>support</th></tr><tr><td>class 1</td><td>1.0000</td><td>0.9000</td><td>0.9474</td><td>30</td></tr><tr><td>class 2</td><td>0.9667</td><td>0.9667</td><td>0.9667</td><td>30</td></tr><tr><td>class 3</td><td>0.9667</td><td>0.9667</td><td>0.9667</td><td>30</td></tr><tr><td>class 4</td><td>0.9091</td><td>1.0000</td><td>0.9524</td><td>30</td></tr></table>
+  <table class='kv'><tr><th>class</th><th>precision</th><th>recall</th><th>f1</th><th>support</th></tr><tr><td>class 1</td><td>1.0000</td><td>1.0000</td><td>1.0000</td><td>30</td></tr><tr><td>class 2</td><td>1.0000</td><td>0.9667</td><td>0.9831</td><td>30</td></tr><tr><td>class 3</td><td>0.9677</td><td>1.0000</td><td>0.9836</td><td>30</td></tr><tr><td>class 4</td><td>1.0000</td><td>1.0000</td><td>1.0000</td><td>30</td></tr></table>
 </section><section class="card">
   <h2>Hyperparameters (final, from full-data tune)</h2>
   
-  <table class='kv'><tr><th>Colsample bylevel</th><td>0.5000</td></tr><tr><th>Colsample bynode</th><td>0.7394</td></tr><tr><th>Colsample bytree</th><td>0.5000</td></tr><tr><th>Gamma</th><td>0.0000</td></tr><tr><th>Learning rate</th><td>0.0100</td></tr><tr><th>Max depth</th><td>10</td></tr><tr><th>Min child weight</th><td>0.1000</td></tr><tr><th>N estimators</th><td>600</td></tr><tr><th>Reg alpha</th><td>10.0000</td></tr><tr><th>Reg lambda</th><td>10.0000</td></tr><tr><th>Subsample</th><td>0.5000</td></tr></table>
+  <table class='kv'><tr><th>Colsample bylevel</th><td>0.5839</td></tr><tr><th>Colsample bynode</th><td>0.7649</td></tr><tr><th>Colsample bytree</th><td>0.5000</td></tr><tr><th>Gamma</th><td>0.0000</td></tr><tr><th>Learning rate</th><td>0.0100</td></tr><tr><th>Max depth</th><td>3</td></tr><tr><th>Min child weight</th><td>0.1000</td></tr><tr><th>N estimators</th><td>288</td></tr><tr><th>Reg alpha</th><td>0.0000</td></tr><tr><th>Reg lambda</th><td>0.1639</td></tr><tr><th>Subsample</th><td>0.6180</td></tr></table>
 </section><details class="panel" open>
   <summary><span class="summary-title">Threshold Optimization</span></summary>
   <div class="panel-body"><section class="card">
   <h2>Holdout Metrics</h2>
   
-  <div class='grid grid-4'><div class='metric'><div class='metric-k'>Test Macro-F1</div><div class='metric-v'>0.9833</div></div><div class='metric'><div class='metric-k'>Test AUROC (macro)</div><div class='metric-v'>0.9976</div></div><div class='metric'><div class='metric-k'>Test Accuracy</div><div class='metric-v'>0.9833</div></div><div class='metric'><div class='metric-k'>Test LogLoss</div><div class='metric-v'>0.5082</div></div></div>
+  <div class='grid grid-4'><div class='metric'><div class='metric-k'>Test Macro-F1</div><div class='metric-v'>0.9917</div></div><div class='metric'><div class='metric-k'>Test AUROC (macro)</div><div class='metric-v'>0.9993</div></div><div class='metric'><div class='metric-k'>Test Accuracy</div><div class='metric-v'>0.9917</div></div><div class='metric'><div class='metric-k'>Test LogLoss</div><div class='metric-v'>0.3088</div></div></div>
 </section><section class="card">
   <h2>Learned Thresholds</h2>
   
-  <table class='kv'><tr><th>Source</th><td>OOF training predictions</td></tr><tr><th>Method</th><td>per_class_probability_ratio</td></tr><tr><th>Optimized metric</th><td>f1_macro</td></tr><tr><th>OOF baseline F1</th><td>0.9167</td></tr><tr><th>OOF optimized F1</th><td>0.9270</td></tr></table><div style='height:10px;'></div><table class='kv'><tr><th>Class</th><th>Threshold</th></tr><tr><td>class 1</td><td>0.4000</td></tr><tr><td>class 2</td><td>0.4500</td></tr><tr><td>class 3</td><td>0.5000</td></tr><tr><td>class 4</td><td>0.4500</td></tr></table>
+  <table class='kv'><tr><th>Source</th><td>OOF training predictions</td></tr><tr><th>Method</th><td>per_class_probability_ratio</td></tr><tr><th>Optimized metric</th><td>f1_macro</td></tr><tr><th>OOF baseline F1</th><td>0.9519</td></tr><tr><th>OOF optimized F1</th><td>0.9583</td></tr></table><div style='height:10px;'></div><table class='kv'><tr><th>Class</th><th>Threshold</th></tr><tr><td>class 1</td><td>0.4500</td></tr><tr><td>class 2</td><td>0.5000</td></tr><tr><td>class 3</td><td>0.4500</td></tr><tr><td>class 4</td><td>0.5000</td></tr></table>
 </section><section class="card">
   <h2>Per-Class Holdout Metrics</h2>
   
-  <table class='kv'><tr><th>class</th><th>precision</th><th>recall</th><th>f1</th><th>support</th></tr><tr><td>class 1</td><td>1.0000</td><td>0.9667</td><td>0.9831</td><td>30</td></tr><tr><td>class 2</td><td>0.9677</td><td>1.0000</td><td>0.9836</td><td>30</td></tr><tr><td>class 3</td><td>1.0000</td><td>0.9667</td><td>0.9831</td><td>30</td></tr><tr><td>class 4</td><td>0.9677</td><td>1.0000</td><td>0.9836</td><td>30</td></tr></table>
+  <table class='kv'><tr><th>class</th><th>precision</th><th>recall</th><th>f1</th><th>support</th></tr><tr><td>class 1</td><td>1.0000</td><td>1.0000</td><td>1.0000</td><td>30</td></tr><tr><td>class 2</td><td>1.0000</td><td>0.9667</td><td>0.9831</td><td>30</td></tr><tr><td>class 3</td><td>0.9677</td><td>1.0000</td><td>0.9836</td><td>30</td></tr><tr><td>class 4</td><td>1.0000</td><td>1.0000</td><td>1.0000</td><td>30</td></tr></table>
 </section></div>
 </details><section class="card">
   <h2>Artifacts</h2>
   
-  <ul><li><code>model</code>: /data01/private/projects/omiclass/examples/results/pipeline-20260509-121958/train_artifacts/xgboost.joblib</li></ul>
+  <ul><li><code>model</code>: /data01/private/projects/omiclass/examples/results/python_example-20260512-173926/train_artifacts/xgboost.joblib</li></ul>
 </section>
       </main>
 

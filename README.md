@@ -13,7 +13,7 @@ The framework is designed to run either directly with Python or inside Docker, s
 - Imbalance handling using class weights and oversampling strategies
 - Output folders with trained models, predictions, metrics, and reports
 
-## Schema
+## Framework Overview
 ![Schema](examples/image/schema.png)
 
 ## Repository structure
@@ -175,12 +175,23 @@ The `examples/` folder contains:
 ```text
 examples/
 ├── README.md
+├── run_bash_example.sh
+├── run_bash_re_run_example.sh
+├── run_docker_example.sh
+├── run_docker_re_run_example.sh
 ├── run_python_example.py
-├── run_docker_example.py
+└── run_python_re_run_example.py
+├── image/
+├── results/
+│   ├── Docker_results
+│   ├── Bash_results
+│   └── Python_results
 └── data/
-    ├── hold_out_patients.txt
+    ├── gene_lengths.csv
     ├── patients_meta.csv
+    ├── patients_meta_with_external.csv
     ├── raw_counts.csv
+    ├── raw_counts_with_external.csv
     └── README.md
 ```
 

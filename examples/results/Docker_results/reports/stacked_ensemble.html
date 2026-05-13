@@ -748,8 +748,7 @@ code{
 <nav class='sidebar-nav'>
 <details class="nav-group" open>
               <summary class="nav-group-title">Final summary</summary>
-              <div class="nav-group-items"><a class='nav-item' href='../final_report.html'>Global evaluation</a>
-<a class='nav-item' href='../final_summary_threshold_optimized.html'>Threshold optimized</a></div>
+              <div class="nav-group-items"><a class='nav-item' href='../final_report.html'>Global evaluation</a></div>
             </details>
 <details class="nav-group" open>
               <summary class="nav-group-title">Models</summary>
@@ -771,6 +770,16 @@ code{
               <summary class="nav-group-title">Differential expression</summary>
               <div class="nav-group-items"><a class='nav-item' href='../de_results/de_report.html'>DE report</a></div>
             </details>
+<details class="nav-group">
+              <summary class="nav-group-title">Prediction & Survival</summary>
+              <div class="nav-group-items"><a class='nav-item' href='../survival_prediction/weighted_random_forest_survival_prediction.html'>Prediction + KM</a></div>
+            </details>
+<details class="nav-group">
+              <summary class="nav-group-title">Limma re-correction</summary>
+              <div class="nav-group-items"><a class='nav-item' href='../limma_re-correction/index.html'>Overview</a>
+<a class='nav-item' href='../limma_re-correction/diagnostic_plots.html'>Diagnostic plots</a>
+<a class='nav-item' href='../limma_re-correction/pca_comparison.html'>PCA comparison</a></div>
+            </details>
 </nav>
 </aside>
       <main class="main">
@@ -784,29 +793,29 @@ code{
         <section class="card">
   <h2>Stacked Ensemble</h2>
   
-  <div class='muted'>HonestStackingClassifier</div><div class='muted'>Run: <code>/app/results/pipeline-20260507-191940</code> • 2026-05-07T21:22:55</div>
+  <div class='muted'>HonestStackingClassifier</div><div class='muted'>Run: <code>/app/results/docker_example-20260513-064217</code> • 2026-05-13T07:54:07</div>
 </section><section class="card">
   <h2>Data &amp; Provenance</h2>
   
-  <table class='kv'><tr><th>X shape</th><td>(480, 32)</td></tr><tr><th>Y length</th><td>480</td></tr><tr><th>Class counts</th><td><table class='kv'><tr><th>Class 1</th><td>120</td></tr><tr><th>Class 4</th><td>120</td></tr><tr><th>Class 2</th><td>120</td></tr><tr><th>Class 3</th><td>120</td></tr></table></td></tr></table><div style='height:10px;'></div><table class='kv'><tr><th>Git</th><td>—</td></tr><tr><th>Python</th><td>3.9.23</td></tr><tr><th>Env</th><td>omiclass_env</td></tr><tr><th>Seed</th><td>42</td></tr></table><details class="panel">
+  <table class='kv'><tr><th>X shape</th><td>(480, 34)</td></tr><tr><th>Y length</th><td>480</td></tr><tr><th>Class counts</th><td><table class='kv'><tr><th>Class 4</th><td>126</td></tr><tr><th>Class 3</th><td>121</td></tr><tr><th>Class 1</th><td>118</td></tr><tr><th>Class 2</th><td>115</td></tr></table></td></tr></table><div style='height:10px;'></div><table class='kv'><tr><th>Git</th><td>—</td></tr><tr><th>Python</th><td>3.9.23</td></tr><tr><th>Env</th><td>omiclass_env</td></tr><tr><th>Seed</th><td>42</td></tr></table><details class="panel">
   <summary><span class="summary-title">Full config snapshot</span></summary>
-  <div class="panel-body"><table class='kv'><tr><th>CV folds</th><td>5</td></tr><tr><th>Scoring</th><td>f1_macro</td></tr><tr><th>Base models</th><td><ul style='margin:0; padding-left:18px;'><li>plain_random_forest</li><li>xgboost</li><li>light_gbm</li></ul></td></tr><tr><th>Meta</th><td>logreg(solver=lbfgs, max_iter=500)</td></tr><tr><th>Passthrough</th><td>True</td></tr></table></div>
+  <div class="panel-body"><table class='kv'><tr><th>CV folds</th><td>5</td></tr><tr><th>Scoring</th><td>f1_macro</td></tr><tr><th>Base models</th><td><ul style='margin:0; padding-left:18px;'><li>weighted_random_forest</li><li>xgboost</li><li>light_gbm</li></ul></td></tr><tr><th>Meta</th><td>logreg(solver=lbfgs, max_iter=500)</td></tr><tr><th>Passthrough</th><td>True</td></tr></table></div>
 </details>
 </section><section class="card">
   <h2>Scorecards</h2>
   
-  <div class='grid grid-4'><div class='metric'><div class='metric-k'>CV Macro-F1</div><div class='metric-v'>0.9145 ± 0.0328</div></div><div class='metric'><div class='metric-k'>CV AUROC (macro)</div><div class='metric-v'>—</div></div><div class='metric'><div class='metric-k'>CV Accuracy</div><div class='metric-v'>0.9146 ± 0.0332</div></div><div class='metric'><div class='metric-k'>CV LogLoss</div><div class='metric-v'>—</div></div></div><div style='height:10px;'></div><div class='grid grid-4'><div class='metric'><div class='metric-k'>Test Macro-F1</div><div class='metric-v'>0.9415</div></div><div class='metric'><div class='metric-k'>Test AUROC (macro)</div><div class='metric-v'>0.9961</div></div><div class='metric'><div class='metric-k'>Test Accuracy</div><div class='metric-v'>0.9417</div></div><div class='metric'><div class='metric-k'>Test LogLoss</div><div class='metric-v'>0.1473</div></div></div>
+  <div class='grid grid-4'><div class='metric'><div class='metric-k'>CV Macro-F1</div><div class='metric-v'>0.9601 ± 0.0154</div></div><div class='metric'><div class='metric-k'>CV AUROC (macro)</div><div class='metric-v'>—</div></div><div class='metric'><div class='metric-k'>CV Accuracy</div><div class='metric-v'>0.9604 ± 0.0153</div></div><div class='metric'><div class='metric-k'>CV LogLoss</div><div class='metric-v'>—</div></div></div><div style='height:10px;'></div><div class='grid grid-4'><div class='metric'><div class='metric-k'>Test Macro-F1</div><div class='metric-v'>0.9743</div></div><div class='metric'><div class='metric-k'>Test AUROC (macro)</div><div class='metric-v'>0.9993</div></div><div class='metric'><div class='metric-k'>Test Accuracy</div><div class='metric-v'>0.9750</div></div><div class='metric'><div class='metric-k'>Test LogLoss</div><div class='metric-v'>0.0651</div></div></div>
 </section><section class="card">
   <h2>Train (Cross-Validation)</h2>
   
-  <table class='kv'><tr><th>Accuracy</th><td>0.9146 ± 0.0332</td></tr><tr><th>F1 (macro)</th><td>0.9145 ± 0.0328</td></tr></table><details class="panel">
+  <table class='kv'><tr><th>Accuracy</th><td>0.9604 ± 0.0153</td></tr><tr><th>F1 (macro)</th><td>0.9601 ± 0.0154</td></tr></table><details class="panel">
   <summary><span class="summary-title">Per-fold metrics</span></summary>
-  <div class="panel-body"><table class='kv'><tr><th>fold</th><th>accuracy</th><th>f1_macro</th></tr><tr><td>1</td><td>0.9167</td><td>0.9164</td></tr><tr><td>2</td><td>0.9271</td><td>0.9264</td></tr><tr><td>3</td><td>0.9688</td><td>0.9682</td></tr><tr><td>4</td><td>0.8854</td><td>0.8881</td></tr><tr><td>5</td><td>0.8750</td><td>0.8737</td></tr></table></div>
+  <div class="panel-body"><table class='kv'><tr><th>fold</th><th>accuracy</th><th>f1_macro</th></tr><tr><td>1</td><td>0.9375</td><td>0.9369</td></tr><tr><td>2</td><td>0.9479</td><td>0.9478</td></tr><tr><td>3</td><td>0.9792</td><td>0.9792</td></tr><tr><td>4</td><td>0.9688</td><td>0.9683</td></tr><tr><td>5</td><td>0.9688</td><td>0.9685</td></tr></table></div>
 </details>
 </section><section class="card">
   <h2>Test (Holdout)</h2>
   
-  <table class='kv'><tr><th>class</th><th>precision</th><th>recall</th><th>f1</th><th>support</th></tr><tr><td>class 1</td><td>0.9333</td><td>0.9333</td><td>0.9333</td><td>30</td></tr><tr><td>class 2</td><td>0.9355</td><td>0.9667</td><td>0.9508</td><td>30</td></tr><tr><td>class 3</td><td>0.9355</td><td>0.9667</td><td>0.9508</td><td>30</td></tr><tr><td>class 4</td><td>0.9643</td><td>0.9000</td><td>0.9310</td><td>30</td></tr></table>
+  <table class='kv'><tr><th>class</th><th>precision</th><th>recall</th><th>f1</th><th>support</th></tr><tr><td>class 1</td><td>1.0000</td><td>0.9667</td><td>0.9831</td><td>30</td></tr><tr><td>class 2</td><td>0.9310</td><td>0.9643</td><td>0.9474</td><td>28</td></tr><tr><td>class 3</td><td>0.9667</td><td>0.9667</td><td>0.9667</td><td>30</td></tr><tr><td>class 4</td><td>1.0000</td><td>1.0000</td><td>1.0000</td><td>32</td></tr></table>
 </section><section class="card">
   <h2>Hyperparameters (final, from full-data tune)</h2>
   
@@ -816,20 +825,20 @@ code{
   <div class="panel-body"><section class="card">
   <h2>Holdout Metrics</h2>
   
-  <div class='grid grid-4'><div class='metric'><div class='metric-k'>Test Macro-F1</div><div class='metric-v'>0.9415</div></div><div class='metric'><div class='metric-k'>Test AUROC (macro)</div><div class='metric-v'>0.9961</div></div><div class='metric'><div class='metric-k'>Test Accuracy</div><div class='metric-v'>0.9417</div></div><div class='metric'><div class='metric-k'>Test LogLoss</div><div class='metric-v'>0.1473</div></div></div>
+  <div class='grid grid-4'><div class='metric'><div class='metric-k'>Test Macro-F1</div><div class='metric-v'>0.9827</div></div><div class='metric'><div class='metric-k'>Test AUROC (macro)</div><div class='metric-v'>0.9993</div></div><div class='metric'><div class='metric-k'>Test Accuracy</div><div class='metric-v'>0.9833</div></div><div class='metric'><div class='metric-k'>Test LogLoss</div><div class='metric-v'>0.0651</div></div></div>
 </section><section class="card">
   <h2>Learned Thresholds</h2>
   
-  <table class='kv'><tr><th>Source</th><td>OOF training predictions</td></tr><tr><th>Method</th><td>per_class_probability_ratio</td></tr><tr><th>Optimized metric</th><td>f1_macro</td></tr><tr><th>OOF baseline F1</th><td>0.9145</td></tr><tr><th>OOF optimized F1</th><td>0.9249</td></tr></table><div style='height:10px;'></div><table class='kv'><tr><th>Class</th><th>Threshold</th></tr><tr><td>class 1</td><td>0.6000</td></tr><tr><td>class 2</td><td>0.4500</td></tr><tr><td>class 3</td><td>0.5000</td></tr><tr><td>class 4</td><td>0.7000</td></tr></table>
+  <table class='kv'><tr><th>Source</th><td>OOF training predictions</td></tr><tr><th>Method</th><td>per_class_probability_ratio</td></tr><tr><th>Optimized metric</th><td>f1_macro</td></tr><tr><th>OOF baseline F1</th><td>0.9604</td></tr><tr><th>OOF optimized F1</th><td>0.9646</td></tr></table><div style='height:10px;'></div><table class='kv'><tr><th>Class</th><th>Threshold</th></tr><tr><td>class 1</td><td>0.4500</td></tr><tr><td>class 2</td><td>0.5500</td></tr><tr><td>class 3</td><td>0.5000</td></tr><tr><td>class 4</td><td>0.5000</td></tr></table>
 </section><section class="card">
   <h2>Per-Class Holdout Metrics</h2>
   
-  <table class='kv'><tr><th>class</th><th>precision</th><th>recall</th><th>f1</th><th>support</th></tr><tr><td>class 1</td><td>0.9333</td><td>0.9333</td><td>0.9333</td><td>30</td></tr><tr><td>class 2</td><td>0.9355</td><td>0.9667</td><td>0.9508</td><td>30</td></tr><tr><td>class 3</td><td>0.9355</td><td>0.9667</td><td>0.9508</td><td>30</td></tr><tr><td>class 4</td><td>0.9643</td><td>0.9000</td><td>0.9310</td><td>30</td></tr></table>
+  <table class='kv'><tr><th>class</th><th>precision</th><th>recall</th><th>f1</th><th>support</th></tr><tr><td>class 1</td><td>1.0000</td><td>0.9667</td><td>0.9831</td><td>30</td></tr><tr><td>class 2</td><td>0.9643</td><td>0.9643</td><td>0.9643</td><td>28</td></tr><tr><td>class 3</td><td>0.9677</td><td>1.0000</td><td>0.9836</td><td>30</td></tr><tr><td>class 4</td><td>1.0000</td><td>1.0000</td><td>1.0000</td><td>32</td></tr></table>
 </section></div>
 </details><section class="card">
   <h2>Artifacts</h2>
   
-  <ul><li><code>model</code>: /app/results/pipeline-20260507-191940/train_artifacts/stacked_ensemble.joblib</li></ul>
+  <ul><li><code>model</code>: /app/results/docker_example-20260513-064217/train_artifacts/stacked_ensemble.joblib</li></ul>
 </section>
       </main>
 

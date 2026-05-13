@@ -9,6 +9,7 @@ docker run --rm \
   -v "$data_path:/app/data" \
   -v "$results_path:/app/results" \
   omiclass:dev \
-  --override expression_file /app/data/merged_count_data.csv \
+  --override expression_file /app/data/raw_counts_with_external.csv \
   --override output_dir /app/results/Docker_results \
-  --override meta_path /app/data/merged_meta_with_external.csv
+  --override meta_path /app/data/patients_meta_with_external.csv \
+  --override raw_count True

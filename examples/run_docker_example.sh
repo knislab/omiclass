@@ -18,4 +18,5 @@ docker run --rm \
   --override batch_column batch \
   --override de_covariates age,sex \
   --override n_jobs 5 \
-  --override gene_lengths_path /app/data/gene_lengths.csv
+  --override gene_lengths_path /app/data/gene_lengths.csv \
+  --override project_name docker_example

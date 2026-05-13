@@ -753,8 +753,7 @@ code{
 <nav class='sidebar-nav'>
 <details class="nav-group" open>
               <summary class="nav-group-title">Final summary</summary>
-              <div class="nav-group-items"><a class='nav-item' href='../final_report.html'>Global evaluation</a>
-<a class='nav-item' href='../final_summary_threshold_optimized.html'>Threshold optimized</a></div>
+              <div class="nav-group-items"><a class='nav-item' href='../final_report.html'>Global evaluation</a></div>
             </details>
 <details class="nav-group" open>
               <summary class="nav-group-title">Models</summary>
@@ -776,6 +775,16 @@ code{
               <summary class="nav-group-title">Differential expression</summary>
               <div class="nav-group-items"><a class='nav-item' href='../de_results/de_report.html'>DE report</a></div>
             </details>
+<details class="nav-group">
+              <summary class="nav-group-title">Prediction & Survival</summary>
+              <div class="nav-group-items"><a class='nav-item' href='../survival_prediction/xgboost_survival_prediction.html'>Prediction + KM</a></div>
+            </details>
+<details class="nav-group">
+              <summary class="nav-group-title">Limma re-correction</summary>
+              <div class="nav-group-items"><a class='nav-item' href='../limma_re-correction/index.html'>Overview</a>
+<a class='nav-item' href='../limma_re-correction/diagnostic_plots.html'>Diagnostic plots</a>
+<a class='nav-item' href='../limma_re-correction/pca_comparison.html'>PCA comparison</a></div>
+            </details>
 </nav>
 </aside>
       <main class="main">
@@ -790,14 +799,14 @@ code{
   <h2>Limma Batch-Correction Evaluation</h2>
   
   <div class='subtle'>Overview &amp; summary statistics.</div>
-    <div class="muted">Run: <code>/data01/private/projects/omiclass/examples/results/pipeline-20260509-121958/limma_correction</code> • 2026-05-09T12:20:23</div>
+    <div class="muted">Run: <code>/data01/private/projects/omiclass/examples/results/python_example-20260512-173926/limma_correction</code> • 2026-05-12T17:39:44</div>
     <div class="toolbar" style="margin-top:10px;"><a class="btn" href="index.html" style="font-weight:700;">Overview &amp; Stats</a><a class="btn" href="pca_comparison.html" style="">PCA Comparison</a><a class="btn" href="diagnostic_plots.html" style="">Diagnostics</a></div>
 </section>
 <div class="grid grid-2">
   <section class="card">
   <h2>Data</h2>
   
-  <table class='kv'><tr><th>Expression shape</th><td><ul style='margin:0; padding-left:18px;'><li>2,400</li><li>600</li></ul></td></tr><tr><th>Genes</th><td>2,400</td></tr><tr><th>Samples</th><td>600</td></tr><tr><th>Metadata columns</th><td>sex, age, batch, subcluster, library_size, time, event</td></tr></table>
+  <table class='kv'><tr><th>Expression shape</th><td><ul style='margin:0; padding-left:18px;'><li>2,400</li><li>600</li></ul></td></tr><tr><th>Genes</th><td>2,400</td></tr><tr><th>Samples</th><td>600</td></tr><tr><th>Metadata columns</th><td>sex, age, batch, library_size, time, event</td></tr></table>
 </section>
   <section class="card">
   <h2>Configuration</h2>
@@ -808,7 +817,7 @@ code{
 <section class="card">
   <h2>Silhouette scores (PC space)</h2>
   
-  <div class='grid grid-4'><div class='metric'><div class='metric-k'>age • orig -0.3722 (+0.0138)</div><div class='metric-v'>-0.3584</div></div><div class='metric'><div class='metric-k'>batch • orig -0.0351 (-0.0001)</div><div class='metric-v'>-0.0352</div></div><div class='metric'><div class='metric-k'>sex • orig -0.0016 (+0.0014)</div><div class='metric-v'>-0.0001</div></div></div><div style='margin-top:12px;'><table class='kv'><tr><th>age</th><td>Original: -0.3722 &nbsp;•&nbsp; Corrected: -0.3584</td></tr><tr><th>batch</th><td>Original: -0.0351 &nbsp;•&nbsp; Corrected: -0.0352</td></tr><tr><th>sex</th><td>Original: -0.0016 &nbsp;•&nbsp; Corrected: -0.0001</td></tr></table></div>
+  <div class='grid grid-4'><div class='metric'><div class='metric-k'>age • orig -0.3349 (-0.0133)</div><div class='metric-v'>-0.3482</div></div><div class='metric'><div class='metric-k'>batch • orig -0.0216 (+0.0039)</div><div class='metric-v'>-0.0177</div></div><div class='metric'><div class='metric-k'>sex • orig -0.0020 (-0.0010)</div><div class='metric-v'>-0.0030</div></div></div><div style='margin-top:12px;'><table class='kv'><tr><th>age</th><td>Original: -0.3349 &nbsp;•&nbsp; Corrected: -0.3482</td></tr><tr><th>batch</th><td>Original: -0.0216 &nbsp;•&nbsp; Corrected: -0.0177</td></tr><tr><th>sex</th><td>Original: -0.0020 &nbsp;•&nbsp; Corrected: -0.0030</td></tr></table></div>
 </section><section class="card">
   <h2>Gene-level batch association</h2>
   

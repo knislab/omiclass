@@ -35,6 +35,9 @@ examples/results/Docker_results/config.freeze.yaml
 examples/results/Python_results/de_results/limma_voom_selected_genes.txt
 examples/results/Python_results/config.freeze.yaml
 examples/results/Python_results/train_artifacts/genesets/**
+examples/results/Bash_results/de_results/limma_voom_selected_genes.txt
+examples/results/Bash_results/config.freeze.yaml
+examples/results/Bash_results/train_artifacts/genesets/**
 
 
 
@@ -46,8 +49,8 @@ examples/results/Python_results/train_artifacts/genesets/**
 !examples/data/patients_meta.csv
 !examples/data/raw_counts.csv
 !examples/data/gene_lengths.csv
-!examples/data/merged_count_data.csv
-!examples/data/merged_meta_with_external.csv
+!examples/data/patients_meta_with_external.csv
+!examples/data/raw_counts_with_external.csv
 
 !examples/results/
 !examples/results/**/
