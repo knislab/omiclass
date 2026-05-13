@@ -7,8 +7,37 @@ import pandas as pd
 
 from ..plotting.plotter import FinalSummaryPlotter
 from .assets import wrap_report_html, get_inline_assets
-from .components import card, svg_panel, json_kv, split_card_1_1, vcard
+from .components import card, svg_panel, json_kv, split_card_1_1, vcard, esc
 from omiclass.reporting.nav import build_sidebar_from_run_dir, render_sidebar_html
+
+
+def _render_model_table(
+    *,
+    df: pd.DataFrame,
+    selected_model: Optional[str],
+) -> str:
+    if df is None or df.empty:
+        return "<div class='muted'>No data available.</div>"
+
+    cols = [c for c in df.columns if c in ("model", "status", "f1_macro_mean", "accuracy_mean", "f1_macro", "accuracy")]
+    if not cols:
+        cols = list(df.columns)
+
+    head = "<tr>" + "".join(f"<th>{esc(c)}</th>" for c in cols) + "</tr>"
+    rows = []
+    for _, r in df[cols].iterrows():
+        model_name = str(r.get("model", ""))
+        active = bool(selected_model and model_name == selected_model)
+        row_style = " style='font-weight:700;background:#fff7e6;'" if active else ""
+        cells = "".join(f"<td>{esc(r.get(c))}</td>" for c in cols)
+        rows.append(f"<tr{row_style}>{cells}</tr>")
+
+    note = (
+        f"<div class='muted'>Highlighted: CV-selected model <code>{esc(selected_model)}</code>.</div>"
+        if selected_model
+        else ""
+    )
+    return f"{note}<table class='kv'>{head}{''.join(rows)}</table>"
 
 
 def render_final_summary_html(
@@ -35,8 +64,24 @@ def render_final_summary_html(
     metrics_svg = plotter.plot_metric_barplot()
 
     feature_reduction_svg = None
+    selected_model = None
+    leaderboard_df = None
+    holdout_df = None
     if ctx is not None and hasattr(ctx, "cache"):
         feature_reduction_svg = ctx.cache.get("feature_reduction_svg")
+        selected_model = ctx.cache.get("best_model")
+        leaderboard_csv = ctx.cache.get("leaderboard_csv")
+        holdout_csv = ctx.cache.get("combined_test_csv")
+        try:
+            if leaderboard_csv:
+                leaderboard_df = pd.read_csv(leaderboard_csv)
+        except Exception:
+            leaderboard_df = None
+        try:
+            if holdout_csv:
+                holdout_df = pd.read_csv(holdout_csv)
+        except Exception:
+            holdout_df = None
 
     # --- build body using components ---
     parts: List[str] = []
@@ -64,6 +109,17 @@ def render_final_summary_html(
             ),
         )
     )
+    if leaderboard_df is not None:
+        parts.append(
+            card(
+                "1b) CV Leaderboard Table",
+                _render_model_table(
+                    df=leaderboard_df,
+                    selected_model=selected_model,
+                ),
+                subtitle="Model selection is based on CV leaderboard only.",
+            )
+        )
 
     # 2) Confusion matrices
     parts.append(
@@ -94,6 +150,17 @@ def render_final_summary_html(
             subtitle="Includes accuracy / F1 / AUROC / LogLoss (as available)",
         )
     )
+    if holdout_df is not None:
+        parts.append(
+            card(
+                "3b) Holdout Metrics Table",
+                _render_model_table(
+                    df=holdout_df,
+                    selected_model=selected_model,
+                ),
+                subtitle="All models are shown for transparency; highlighted row remains the CV-selected model.",
+            )
+        )
 
     # 4) Macro PR & ROC side-by-side
     parts.append(

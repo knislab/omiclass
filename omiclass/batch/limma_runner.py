@@ -77,18 +77,14 @@ class LimmaRunner:
             box_svgs[name] = svg
 
         # Heatmap
-        binary_labels: dict[str, pd.Series] = {
-            name: s for name, s in label_series.items() 
-            if pd.Series(s).dropna().nunique() == 2
+        heatmap_labels: dict[str, pd.Series] = {
+            name: s for name, s in label_series.items()
+            if pd.Series(s).dropna().nunique() >= 2
         }
-        multi_label = next((s for name, s in label_series.items() if pd.Series(s).dropna().nunique() > 2), None)
-        multi_label_name = next((name for name, s in label_series.items() if pd.Series(s).dropna().nunique() > 2), None)
 
-        if binary_labels or multi_label is not None:
+        if heatmap_labels:
             heatmap_svg = plotter.plot_pc_batch_heatmap(
-                binary_labels=binary_labels,
-                multi_label=multi_label,
-                multi_label_name=multi_label_name or "group",
+                labels_dict=heatmap_labels,
                 title=f"({prefix} correction)",
             )
         else:

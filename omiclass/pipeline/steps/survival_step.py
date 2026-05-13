@@ -23,7 +23,6 @@ class SurvivalStep:
         Run survival analysis prediction and store results in ctx.cache["survival_results"].
         """
         try:
-            final_test_res_path = Path(ctx.out_dir) / "test_metrics.csv"
             surv_cfg = ctx.cfg.runtime.survival_prediction
             surv_path = Path(ctx.cfg.project.meta_path)
             time_col = surv_cfg.time_col
@@ -45,8 +44,20 @@ class SurvivalStep:
                         )
                         return
                     
-            final_test_res = load_matrix(final_test_res_path, numeric=False)
-            model_base_path = Path(final_test_res.iloc[0]["artifact"])
+            model_base_path = ctx.cache.get("best_model_path")
+            if model_base_path is None:
+                # Fallback for reruns without cache.
+                best_model_name = ctx.cache.get("best_model")
+                if best_model_name:
+                    model_base_path = ctx.out_dir / "train_artifacts" / f"{best_model_name}.joblib"
+                else:
+                    leaderboard_path = Path(ctx.out_dir) / "leaderboard.csv"
+                    leaderboard = load_matrix(leaderboard_path, numeric=False)
+                    if "status" in leaderboard.columns:
+                        leaderboard = leaderboard[leaderboard["status"] == "ok"]
+                    best_model_name = str(leaderboard.iloc[0]["model"])
+                    model_base_path = ctx.out_dir / "train_artifacts" / f"{best_model_name}.joblib"
+            model_base_path = Path(model_base_path)
             labels_for_plot = ctx.cache.get("labels_for_plot", None)
 
             # optional threshold-optimized survival report

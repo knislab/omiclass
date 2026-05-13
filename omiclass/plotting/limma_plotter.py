@@ -404,43 +404,47 @@ class limma_plotter:
 
     def plot_pc_batch_heatmap(
         self,
-        binary_labels: Dict[str, LabelVector],
-        multi_label: Optional[LabelVector] = None,
-        multi_label_name: str = "centrum",
+        labels_dict: Dict[str, LabelVector],
         title: str = "",
         save_path: Optional[str] = None,
     ):
-        labels = dict(binary_labels)
-        if multi_label is not None: labels[multi_label_name] = multi_label
-        meta = self._build_meta(labels)
+        meta = self._build_meta(labels_dict)
 
         results = {}
         pcs = [f"PC{i+1}" for i in range(min(self.n_pcs, 10))]
 
-        for col, vec in binary_labels.items():
-            m = meta.dropna(subset=[col]) if col == "IGHV" else meta
-            if m[col].nunique() != 2: continue
-            g1, g2 = m[col].dropna().unique()
-            vals = []
-            for pc in pcs:
-                a = m.loc[m[col]==g1, pc]; b = m.loc[m[col]==g2, pc]
-                if len(a)<2 or len(b)<2: vals.append(np.nan); continue
-                if np.var(a) < VAR_EPS and np.var(b) < VAR_EPS: vals.append(np.nan); continue
-                
-                p = ttest_ind(a, b, equal_var=False).pvalue
-                vals.append(min(-np.log10(p) if p>0 else self.heatmap_max_logp, self.heatmap_max_logp))
-            results[col] = vals
+        for col in labels_dict.keys():
+            m = meta.dropna(subset=[col]) if col in meta.columns else meta
+            if col not in m.columns:
+                continue
+            n_levels = m[col].dropna().nunique()
+            if n_levels < 2:
+                continue
 
-        if multi_label is not None:
-            m = meta.dropna(subset=[multi_label_name])
             vals = []
-            for pc in pcs:
-                groups = [m.loc[m[multi_label_name]==v, pc].dropna() for v in m[multi_label_name].unique()]
-                groups = [g for g in groups if len(g)>1]
-                if len(groups)<2: vals.append(np.nan); continue
-                p = f_oneway(*groups).pvalue
-                vals.append(min(-np.log10(p) if p>0 else self.heatmap_max_logp, self.heatmap_max_logp))
-            results[multi_label_name] = vals
+            if n_levels == 2:
+                g1, g2 = m[col].dropna().unique()
+                for pc in pcs:
+                    a = m.loc[m[col] == g1, pc]
+                    b = m.loc[m[col] == g2, pc]
+                    if len(a) < 2 or len(b) < 2:
+                        vals.append(np.nan)
+                        continue
+                    if np.var(a) < VAR_EPS and np.var(b) < VAR_EPS:
+                        vals.append(np.nan)
+                        continue
+                    p = ttest_ind(a, b, equal_var=False).pvalue
+                    vals.append(min(-np.log10(p) if p > 0 else self.heatmap_max_logp, self.heatmap_max_logp))
+            else:
+                for pc in pcs:
+                    groups = [m.loc[m[col] == v, pc].dropna() for v in m[col].dropna().unique()]
+                    groups = [g for g in groups if len(g) > 1]
+                    if len(groups) < 2:
+                        vals.append(np.nan)
+                        continue
+                    p = f_oneway(*groups).pvalue
+                    vals.append(min(-np.log10(p) if p > 0 else self.heatmap_max_logp, self.heatmap_max_logp))
+            results[col] = vals
 
         df_res = pd.DataFrame(results, index=pcs)
         if "centrum" in df_res.columns: df_res.rename(columns={"centrum": "center"}, inplace=True)

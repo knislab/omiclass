@@ -31,6 +31,14 @@ if TYPE_CHECKING:
 
 class TrainAndEvalStep:
     name = "train_and_eval"
+    
+    @staticmethod
+    def _is_higher_better_metric(metric_name: str) -> bool:
+        m = str(metric_name or "").lower()
+        if m.startswith("neg_"):
+            return True
+        lower_better_tokens = ("loss", "error", "rmse", "mae", "mse")
+        return not any(tok in m for tok in lower_better_tokens)
 
     def should_run(self, ctx: RunContext) -> bool:
         if ctx.opts.mode == "clean_and_predict":
@@ -157,12 +165,45 @@ class TrainAndEvalStep:
             })
 
         combined_test_csv = ctx.out_dir / "test_metrics.csv"
-        final_test_res = pd.DataFrame(test_rows).sort_values(
-            "f1_macro", ascending=False
-        )
-        best_model = final_test_res.iloc[0]["model"]
-        best_model_path = summary.artifact_paths[best_model]
+        final_test_res = pd.DataFrame(test_rows)
         final_test_res.to_csv(combined_test_csv, index=False)
+
+        # Select best model ONLY from CV leaderboard (never from holdout ranking).
+        scoring_metric = str(
+            getattr(getattr(ctx.cfg.runtime, "tuning", None), "scoring_override", None)
+            or ctx.cfg.runtime.scoring
+        )
+        cv_metric_col = f"{scoring_metric}_mean"
+        fallback_cv_cols = ["f1_macro_mean", "accuracy_mean"]
+
+        cv_leaderboard = summary.metrics.copy()
+        if "status" in cv_leaderboard.columns:
+            cv_leaderboard = cv_leaderboard[cv_leaderboard["status"] == "ok"]
+        cv_leaderboard = cv_leaderboard[
+            cv_leaderboard["model"].isin(summary.artifact_paths.keys())
+        ]
+
+        selected_metric_col = None
+        if cv_metric_col in cv_leaderboard.columns and cv_leaderboard[cv_metric_col].notna().any():
+            selected_metric_col = cv_metric_col
+        else:
+            for col in fallback_cv_cols:
+                if col in cv_leaderboard.columns and cv_leaderboard[col].notna().any():
+                    selected_metric_col = col
+                    break
+        if selected_metric_col is None:
+            raise RuntimeError(
+                "Could not select best model from CV leaderboard: no usable CV metric column found."
+            )
+
+        ascending = not self._is_higher_better_metric(selected_metric_col.replace("_mean", ""))
+        cv_leaderboard = cv_leaderboard.sort_values(
+            by=selected_metric_col,
+            ascending=ascending,
+            kind="mergesort",
+        )
+        best_model = str(cv_leaderboard.iloc[0]["model"])
+        best_model_path = summary.artifact_paths[best_model]
 
         labels_for_plot = (
             labels_from_first
@@ -197,7 +238,12 @@ class TrainAndEvalStep:
 
         _ = render_final_summary_html(
             plotter=plotter,
-            meta={"n_test": int(len(yte)), "k": len(labels_for_plot)},
+            meta={
+                "n_test": int(len(yte)),
+                "k": len(labels_for_plot),
+                "cv_selected_model": best_model,
+                "cv_selection_metric": selected_metric_col,
+            },
             ctx=ctx
         )
 
@@ -222,6 +268,8 @@ class TrainAndEvalStep:
                 "n_test": int(len(yte)),
                 "k": len(labels_for_plot),
                 "evaluation": "threshold optimized",
+                "cv_selected_model": best_model,
+                "cv_selection_metric": selected_metric_col,
             },
             ctx=ctx,
             output_name="final_summary_threshold_optimized.html",

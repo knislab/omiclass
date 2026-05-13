@@ -1,6 +1,7 @@
 # omiclass/pipeline/steps/de_step.py
 from __future__ import annotations
 from typing import TYPE_CHECKING
+from pathlib import Path
 
 if TYPE_CHECKING:
     from omiclass.pipeline.orchestrator import RunContext
@@ -46,7 +47,34 @@ class DEStep:
             cfg=ctx.cfg,
             reuse_split=ctx.opts.reuse_split,
         )
-        de_cfg = ctx.cfg.de 
+        de_cfg = ctx.cfg.de
+        bc_cfg = ctx.cfg.batch_correction
+
+        # Build DE-only covariates: biological DE covariates + batch covariates.
+        de_covariates = list(de_cfg.covariates) if de_cfg.covariates else []
+        de_covariates_seen = set(de_covariates)
+
+        # Case 1: single batch column (e.g., cohort) from metadata.
+        if bc_cfg.batch_column and bc_cfg.batch_column in meta_df.columns:
+            if bc_cfg.batch_column not in de_covariates_seen:
+                de_covariates.append(bc_cfg.batch_column)
+                de_covariates_seen.add(bc_cfg.batch_column)
+
+        # Case 2: multi-column batch representation from external covariate matrix.
+        if bc_cfg.covariates_path:
+            cov_matrix = load_matrix(Path(bc_cfg.covariates_path))
+            cov_matrix = cov_matrix.loc[cov_matrix.index.intersection(common_index)]
+            cov_matrix = cov_matrix.loc[meta_df.index]
+            if not cov_matrix.empty:
+                overlap_cols = [c for c in cov_matrix.columns if c in meta_df.columns]
+                if overlap_cols:
+                    cov_matrix = cov_matrix.drop(columns=overlap_cols)
+                if not cov_matrix.empty:
+                    meta_df = meta_df.join(cov_matrix, how="left")
+                    for col in cov_matrix.columns:
+                        if col not in de_covariates_seen:
+                            de_covariates.append(col)
+                            de_covariates_seen.add(col)
 
         limma = LimmaVoomRunner(de_cfg=de_cfg, cfg=ctx.cfg)
         min_count = getattr(de_cfg, 'min_count', 10)
@@ -56,7 +84,7 @@ class DEStep:
             meta_df=meta_df,
             output_dir=ctx.out_dir,
             design_col=design_col,
-            covariates=de_cfg.covariates if de_cfg.covariates else None,
+            covariates=de_covariates if de_covariates else None,
             min_count=min_count,
             min_samples_frac=de_cfg.min_samples_frac if de_cfg.min_samples_frac else 0.5,
             surface_markers=ctx.cfg.surface_markers.enabled if ctx.cfg.surface_markers and ctx.cfg.surface_markers.enabled else False
