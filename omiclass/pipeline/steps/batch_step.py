@@ -51,6 +51,15 @@ class BatchCorrectionStep:
         limma_runner = LimmaRunner()
         limma_out_dir = ctx.out_dir / "limma_correction"
         limma_out_dir.mkdir(parents=True, exist_ok=True)
+        modality = str(getattr(ctx.cfg.project, "modality", "rnaseq"))
+        feature_label_singular = "protein" if modality == "cptac_ms" else "gene"
+        feature_label_plural = "proteins" if modality == "cptac_ms" else "genes"
+        corrected_matrix_label = (
+            "batch-corrected protein abundance"
+            if modality == "cptac_ms"
+            else "batch-corrected expression"
+        )
+        # Keep legacy RNA filename for compatibility.
         limma_out_csv = "limma_corrected_expression.csv"
 
         limma_run_res = limma_runner.run_limma(
@@ -76,5 +85,8 @@ class BatchCorrectionStep:
             n_pc=bc.n_pcs or 10,
             na_fill=bc.fill_na or None,
             limma_result=limma_run_res,
+            feature_label_singular=feature_label_singular,
+            feature_label_plural=feature_label_plural,
+            corrected_matrix_label=corrected_matrix_label,
         )
         ctx.cache["X_corrected"] = X_full_raw

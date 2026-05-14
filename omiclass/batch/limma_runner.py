@@ -121,7 +121,7 @@ class LimmaRunner:
                 label_name=batch_like_name,
                 gene_table=gene_assoc["table"],
                 top_n=12,
-                title=f"Top batch-associated genes by {batch_like_name} ({prefix.capitalize()})",
+                title=f"Top batch-associated features by {batch_like_name} ({prefix.capitalize()})",
             )
 
         # Return results

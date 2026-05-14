@@ -253,6 +253,9 @@ def _render_index_html(d: Dict[str, Any], site_dir: Path) -> str:
     data = d["data"]
     cfg = d["config"]
     ev = d["eval"]
+    labels_cfg = d.get("labels") or {}
+    feature_label_plural = labels_cfg.get("feature_label_plural", "genes")
+    corrected_label = labels_cfg.get("corrected_matrix_label", "batch-corrected expression")
 
     labels = sorted(ev.get("labels") or [])
 
@@ -314,7 +317,7 @@ def _render_index_html(d: Dict[str, Any], site_dir: Path) -> str:
             columns=4,
         )
         gene_card_html = card(
-            "Gene-level batch association",
+            "Feature-level batch association",
             f"""
 <div class="muted">Label: <code>{esc(name)}</code> • FDR: {esc(fdr_txt)}</div>
 <div style="margin-top:10px;">{gene_metrics}</div>
@@ -323,8 +326,8 @@ def _render_index_html(d: Dict[str, Any], site_dir: Path) -> str:
 
     data_tbl = kv_table(
         {
-            "Expression shape": tuple(data["expr_shape"]),
-            "Genes": data["n_genes"],
+            corrected_label.capitalize() + " shape": tuple(data["expr_shape"]),
+            feature_label_plural.capitalize(): data["n_genes"],
             "Samples": data["n_samples"],
             "Metadata columns": ", ".join(data.get("meta_cols") or []),
         }
@@ -344,7 +347,7 @@ def _render_index_html(d: Dict[str, Any], site_dir: Path) -> str:
         _header_card(
             run=run,
             active="index",
-            title="Limma Batch-Correction Evaluation",
+            title=f"Limma Batch-Correction Evaluation ({corrected_label})",
             subtitle="Overview & summary statistics.",
         )
         + f"""
@@ -366,7 +369,7 @@ def _render_index_html(d: Dict[str, Any], site_dir: Path) -> str:
     sidebar_html = render_sidebar_html(tree=tree, current_page=current_page)
 
     return wrap_report_html(
-        title="Limma Batch-Correction Evaluation — Overview",
+        title=f"Limma Batch-Correction Evaluation — Overview ({corrected_label})",
         subtitle="Overview & stats",
         body_html=body,
         assets=_extend_assets_css(_extra_css_for_svgs()),
@@ -377,6 +380,8 @@ def _render_index_html(d: Dict[str, Any], site_dir: Path) -> str:
 
 def _render_pca_comparison_html(d: Dict[str, Any], site_dir: Path) -> str:
     run = d["run"]
+    labels_cfg = d.get("labels") or {}
+    corrected_label = labels_cfg.get("corrected_matrix_label", "batch-corrected expression")
     orig = d["figures_original"]
     corr = d["figures_corrected"]
 
@@ -427,7 +432,7 @@ def _render_pca_comparison_html(d: Dict[str, Any], site_dir: Path) -> str:
         _header_card(
             run=run,
             active="pca",
-            title="Limma Batch-Correction Evaluation",
+            title=f"Limma Batch-Correction Evaluation ({corrected_label})",
             subtitle="PCA comparison (Original vs corrected).",
         )
         + ("".join(blocks) if blocks else card("PCA comparison", "<div class='muted'>No PCA/dendrogram figures recorded.</div>"))
@@ -439,7 +444,7 @@ def _render_pca_comparison_html(d: Dict[str, Any], site_dir: Path) -> str:
     sidebar_html = render_sidebar_html(tree=tree, current_page=current_page)
 
     return wrap_report_html(
-        title="Limma Batch-Correction Evaluation — PCA Comparison",
+        title=f"Limma Batch-Correction Evaluation — PCA Comparison ({corrected_label})",
         subtitle="Original vs corrected",
         body_html=body,
         sidebar_html=sidebar_html,
@@ -450,6 +455,8 @@ def _render_pca_comparison_html(d: Dict[str, Any], site_dir: Path) -> str:
 
 def _render_diagnostic_html(d: Dict[str, Any], site_dir: Path) -> str:
     run = d["run"]
+    labels_cfg = d.get("labels") or {}
+    corrected_label = labels_cfg.get("corrected_matrix_label", "batch-corrected expression")
     orig = d["figures_original"]
     corr = d["figures_corrected"]
 
@@ -483,12 +490,12 @@ def _render_diagnostic_html(d: Dict[str, Any], site_dir: Path) -> str:
 
     blocks.append(
         split_card_1_1(
-            title="Top batch-associated genes (feature-level)",
+            title="Top batch-associated features",
             subtitle="Original vs corrected.",
             left_title="Original",
             right_title="Corrected",
-            left_html=_svg_block(site_dir=site_dir, title="Top batch-associated genes", src=orig.get("top_batch_gene_boxplot"), open_by_default=False),
-            right_html=_svg_block(site_dir=site_dir, title="Top batch-associated genes", src=corr.get("top_batch_gene_boxplot"), open_by_default=False),
+            left_html=_svg_block(site_dir=site_dir, title="Top batch-associated features", src=orig.get("top_batch_gene_boxplot"), open_by_default=False),
+            right_html=_svg_block(site_dir=site_dir, title="Top batch-associated features", src=corr.get("top_batch_gene_boxplot"), open_by_default=False),
         )
     )
 
@@ -496,7 +503,7 @@ def _render_diagnostic_html(d: Dict[str, Any], site_dir: Path) -> str:
         _header_card(
             run=run,
             active="diag",
-            title="Limma Batch-Correction Evaluation",
+            title=f"Limma Batch-Correction Evaluation ({corrected_label})",
             subtitle="Diagnostics (Original vs corrected).",
         )
         + ("".join(blocks) if blocks else card("Diagnostics", "<div class='muted'>No diagnostic figures recorded.</div>"))
@@ -508,7 +515,7 @@ def _render_diagnostic_html(d: Dict[str, Any], site_dir: Path) -> str:
     sidebar_html = render_sidebar_html(tree=tree, current_page=current_page)
 
     return wrap_report_html(
-        title="Limma Batch-Correction Evaluation — Diagnostics",
+        title=f"Limma Batch-Correction Evaluation — Diagnostics ({corrected_label})",
         subtitle="Deep diagnostics",
         body_html=body,
         sidebar_html=sidebar_html,
@@ -531,6 +538,9 @@ def write_limma_report(
     n_pc: int,
     na_fill: Optional[float],
     limma_result: Dict[str, Any],
+    feature_label_singular: str = "gene",
+    feature_label_plural: str = "genes",
+    corrected_matrix_label: str = "batch-corrected expression",
 ) -> Path:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -627,6 +637,11 @@ def write_limma_report(
     jpath.write_text(json.dumps(asdict(doc), indent=2, default=_json_default), encoding="utf-8")
 
     dd = asdict(doc)
+    dd["labels"] = {
+        "feature_label_singular": feature_label_singular,
+        "feature_label_plural": feature_label_plural,
+        "corrected_matrix_label": corrected_matrix_label,
+    }
 
     # HTMLs
     index_path = limma_index_html_path(out_dir)

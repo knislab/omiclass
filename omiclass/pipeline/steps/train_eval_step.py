@@ -236,14 +236,24 @@ class TrainAndEvalStep:
         except Exception as e:
             pass
 
+        meta_payload = {
+            "n_test": int(len(yte)),
+            "k": len(labels_for_plot),
+            "input_modality": str(getattr(ctx.cfg.project, "modality", "rnaseq")),
+            "input_modality_label": (
+                "CPTAC MS proteomics"
+                if str(getattr(ctx.cfg.project, "modality", "rnaseq")) == "cptac_ms"
+                else "RNA-seq"
+            ),
+            "cv_selected_model": best_model,
+            "cv_selection_metric": selected_metric_col,
+        }
+        if ctx.cache.get("cptac_preprocessing"):
+            meta_payload["cptac_preprocessing"] = ctx.cache.get("cptac_preprocessing")
+
         _ = render_final_summary_html(
             plotter=plotter,
-            meta={
-                "n_test": int(len(yte)),
-                "k": len(labels_for_plot),
-                "cv_selected_model": best_model,
-                "cv_selection_metric": selected_metric_col,
-            },
+            meta=meta_payload,
             ctx=ctx
         )
 
@@ -262,15 +272,25 @@ class TrainAndEvalStep:
                 class_name_map=class_name_map,
             )
 
-            _ = render_final_summary_html(
-                plotter=threshold_plotter,
-            meta={
+            threshold_meta_payload = {
                 "n_test": int(len(yte)),
                 "k": len(labels_for_plot),
+                "input_modality": str(getattr(ctx.cfg.project, "modality", "rnaseq")),
+                "input_modality_label": (
+                    "CPTAC MS proteomics"
+                    if str(getattr(ctx.cfg.project, "modality", "rnaseq")) == "cptac_ms"
+                    else "RNA-seq"
+                ),
                 "evaluation": "threshold optimized",
                 "cv_selected_model": best_model,
                 "cv_selection_metric": selected_metric_col,
-            },
+            }
+            if ctx.cache.get("cptac_preprocessing"):
+                threshold_meta_payload["cptac_preprocessing"] = ctx.cache.get("cptac_preprocessing")
+
+            _ = render_final_summary_html(
+                plotter=threshold_plotter,
+            meta=threshold_meta_payload,
             ctx=ctx,
             output_name="final_summary_threshold_optimized.html",
         )

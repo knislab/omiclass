@@ -29,6 +29,9 @@ def write_de_geneset_report_html(
     covariates: Union[Sequence[str], None],
     html_name: str = "de_report.html",
     cfg: Optional[Dict[str, Any]] = None,
+    analysis_label: str = "Differential Expression",
+    feature_label_singular: str = "gene",
+    feature_label_plural: str = "genes",
 ) -> Path:
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -67,7 +70,7 @@ def write_de_geneset_report_html(
         "Design column": design_col or "—",
         "Covariates": ", ".join(covariates) if covariates else "—",
         "Number of classes": int(n_classes),
-        "Selected genes (K)": int(K),
+        f"Selected {feature_label_plural} (K)": int(K),
         "FDR threshold": fdr_thresh,
         "log2FC threshold": logfc_thresh,
         "Min count": min_count,
@@ -81,9 +84,9 @@ def write_de_geneset_report_html(
     n_final = len(combined_genes)
     summary_html = vertical_metric_grid(
         [
-            ("DE genes", f"{len(df):,}"),
+            (f"DE {feature_label_plural}", f"{len(df):,}"),
             ("Pan markers", f"{n_pan:,}"),
-            ("Final gene-set", f"{n_final:,}"),
+            (f"Final {feature_label_singular}-set", f"{n_final:,}"),
             ("Volcano plots", f"{len(volcano_svgs):,}"),
         ]
     )
@@ -95,7 +98,7 @@ def write_de_geneset_report_html(
         genes_html_parts.append(
             chips_panel(
                 panel_id="genes_selected",
-                title="Selected genes",
+                title=f"Selected {feature_label_plural}",
                 items=gene_chip_items(combined_genes),
                 
                 open_by_default=False,
@@ -133,7 +136,7 @@ def write_de_geneset_report_html(
         genes_html_parts.append(
             chips_panel(
                 panel_id="genes_final",
-                title="Final combined gene-set",
+                title=f"Final combined {feature_label_singular}-set",
                 items=gene_chip_items(combined_genes),
                 open_by_default=False,
                 searchable=True,
@@ -141,7 +144,7 @@ def write_de_geneset_report_html(
             )
         )
 
-    genes_html = "".join(genes_html_parts) if genes_html_parts else "<div class='muted'>No genes provided</div>"
+    genes_html = "".join(genes_html_parts) if genes_html_parts else f"<div class='muted'>No {feature_label_plural} provided</div>"
 
     figs = ""
     for i, (caption, svg) in enumerate(volcano_svgs, start=1):
@@ -160,7 +163,7 @@ def write_de_geneset_report_html(
     # Assemble report
     side_by_side = split_card_3_1(
     title="Configuration Summary",
-    subtitle="Parameters and settings used for differential expression analysis.",
+    subtitle=f"Parameters and settings used for {analysis_label.lower()} analysis.",
     left_title="Settings",
     right_title="Results",
     left_html=kv_table(meta),
@@ -171,15 +174,15 @@ def write_de_geneset_report_html(
 
     body_html = (
         side_by_side
-        + card("Selected Genes", genes_html)
+        + card(f"Selected {feature_label_plural.title()}", genes_html)
         + card("Volcano Plots", volcano_html)
     )
 
 
     # Render full HTML
     final_html = wrap_report_html(
-        title="Differential Expression Report",
-        subtitle="Limma-voom differential expression and gene-set selection summary.",
+        title=f"{analysis_label} Report",
+        subtitle=f"{analysis_label} and {feature_label_singular}-set selection summary.",
         body_html=body_html,
         sidebar_html=sidebar_html,
     )

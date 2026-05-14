@@ -75,14 +75,85 @@ class LimmaVoomRunner:
                        gene_list: Optional[Sequence[str]] = None,
                        surface_markers: bool = False,
             ) -> dict:
+        return self._run_limma_backend(
+            expr_df=raw_counts_df,
+            meta_df=meta_df,
+            output_dir=output_dir,
+            design_col=design_col,
+            covariates=covariates,
+            out_csv=out_csv,
+            r_script_path=r_script_path,
+            min_count=min_count,
+            min_samples_frac=min_samples_frac,
+            gene_list=gene_list,
+            surface_markers=surface_markers,
+            backend="voom",
+            analysis_label="Differential Expression",
+            feature_label_singular="gene",
+            feature_label_plural="genes",
+        )
+
+    def run_limma(
+            self,
+            expr_df: pd.DataFrame,
+            meta_df: pd.DataFrame,
+            output_dir: Union[str, Path],
+            design_col: str,
+            covariates: Optional[Sequence[str]] = None,
+            out_csv: str = "limma_de_results.csv",
+            r_script_path: Optional[Union[str, Path]] = None,
+            min_count: float = 0,
+            min_samples_frac: float = 0.0,
+            gene_list: Optional[Sequence[str]] = None,
+            surface_markers: bool = False,
+            analysis_label: str = "Differential Protein Abundance",
+            feature_label_singular: str = "protein",
+            feature_label_plural: str = "proteins",
+    ) -> dict:
+        return self._run_limma_backend(
+            expr_df=expr_df,
+            meta_df=meta_df,
+            output_dir=output_dir,
+            design_col=design_col,
+            covariates=covariates,
+            out_csv=out_csv,
+            r_script_path=r_script_path,
+            min_count=min_count,
+            min_samples_frac=min_samples_frac,
+            gene_list=gene_list,
+            surface_markers=surface_markers,
+            backend="limma",
+            analysis_label=analysis_label,
+            feature_label_singular=feature_label_singular,
+            feature_label_plural=feature_label_plural,
+        )
+
+    def _run_limma_backend(
+            self,
+            expr_df: pd.DataFrame,
+            meta_df: pd.DataFrame,
+            output_dir: Union[str, Path],
+            design_col: str,
+            covariates: Optional[Sequence[str]],
+            out_csv: str,
+            r_script_path: Optional[Union[str, Path]],
+            min_count: float,
+            min_samples_frac: float,
+            gene_list: Optional[Sequence[str]],
+            surface_markers: bool,
+            backend: str,
+            analysis_label: str,
+            feature_label_singular: str,
+            feature_label_plural: str,
+    ) -> dict:
         min_count = self.rt_cfg.min_features if self.rt_cfg.min_features is not None else min_count
         min_samples_frac = self.de_cfg.min_samples_frac if self.de_cfg.min_samples_frac is not None else min_samples_frac
 
         
-        _assert_unique(raw_counts_df, "raw_counts_df")
+        _assert_unique(expr_df, "expr_df")
         _assert_unique(meta_df, "meta_df")
 
-        X, M = _align_samples(raw_counts_df, meta_df, required_meta_cols=[design_col] + (covariates if covariates else []))
+        X, M = _align_samples(expr_df, meta_df, required_meta_cols=[design_col] + (covariates if covariates else []))
         
         if design_col not in M.columns:
             raise ValueError(f"design_col '{design_col}' not in meta_df")
@@ -134,7 +205,10 @@ class LimmaVoomRunner:
             if not self.r_loaded:
                 try:
                     ro.r.source(str(r_script_path))
-                    self.r_voom_func = ro.globalenv['execute_limma_voom_de']
+                    if backend == "voom":
+                        self.r_voom_func = ro.globalenv['execute_limma_voom_de']
+                    else:
+                        self.r_voom_func = ro.globalenv['execute_limma_de']
                     self.r_loaded = True
                 except RRuntimeError as e:
                     raise RBackendError(
@@ -172,7 +246,9 @@ class LimmaVoomRunner:
                     min_surface_markers=self.rt_cfg.min_features if self.rt_cfg.min_features is not None else 20,
                 )
                 gene_list = summary.combined
-                # ssave gene list text
+                feature_list_path = output_dir / "limma_selected_features.txt"
+                feature_list_path.write_text("\n".join(gene_list))
+                # Backward-compatible RNA-era artifact name
                 gene_list_path = output_dir / "limma_voom_selected_genes.txt"
                 gene_list_path.write_text("\n".join(gene_list))
 
@@ -192,7 +268,7 @@ class LimmaVoomRunner:
                         de_results=sub_path,
                         fdr_thresh=0.05,
                         logfc_thresh=1.0,
-                        title=f"Limma-Voom DE: {contrast_name}",
+                        title=f"{analysis_label}: {contrast_name}",
                         markers=gene_list if gene_list is not None else [],
                     )
                     # remove temp sub csv and plot directory
@@ -214,7 +290,7 @@ class LimmaVoomRunner:
                     de_results=output_filepath,
                     fdr_thresh=0.05,
                     logfc_thresh=1.0,
-                    title="Limma-Voom DE Results",
+                    title=f"{analysis_label} Results",
                     markers=gene_list if gene_list is not None else [],
                 )
                 volcano_svgs.append(("Volcano", svg))
@@ -234,11 +310,15 @@ class LimmaVoomRunner:
                 combined_genes=gene_list,
                 covariates=covariates,
                 cfg=self.cfg,
+                analysis_label=analysis_label,
+                feature_label_singular=feature_label_singular,
+                feature_label_plural=feature_label_plural,
             )
 
 
             # return gene_list in r_result_dict
             r_result_dict['selected_genes'] = gene_list
+            r_result_dict['selected_features'] = gene_list
 
             return r_result_dict
     

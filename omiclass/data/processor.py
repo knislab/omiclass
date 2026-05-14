@@ -91,6 +91,107 @@ class DataProcessor:
                 )
 
         return ExpressionBundle(X=X, genes=genes)
+
+    def load_modality_input(
+        self,
+        expression_path: Path,
+        gene_path: Optional[Path] = None,
+        *,
+        surface_markers: bool = False,
+    ) -> ExpressionBundle:
+        """
+        Modality-aware input loader.
+        - rnaseq: preserve current behavior exactly.
+        - cptac_ms: load protein abundance matrix (features x samples) with generic feature IDs.
+        """
+        modality = getattr(getattr(self.cfg, "project", None), "modality", "rnaseq")
+
+        if modality == "rnaseq":
+            return self.load_expression_and_genes(
+                expression_path=expression_path,
+                gene_path=gene_path,
+                surface_markers=surface_markers,
+            )
+
+        if modality == "cptac_ms":
+            expression_path = Path(expression_path)
+            if not expression_path.exists():
+                raise DataError(f"Expression file not found: {expression_path}")
+            X = load_matrix(expression_path)
+            if X.empty:
+                raise DataError(f"Expression matrix is empty: {expression_path}")
+            X = X.select_dtypes(include=[np.number]).astype("float32")
+            X = X.replace([np.inf, -np.inf], np.nan)
+
+            genes: List[str]
+            if gene_path is not None:
+                gene_path = Path(gene_path)
+                if not gene_path.exists():
+                    raise DataError(f"Gene list file not found: {gene_path}")
+                genes = load_list(gene_path)
+            else:
+                genes = list(X.index)
+            if not genes:
+                raise DataError("Feature list is empty after loading CPTAC matrix.")
+
+            bundle = ExpressionBundle(X=X, genes=genes)
+            # Keep identifiers fully generic for proteomics workflows.
+            bundle.X.index = bundle.X.index.map(str)
+            bundle.genes = [str(g) for g in bundle.genes]
+            return bundle
+
+        raise DataError(
+            f"Unsupported project.modality '{modality}'. Supported modalities: rnaseq, cptac_ms."
+        )
+
+    def preprocess_cptac_ms(self, X: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+        """
+        CPTAC proteomics preprocessing (features x samples):
+        missingness filtering -> optional log2 transform -> optional imputation.
+        """
+        cfg = getattr(self.cfg, "cptac_ms_preprocessing", None)
+        if cfg is None:
+            return X, {"modality": "cptac_ms", "preprocessing": "none"}
+
+        out = X.copy()
+        summary = {
+            "modality": "cptac_ms",
+            "input_shape": list(out.shape),
+            "max_missing_fraction": cfg.max_missing_fraction,
+            "log2_transform": bool(cfg.log2_transform),
+            "imputation": str(cfg.imputation),
+        }
+
+        if cfg.max_missing_fraction is not None:
+            row_missing_frac = out.isna().mean(axis=1)
+            keep = row_missing_frac <= float(cfg.max_missing_fraction)
+            removed = int((~keep).sum())
+            out = out.loc[keep]
+            summary["removed_features_by_missingness"] = removed
+
+        if bool(cfg.log2_transform):
+            valid = out.to_numpy(dtype=float)
+            finite = valid[np.isfinite(valid)]
+            if finite.size > 0:
+                min_val = float(np.nanmin(finite))
+                if min_val <= 0:
+                    offset = abs(min_val) + float(cfg.pseudocount)
+                else:
+                    offset = 0.0
+                out = np.log2(out + offset)
+                summary["log2_offset_added"] = float(offset)
+            else:
+                summary["log2_offset_added"] = 0.0
+
+        if str(cfg.imputation) == "median_by_feature":
+            med = out.median(axis=1, skipna=True)
+            out = out.T.fillna(med).T
+            summary["imputed_missing_values"] = True
+        else:
+            summary["imputed_missing_values"] = False
+
+        summary["output_shape"] = list(out.shape)
+        return out, summary
     
     def load_batch_metadata_prediction(self,
         X_expr: pd.DataFrame,

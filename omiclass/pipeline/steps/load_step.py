@@ -24,10 +24,16 @@ class LoadInputStep:
         - ctx.cache["gene_list"]: gene list associated with the matrix
         """
         dp = DataProcessor(ctx.cfg)
+        modality = getattr(ctx.cfg.project, "modality", "rnaseq")
+
+        modality_label = (
+            "CPTAC MS proteomics" if modality == "cptac_ms" else "RNA-seq"
+        )
+        print(f"[LoadInputStep] Input modality: {modality_label} ({modality})")
 
         if ctx.opts.input_mode == "raw_counts":
             # For now use the same loader; you can later plug in DE/normalization
-            expr_bundle = dp.load_expression_and_genes(
+            expr_bundle = dp.load_modality_input(
                 expression_path=ctx.opts.counts_path,
                 gene_path=ctx.opts.gene_path,
                 surface_markers=ctx.opts.surface_markers,
@@ -36,7 +42,7 @@ class LoadInputStep:
 
         else:
             # batch_corrected or ready_for_training both start from an expression matrix
-            expr_bundle = dp.load_expression_and_genes(
+            expr_bundle = dp.load_modality_input(
                 expression_path=ctx.opts.expression_path,
                 gene_path=ctx.opts.gene_path,
                 surface_markers=ctx.opts.surface_markers,
@@ -46,3 +52,4 @@ class LoadInputStep:
         ctx.cache["full_expr"] = full_expr
         ctx.cache["full_expr_t"] = full_expr.T  # samples in rows
         ctx.cache["gene_list"] = gene_list
+        ctx.cache["input_modality"] = modality

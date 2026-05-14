@@ -26,6 +26,8 @@ SPEC = OverrideSpec(
         "classification_column": "project.cluster_column",
         "class_col": "project.cluster_column",
         "meta_path": "project.meta_path",
+        "modality": "project.modality",
+        "project_modality": "project.modality",
         "test_holdout_path": "project.hold_out_path",
         "markers_path": "project.geneset_path",
 
@@ -82,6 +84,10 @@ SPEC = OverrideSpec(
         "gencode_version": "project.version",
         "gtf_path": "normalization.gtf_path",
         "surface_markers_enabled": "surface_markers.enabled",
+        "cptac_max_missing_fraction": "cptac_ms_preprocessing.max_missing_fraction",
+        "cptac_log2_transform": "cptac_ms_preprocessing.log2_transform",
+        "cptac_pseudocount": "cptac_ms_preprocessing.pseudocount",
+        "cptac_imputation": "cptac_ms_preprocessing.imputation",
 
         # models.random_forest (Defaults & Search Space)
         "rf_oob_score": "models.random_forest.defaults.oob_score",

@@ -12,7 +12,7 @@ from omiclass.utils.pipeline import make_or_load_split
 
 
 class DEStep:
-    name = "differential_expression"
+    name = "feature_selection"
 
     def should_run(self, ctx: RunContext) -> bool:
         if ctx.opts.mode == "clean_and_predict":
@@ -26,9 +26,10 @@ class DEStep:
 
     def run(self, ctx: RunContext) -> None:
         """
-        Run differential expression analysis, store result in ctx.cache["de_results"].
+        Run modality-aware differential feature analysis and store selected features.
         """
         full_expr = ctx.cache["full_expr"]
+        modality = str(getattr(ctx.cfg.project, "modality", "rnaseq"))
 
         dp = DataProcessor(ctx.cfg)
         meta_df, design_col, y = dp.load_de_data(
@@ -78,16 +79,35 @@ class DEStep:
 
         limma = LimmaVoomRunner(de_cfg=de_cfg, cfg=ctx.cfg)
         min_count = getattr(de_cfg, 'min_count', 10)
-
-        res_dict = limma.run_limma_voom(
-            raw_counts_df=Xtr.T,
+        common_kwargs = dict(
             meta_df=meta_df,
             output_dir=ctx.out_dir,
             design_col=design_col,
             covariates=de_covariates if de_covariates else None,
-            min_count=min_count,
             min_samples_frac=de_cfg.min_samples_frac if de_cfg.min_samples_frac else 0.5,
-            surface_markers=ctx.cfg.surface_markers.enabled if ctx.cfg.surface_markers and ctx.cfg.surface_markers.enabled else False
+            surface_markers=ctx.cfg.surface_markers.enabled if ctx.cfg.surface_markers and ctx.cfg.surface_markers.enabled else False,
         )
 
-        ctx.cache["gene_list"] = res_dict.get('selected_genes', [])
+        if modality == "cptac_ms":
+            # CPTAC path: limma on log2-normalized protein abundance, no voom.
+            res_dict = limma.run_limma(
+                expr_df=Xtr.T,
+                out_csv="limma_protein_de_results.csv",
+                min_count=0,
+                analysis_label="Differential Protein Abundance",
+                feature_label_singular="protein",
+                feature_label_plural="proteins",
+                **common_kwargs,
+            )
+        else:
+            # RNA path: keep current limma-voom behavior unchanged.
+            res_dict = limma.run_limma_voom(
+                raw_counts_df=Xtr.T,
+                min_count=min_count,
+                **common_kwargs,
+            )
+
+        selected_features = res_dict.get('selected_features', res_dict.get('selected_genes', []))
+        ctx.cache["feature_list"] = selected_features
+        # Backward compatibility for existing training/batch flows.
+        ctx.cache["gene_list"] = selected_features

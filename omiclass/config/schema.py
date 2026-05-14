@@ -5,6 +5,7 @@ from typing import List, Optional, Union, Literal, Dict
 from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
 
 BatchMethod = Literal["batch", "design", "covariates", "pcs"]
+Modality = Literal["rnaseq", "cptac_ms"]
 
 # ---------- feature selection ----------
 class FeatureSelectionCfg(BaseModel):
@@ -47,6 +48,29 @@ class NormalizationCfg(BaseModel):
     gene_lengths_path: Optional[Path] = None
     gtf_path: Optional[Path] = None
 
+
+class CPTACMSPreprocessingCfg(BaseModel):
+    max_missing_fraction: Optional[float] = None
+    log2_transform: bool = False
+    pseudocount: float = 1e-6
+    imputation: Literal["none", "median_by_feature"] = "none"
+
+    @field_validator("max_missing_fraction")
+    @classmethod
+    def _validate_missing_fraction(cls, v):
+        if v is None:
+            return v
+        if not (0.0 <= float(v) <= 1.0):
+            raise ValueError("max_missing_fraction must be between 0 and 1.")
+        return float(v)
+
+    @field_validator("pseudocount")
+    @classmethod
+    def _validate_pseudocount(cls, v):
+        if float(v) <= 0:
+            raise ValueError("pseudocount must be > 0.")
+        return float(v)
+
 # ---------- Surface markers ----------
 class SurfaceMarkerCfg(BaseModel):
     enabled: bool = False
@@ -55,6 +79,7 @@ class SurfaceMarkerCfg(BaseModel):
 # ---------- Project ----------
 class ProjectCfg(BaseModel):
     name: str = "Omiclass"                     
+    modality: Modality = "rnaseq"
     out_dir: Path = Field(default_factory=Path.cwd)
     split_data_dir: Optional[Path] = None
     classes_names: Optional[List[str]] = None 
@@ -81,6 +106,23 @@ class ProjectCfg(BaseModel):
         if self.cluster_column is None:
             raise ValueError("cluster_column from meta is required.")
         return self
+
+    @field_validator("modality", mode="before")
+    @classmethod
+    def _validate_modality(cls, v):
+        if v is None:
+            return "rnaseq"
+        if not isinstance(v, str):
+            raise ValueError(
+                "Unsupported project.modality value. Supported modalities: 'rnaseq', 'cptac_ms'."
+            )
+        normalized = v.strip().lower()
+        allowed = {"rnaseq", "cptac_ms"}
+        if normalized not in allowed:
+            raise ValueError(
+                f"Unsupported project.modality '{v}'. Supported modalities: 'rnaseq', 'cptac_ms'."
+            )
+        return normalized
     
 
     
@@ -363,6 +405,7 @@ class Config(BaseModel):
     models: ModelsCfg = Field(default_factory=ModelsCfg)
     de: DECfg = Field(default_factory=DECfg)
     normalization: NormalizationCfg = Field(default_factory=NormalizationCfg)
+    cptac_ms_preprocessing: CPTACMSPreprocessingCfg = Field(default_factory=CPTACMSPreprocessingCfg)
     surface_markers: SurfaceMarkerCfg = Field(default_factory=SurfaceMarkerCfg)
 
     @model_validator(mode="after")

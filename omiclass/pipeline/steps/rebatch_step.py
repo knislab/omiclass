@@ -49,6 +49,14 @@ class RebatchCorrectionStep:
         limma_runner = LimmaRunner()
         limma_out_dir = ctx.out_dir / "limma_re-correction"
         limma_out_dir.mkdir(parents=True, exist_ok=True)
+        modality = str(getattr(ctx.cfg.project, "modality", "rnaseq"))
+        feature_label_singular = "protein" if modality == "cptac_ms" else "gene"
+        feature_label_plural = "proteins" if modality == "cptac_ms" else "genes"
+        corrected_matrix_label = (
+            "batch-corrected protein abundance"
+            if modality == "cptac_ms"
+            else "batch-corrected expression"
+        )
         limma_out_csv = "limma_corrected_expression.csv"
 
         limma_run_res = limma_runner.run_limma(
@@ -74,6 +82,9 @@ class RebatchCorrectionStep:
             n_pc=bc.n_pcs or 10,
             na_fill=bc.fill_na or None,
             limma_result=limma_run_res,
+            feature_label_singular=feature_label_singular,
+            feature_label_plural=feature_label_plural,
+            corrected_matrix_label=corrected_matrix_label,
         )
         try:
             split = load_split(ctx.cfg.project.split_data_dir / "split.json")

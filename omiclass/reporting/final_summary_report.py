@@ -99,7 +99,7 @@ def render_final_summary_html(
     # 1) Leaderboard
     parts.append(
         card(
-            "1) Leaderboard",
+            "Leaderboard",
             svg_panel(
                 title="Leaderboard",
                 svg=lb_svg,
@@ -112,19 +112,17 @@ def render_final_summary_html(
     if leaderboard_df is not None:
         parts.append(
             card(
-                "1b) CV Leaderboard Table",
+                "CV Leaderboard Table",
                 _render_model_table(
                     df=leaderboard_df,
                     selected_model=selected_model,
-                ),
-                subtitle="Model selection is based on CV leaderboard only.",
-            )
+                ),            )
         )
 
     # 2) Confusion matrices
     parts.append(
         card(
-            "2) Confusion matrices",
+            "Confusion matrices",
             svg_panel(
                 title="Confusion matrices grid",
                 svg=cm_grid_svg,
@@ -139,7 +137,7 @@ def render_final_summary_html(
     # 3) Key metrics bar plot
     parts.append(
         card(
-            "3) Key performance metrics",
+            "Key performance metrics",
             svg_panel(
                 title="Metrics bar plot",
                 svg=metrics_svg,
@@ -153,7 +151,7 @@ def render_final_summary_html(
     if holdout_df is not None:
         parts.append(
             card(
-                "3b) Holdout Metrics Table",
+                "Holdout Metrics Table",
                 _render_model_table(
                     df=holdout_df,
                     selected_model=selected_model,
@@ -165,7 +163,7 @@ def render_final_summary_html(
     # 4) Macro PR & ROC side-by-side
     parts.append(
         split_card_1_1(
-            title="4) Macro PR & Macro ROC",
+            title= "Macro PR & Macro ROC",
             subtitle="Overlay curves across models (macro averaging)",
             left_title="Macro PR",
             right_title="Macro ROC",
@@ -190,7 +188,7 @@ def render_final_summary_html(
     if feature_reduction_svg:
         parts.append(
             card(
-                "5) Feature selection analysis",
+                "Feature selection analysis",
                 svg_panel(
                     title="Feature selection analysis",
                     svg=feature_reduction_svg,
