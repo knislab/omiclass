@@ -277,10 +277,31 @@ class TrainAndEvalStep:
         except Exception as e:
             pass
 
+        meta_payload = {
+            "n_test": int(len(yte)),
+            "k": len(labels_for_plot),
+            "input_modality": str(getattr(ctx.cfg.project, "modality", "rnaseq")),
+            "input_modality_label": (
+                "CPTAC MS proteomics"
+                if str(getattr(ctx.cfg.project, "modality", "rnaseq")) == "cptac_ms"
+                else "RNA-seq"
+            ),
+            "cv_selected_model": best_model,
+            "cv_selection_metric": selected_metric_col,
+        }
+        if ctx.cache.get("cptac_preprocessing"):
+            meta_payload["cptac_preprocessing"] = ctx.cache.get("cptac_preprocessing")
+
+        _ = render_final_summary_html(
+            plotter=plotter,
+            meta=meta_payload,
+            ctx=ctx
+        )
+
         # Check if best model's threshold optimization improves F1
         best_model_improves_with_threshold = (
-            best_model in threshold_f1_scores and 
-            threshold_f1_scores[best_model] > original_f1_scores[best_model]
+            best_model in threshold_f1_scores
+            and threshold_f1_scores[best_model] > original_f1_scores[best_model]
         )
 
         threshold_plotter = None
@@ -295,18 +316,29 @@ class TrainAndEvalStep:
                 y_true_train=ytr,
             )
 
+        meta_payload = {
+            "train samples": int(len(ytr)),
+            "test samples": int(len(yte)),
+            "Number of classes": len(labels_for_plot),
+            "Selected model": best_model.replace("_", " ").title(),
+            "Selected metric": selected_metric_col,
+            "Threshold optimized appendix": "yes" if threshold_plotter is not None else "no",
+            "input_modality": str(getattr(ctx.cfg.project, "modality", "rnaseq")),
+            "input_modality_label": (
+                "CPTAC MS proteomics"
+                if str(getattr(ctx.cfg.project, "modality", "rnaseq")) == "cptac_ms"
+                else "RNA-seq"
+            ),
+        }
+
+        if ctx.cache.get("cptac_preprocessing"):
+            meta_payload["cptac_preprocessing"] = ctx.cache.get("cptac_preprocessing")
+
         _ = render_final_summary_html(
             plotter=plotter,
             threshold_plotter=threshold_plotter,
             include_threshold_appendix=bool(threshold_plotter is not None),
-            meta={
-                "train samples": int(len(ytr)),
-                "test samples": int(len(yte)),
-                "Number of classes": len(labels_for_plot),
-                "Selected model": best_model.replace("_", " ").title(),
-                "Selected metric": selected_metric_col,
-                "Threshold optimized appendix": "yes" if threshold_plotter is not None else "no",
-            },
+            meta=meta_payload,
             ctx=ctx,
         )
 
