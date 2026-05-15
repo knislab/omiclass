@@ -134,7 +134,7 @@ Ranks all trained models according to the selected main metric, usually macro F1
 
 This plot is used to quickly compare the overall performance of all models.
 
-### 2) Confusion Matrices
+### 2) Confusion matrix
 
 Shows one row-normalized confusion matrix for each model.
 
