@@ -17,12 +17,15 @@ from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, r
 from sklearn.preprocessing import label_binarize
 
 class FinalSummaryPlotter:
-    def __init__(self, *, labels: List[str], y_true, per_model: Dict[str, Dict[str, np.ndarray]], out_dir: Path, class_name_map: Optional[Dict[int, str]] = None,):
+    def __init__(self, *, labels: List[str], y_true, per_model: Dict[str, Dict[str, np.ndarray]], per_model_train: Dict[str, Dict[str, np.ndarray]], out_dir: Path, class_name_map: Optional[Dict[int, str]] = None, y_true_train=None,):
         self.labels = list(labels)
         self.K = len(self.labels)
         self.y_true = as_numpy_y(y_true)
+        self.y_true_train = as_numpy_y(y_true_train) if y_true_train is not None else self.y_true
         self.per_model = self.clean_models_names(per_model)
         self.out_dir = Path(out_dir)
+        self.per_model_train = self.clean_models_names(per_model_train)
+
 
         if class_name_map is not None:
             self.class_name_map = {int(k): str(v) for k, v in class_name_map.items()}
@@ -71,70 +74,77 @@ class FinalSummaryPlotter:
         svg = fig_to_svg_str(fig)
         plt.close(fig)
         return svg
+    
+    def _resolve_model_key(self, key: str) -> str:
+        if key in self.per_model:
+            return key
 
-    def plot_confusion_matrices(self) -> str:
-        model_items = list(self.per_model.items())
+        def normalize(s):
+            return (
+                str(s)
+                .lower()
+                .replace("_", "")
+                .replace("-", "")
+                .replace(" ", "")
+            )
+
+        target = normalize(key)
+
+        for existing_key in self.per_model.keys():
+            if normalize(existing_key) == target:
+                return existing_key
+
+        raise KeyError(
+            f"best_model_key='{key}' was not found in per_model. "
+            f"Available models: {list(self.per_model.keys())}"
+        )
+
+    def plot_confusion_matrices(self, best_model_key: str | None = None) -> str:
+        if best_model_key is not None:
+            resolved_key = self._resolve_model_key(best_model_key)
+            model_items = [(resolved_key, self.per_model[resolved_key])]
+        else:
+            model_items = list(self.per_model.items())
+
         n_models = len(model_items)
-        n_rows = 2
-        n_cols = max(1, math.ceil(n_models / 2))
+        if n_models == 0:
+            raise ValueError("No models found in per_model.")
+
         label_index = self._get_label_index()
         class_names = [self.class_name_map.get(int(i), str(i)) for i in label_index]
         K = len(label_index)
 
-        # figure size scales with number of classes and grid width
-        fig_w = n_cols * (4.5 + 0.3 * K)
-        fig_h = n_rows * (4.5 + 0.3 * K)
-        
-        # Increase the width slightly to accommodate the external colorbar
-        fig, axes = plt.subplots(n_rows, n_cols, figsize=(fig_w + 1, fig_h))
-        
-        if n_rows == 1 or n_cols == 1:
-            axes = np.atleast_2d(axes) # Ensure 2D for consistent indexing
+        fig_w = 5.0 + 0.35 * K
+        fig_h = 4.8 + 0.35 * K
 
-        im = None
-        for idx, (name, res) in enumerate(model_items):
-            r = idx // n_cols
-            c = idx % n_cols
-            ax = axes[r, c]
-            y_pred = as_numpy_y(res["y_pred"])
-            cm_counts, cm = _safe_row_normalized_cm(self.y_true, y_pred, labels=label_index)
+        fig, ax = plt.subplots(1, 1, figsize=(fig_w + 1, fig_h))
 
-            cm_percentage = cm * 100
-            im = sns.heatmap(
-                cm_percentage, 
-                annot=True,
-                fmt='.0f',
-                cmap='Blues',
-                cbar=False,
-                vmin=0, vmax=100,
-                ax=ax
-            )
-            ax.set_xticks(np.arange(K) + 0.5)
-            ax.set_yticks(np.arange(K) + 0.5)
-            ax.set_xticklabels(class_names, rotation=45, ha="right")
-            ax.set_yticklabels(class_names, rotation=0)
-            ax.set_xlabel("Predicted")
-            ax.set_ylabel("True")
-            ax.set_title(name)
-            
-        # hide any unused subplots
-        total_slots = n_rows * n_cols
-        for k in range(n_models, total_slots):
-            axes.flatten()[k].axis("off")
+        name, res = model_items[0]
+        y_pred = as_numpy_y(res["y_pred"])
+        cm_counts, cm = _safe_row_normalized_cm(self.y_true, y_pred, labels=label_index)
 
-        # --- COLORBAR LOGIC ---
-        if n_models > 0:
-            # We create a new axis on the right specifically for the colorbar
-            # This prevents it from overlapping the matrices
-            fig.subplots_adjust(right=0.88) # Make room on the right
-            cbar_ax = fig.add_axes([0.91, 0.15, 0.02, 0.7]) # [left, bottom, width, height]
-            
-            # Reference the mapping from the last heatmap
-            mappable = axes.flatten()[n_models-1].collections[0]
-            cbar = fig.colorbar(mappable, cax=cbar_ax)
-            cbar.set_label("Row-normalized Score", rotation=90, labelpad=15)
+        cm_percentage = cm * 100
+        sns.heatmap(
+            cm_percentage,
+            annot=True,
+            fmt=".0f",
+            cmap="Blues",
+            cbar=True,
+            vmin=0,
+            vmax=100,
+            ax=ax,
+            cbar_kws={"label": "Row-normalized Score"},
+        )
 
-        fig.subplots_adjust(left=0.08, bottom=0.15, wspace=0.4, hspace=0.4)
+        ax.set_xticks(np.arange(K) + 0.5)
+        ax.set_yticks(np.arange(K) + 0.5)
+        ax.set_xticklabels(class_names, rotation=45, ha="right")
+        ax.set_yticklabels(class_names, rotation=0)
+        ax.set_xlabel("Predicted")
+        ax.set_ylabel("True")
+        ax.set_title(name)
+
+        fig.tight_layout()
         svg = fig_to_svg_str(fig)
         plt.close(fig)
         return svg
@@ -143,13 +153,13 @@ class FinalSummaryPlotter:
     def plot_macro_pr_and_roc(self) -> Tuple[Path, Path]:
         label_index = self._get_label_index()
         K = len(label_index)
-        Y = np.column_stack([(self.y_true == k).astype(int) for k in label_index])
+        Y = np.column_stack([(self.y_true_train == k).astype(int) for k in label_index])
         grid_pr = np.linspace(0, 1, 500)
         grid_fpr = np.linspace(0, 1, 500)
 
         # PR
         fig_pr, ax_pr = plt.subplots(figsize=(6.5, 5))
-        for name, res in self.per_model.items():
+        for name, res in self.per_model_train.items():
             P = np.asarray(res["y_proba"])
             P = self._ensure_proba_shape(P, K)
 
@@ -171,7 +181,7 @@ class FinalSummaryPlotter:
         # ROC
         fig_roc, ax_roc = plt.subplots(figsize=(6.5, 5))
         ax_roc.plot([0, 1], [0, 1], linestyle="--", linewidth=1)
-        for name, res in self.per_model.items():
+        for name, res in self.per_model_train.items():
             P = np.asarray(res["y_proba"])
             P = self._ensure_proba_shape(P, K)
 
@@ -193,8 +203,10 @@ class FinalSummaryPlotter:
 
     def plot_metric_barplot(self) -> Path:
         records = []
-        for name, res in self.per_model.items():
+        for name, res in self.per_model_train.items():
             y_pred = as_numpy_y(res["y_pred"])
+            if y_pred.shape[0] != self.y_true_train.shape[0]:
+                continue
             cleaned_name = None
             if len(name) > 18:
                 spaces = [i for i, c in enumerate(name) if c == " "]
@@ -208,12 +220,19 @@ class FinalSummaryPlotter:
                 cleaned_name = name
             records.append({
                 "model":     cleaned_name,
-                "Accuracy":  accuracy_score(self.y_true, y_pred),
-                "Precision": precision_score(self.y_true, y_pred, average="macro", zero_division=0),
-                "Recall":    recall_score(self.y_true, y_pred, average="macro", zero_division=0),
-                "Macro F1":  f1_score(self.y_true, y_pred, average="macro", zero_division=0),
+                "Accuracy":  accuracy_score(self.y_true_train, y_pred),
+                "Precision": precision_score(self.y_true_train, y_pred, average="macro", zero_division=0),
+                "Recall":    recall_score(self.y_true_train, y_pred, average="macro", zero_division=0),
+                "Macro F1":  f1_score(self.y_true_train, y_pred, average="macro", zero_division=0),
             })
-        
+        if not records:
+            fig, ax = plt.subplots(figsize=(7, 3))
+            ax.axis("off")
+            ax.text(0.5, 0.5, "No training CV payload available", ha="center", va="center")
+            svg = fig_to_svg_str(fig)
+            plt.close(fig)
+            return svg
+
         df = pd.DataFrame(records).melt(
             id_vars="model",
             value_vars=["Accuracy", "Precision", "Recall", "Macro F1"],
