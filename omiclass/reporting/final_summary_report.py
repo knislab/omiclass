@@ -24,6 +24,19 @@ def _pretty_model_name(name: Optional[str]) -> str:
         return ""
     return str(name).replace("_", " ").strip().title()
 
+def _format_table_value(col: str, val: Any) -> Any:
+    if col == "model":
+        return _pretty_model_name(val)
+    if col in ("F1 macro mean", "Accuracy mean", "f1_macro", "accuracy"):
+        try:
+            v = float(val)
+            if pd.isna(v):
+                return "—"
+            return f"{v:.1f}"
+        except Exception:
+            return val
+    return val
+
 
 def _render_model_table(
     *,
@@ -47,10 +60,7 @@ def _render_model_table(
             and _normalize_model_name(model_name) == _normalize_model_name(selected_model)
         )
         row_style = " style='font-weight:700;background:#fff7e6;'" if active else ""
-        cells = "".join(
-            f"<td>{esc(_pretty_model_name(r.get(c)) if c == 'model' else r.get(c))}</td>"
-            for c in cols
-        )
+        cells = "".join(f"<td>{esc(_format_table_value(c, r.get(c)))}</td>" for c in cols)
         rows.append(f"<tr{row_style}>{cells}</tr>")
 
     note = (
@@ -61,16 +71,24 @@ def _render_model_table(
     return f"{note}<table class='kv'>{head}{''.join(rows)}</table>"
 
 def clean_leaderboard_df(df: pd.DataFrame) -> pd.DataFrame:
+    # Keep only successful models first; failed/skipped rows often carry NaN metrics.
+    if "status" in df.columns:
+        df = df[df["status"].astype(str).str.lower() == "ok"].copy()
+    # Guardrail: only keep rows with usable score values.
+    metric_candidates = [c for c in ("f1_macro_mean", "accuracy_mean", "f1_macro", "accuracy") if c in df.columns]
+    if metric_candidates:
+        df = df.dropna(subset=metric_candidates, how="all").copy()
+
     if "status" in df.columns:
         df = df.drop(columns=["status"])
     if "error" in df.columns:
         df = df.drop(columns=["error"])
     if "f1_macro_mean" in df.columns:
-        df["f1_macro_mean"] = df["f1_macro_mean"].round(3) * 100
+        df["f1_macro_mean"] = pd.to_numeric(df["f1_macro_mean"], errors="coerce") * 100
         df["F1 macro mean"] = df["f1_macro_mean"]
         df.drop(columns=["f1_macro_mean"], inplace=True)
     if "accuracy_mean" in df.columns:
-        df["Accuracy mean"] = df["accuracy_mean"].round(3) * 100
+        df["Accuracy mean"] = pd.to_numeric(df["accuracy_mean"], errors="coerce") * 100
         df.drop(columns=["accuracy_mean"], inplace=True)
 
     return df

@@ -236,12 +236,23 @@ def svg_panel(
 
     dl = ""
     if download_name:
+        png_name = (
+            download_name[:-4] + ".png"
+            if download_name.lower().endswith(".svg")
+            else download_name + ".png"
+        )
         dl = f"""
     <button class="btn btn-sm"
             type="button"
             data-download-svg="{esc(fig_id)}"
             data-download-name="{esc(download_name)}">
     Download SVG
+    </button>
+    <button class="btn btn-sm"
+            type="button"
+            data-download-png="{esc(fig_id)}"
+            data-download-name="{esc(png_name)}">
+    Download PNG
     </button>
     """.strip()
         

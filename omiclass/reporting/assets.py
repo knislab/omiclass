@@ -511,6 +511,82 @@ OMICLASS_JS = r"""
   });
 
   /* -----------------------------
+  * PNG download (from inline SVG)
+  * ----------------------------- */
+  document.addEventListener("click", (ev) => {
+    const btn = ev.target instanceof HTMLElement
+      ? ev.target.closest("button[data-download-png]")
+      : null;
+    if (!btn) return;
+
+    const figId = btn.getAttribute("data-download-png");
+    const filename = btn.getAttribute("data-download-name") || "figure.png";
+    if (!figId) return;
+
+    const vp = document.getElementById(figId);
+    if (!vp) return;
+
+    const svg = vp.querySelector("svg");
+    if (!svg) return;
+
+    const clone = svg.cloneNode(true);
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+
+    // Ensure concrete pixel size for canvas rendering.
+    const vb = clone.viewBox && clone.viewBox.baseVal ? clone.viewBox.baseVal : null;
+    let w = parseFloat(clone.getAttribute("width") || "");
+    let h = parseFloat(clone.getAttribute("height") || "");
+    if ((!isFinite(w) || w <= 0) && vb && vb.width > 0) w = vb.width;
+    if ((!isFinite(h) || h <= 0) && vb && vb.height > 0) h = vb.height;
+    if (!isFinite(w) || w <= 0) w = 1200;
+    if (!isFinite(h) || h <= 0) h = 800;
+    clone.setAttribute("width", String(w));
+    clone.setAttribute("height", String(h));
+
+    const text = new XMLSerializer().serializeToString(clone);
+    const blob = new Blob([text], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(w));
+        canvas.height = Math.max(1, Math.round(h));
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((pngBlob) => {
+          if (!pngBlob) {
+            URL.revokeObjectURL(url);
+            return;
+          }
+          const pngUrl = URL.createObjectURL(pngBlob);
+          const a = document.createElement("a");
+          a.href = pngUrl;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(pngUrl), 2000);
+          URL.revokeObjectURL(url);
+        }, "image/png");
+      } catch (_e) {
+        URL.revokeObjectURL(url);
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+    };
+
+    img.src = url;
+  });
+
+  /* -----------------------------
    * Copy-to-clipboard buttons
    * ----------------------------- */
   document.addEventListener("click", async (ev) => {
