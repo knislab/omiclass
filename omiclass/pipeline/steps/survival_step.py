@@ -55,7 +55,13 @@ class SurvivalStep:
                     leaderboard = load_matrix(leaderboard_path, numeric=False)
                     if "status" in leaderboard.columns:
                         leaderboard = leaderboard[leaderboard["status"] == "ok"]
-                    best_model_name = str(leaderboard.iloc[0]["model"])
+                    if "model" in leaderboard.columns:
+                        best_model_name = str(leaderboard.iloc[0]["model"])
+                    elif leaderboard.index.name == "model" or leaderboard.index[0] is not None:
+                        best_model_name = str(leaderboard.index[0])
+                    else:
+                        raise ValueError("Could not determine best model name from leaderboard.")
+
                     model_base_path = ctx.out_dir / "train_artifacts" / f"{best_model_name}.joblib"
             model_base_path = Path(model_base_path)
             labels_for_plot = ctx.cache.get("labels_for_plot", None)
