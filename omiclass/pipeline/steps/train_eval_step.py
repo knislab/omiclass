@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from typing import TYPE_CHECKING
 
-from omiclass.utils.pipeline import make_or_load_split
+from omiclass.utils.pipeline import make_or_load_split, maybe_log1p_expression
 from omiclass.data.processor import DataProcessor
 from omiclass.train.trainer import Trainer
 from omiclass.eval.holdout import evaluate_holdout, evaluate_holdout_with_thresholds, write_holdout_csvs
@@ -58,10 +58,15 @@ class TrainAndEvalStep:
 
         gene_list = ctx.cache["gene_list"]
 
-        # Optional log1p before train
-        if ctx.cfg.runtime.log_transform is True and not ctx.cache.get("_did_raw_count_norm", False) and not ctx.cache.get("_did_log_transform", False):
-            X_full_raw = np.log1p(X_full_raw)
+        X_full_raw, did_log, log_reason = maybe_log1p_expression(
+            X_full_raw,
+            enabled=ctx.cfg.runtime.log_transform is True,
+            already_normalized_or_logged=ctx.cache.get("_did_raw_count_norm", False)
+            or ctx.cache.get("_did_log_transform", False),
+        )
+        if did_log:
             ctx.cache["_did_log_transform"] = True
+        ctx.cache["_log_transform_reason"] = log_reason
 
         X_full_raw = apply_batch_holdout(
             X=X_full_raw,
