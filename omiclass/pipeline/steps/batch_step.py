@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING
-import numpy as np
 
 if TYPE_CHECKING:
     from omiclass.pipeline.orchestrator import RunContext
@@ -11,6 +10,7 @@ from omiclass.batch.limma_runner import LimmaRunner
 from omiclass.reporting.limma_report import write_limma_report
 from omiclass.utils.io import load_matrix
 from omiclass.data.processor import DataProcessor
+from omiclass.utils.pipeline import maybe_log1p_expression
 
 class BatchCorrectionStep:
     name = "batch_correction"
@@ -33,10 +33,15 @@ class BatchCorrectionStep:
         """
         full_expr = ctx.cache["full_expr"]
 
-        # Optional log1p before limma
-        if ctx.cfg.runtime.log_transform is True and not ctx.cache.get("_did_raw_count_norm", False) and not ctx.cache.get("_did_log_transform", False):
-            full_expr = np.log1p(full_expr)
+        full_expr, did_log, log_reason = maybe_log1p_expression(
+            full_expr,
+            enabled=ctx.cfg.runtime.log_transform is True,
+            already_normalized_or_logged=ctx.cache.get("_did_raw_count_norm", False)
+            or ctx.cache.get("_did_log_transform", False),
+        )
+        if did_log:
             ctx.cache["_did_log_transform"] = True
+        ctx.cache["_log_transform_reason"] = log_reason
 
         bc = ctx.cfg.batch_correction
         dp = DataProcessor(ctx.cfg)

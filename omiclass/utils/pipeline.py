@@ -4,12 +4,50 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Tuple, Optional, List
 
+import numpy as np
 import pandas as pd
 
 from omiclass.utils.splits import holdout_split, save_split, load_split, apply_split
 from omiclass.utils.io import load_labels
 from omiclass.errors.errors import DataShapeError
 from omiclass.config.schema import Config
+
+
+def expression_looks_log_transformed(X: pd.DataFrame) -> bool:
+    """
+    Conservative scale check used to avoid applying log1p twice.
+
+    Limma batch correction expects log-scale expression. Raw counts and TPM-like
+    values usually have a large upper tail; already log-transformed matrices
+    usually do not. Negative values also imply a transformed scale.
+    """
+    vals = pd.to_numeric(X.stack(dropna=True), errors="coerce")
+    vals = vals[np.isfinite(vals)]
+    if vals.empty:
+        return False
+    if (vals < 0).any():
+        return True
+    integer_like = np.isclose(vals.to_numpy(dtype=float), np.round(vals.to_numpy(dtype=float))).mean()
+    if integer_like >= 0.95:
+        return False
+    q99 = float(vals.quantile(0.99))
+    vmax = float(vals.max())
+    return q99 <= 25.0 and vmax <= 50.0
+
+
+def maybe_log1p_expression(
+    X: pd.DataFrame,
+    *,
+    enabled: bool,
+    already_normalized_or_logged: bool,
+) -> tuple[pd.DataFrame, bool, str]:
+    if not enabled:
+        return X, False, "disabled"
+    if already_normalized_or_logged:
+        return X, False, "already transformed"
+    if expression_looks_log_transformed(X):
+        return X, False, "input appears log-scale"
+    return np.log1p(X), True, "applied"
 
 
 
