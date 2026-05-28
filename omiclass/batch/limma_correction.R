@@ -58,25 +58,6 @@ create_pc_for_covariates <- function(expr_numeric, n_pcs) {
     return(pcs)
 }
 
-validate_covariates <- function(cov, expr_numeric) {
-    cov <- as.matrix(cov)
-    if (is.null(rownames(cov))) {
-        stop("Covariate matrix must have sample IDs as row names.")
-    }
-    if (!setequal(rownames(cov), colnames(expr_numeric))) {
-        stop("Covariate matrix row names must match expression column/sample names.")
-    }
-    cov <- cov[colnames(expr_numeric), , drop = FALSE]
-    if (!all(rownames(cov) == colnames(expr_numeric))) {
-        stop("Covariate matrix rows are not aligned to expression columns.")
-    }
-    storage.mode(cov) <- "numeric"
-    if (any(!is.finite(cov))) {
-        stop("Covariate matrix contains NA/Inf after numeric conversion.")
-    }
-    return(cov)
-}
-
 # state map 1: batch, 2: batch + design, 3: covariates, 4: covariates + design 5: pcs, 6: pcs + design
 
 run_limma_remove_batch_effect <- function(expr_numeric, final_meta_data, state, extra1 = NULL, extra2 = NULL) {
@@ -105,11 +86,9 @@ run_limma_remove_batch_effect <- function(expr_numeric, final_meta_data, state, 
         expr_corrected <- remove_batch_desingn(expr_filt, final_meta_data, extra1, design)
     } else if (state == 3) {
         # State 3: Covariates only (extra1 must be a covariate matrix/data.frame)
-        extra1 <- validate_covariates(extra1, expr_filt)
         expr_corrected <- remove_batch_covariates(expr_filt, extra1)
     } else if (state == 4) {
         # State 4: Covariates + Design (extra1=cov matrix/df, extra2=design formula column name)
-        extra1 <- validate_covariates(extra1, expr_filt)
         design_formula <- formula(paste("~", extra2))
         design <- model.matrix(design_formula, data = final_meta_data)
         expr_corrected <- remove_batch_covariates_desingn(expr_filt, extra1, design)
