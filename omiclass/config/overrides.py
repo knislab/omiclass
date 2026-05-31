@@ -73,6 +73,9 @@ SPEC = OverrideSpec(
 
         # DE (Differential Expression)
         "de_covariates": "de.covariates",
+        "de_include_batch_correction": "de.include_batch_correction",
+        "include_batch_correction_in_de": "de.include_batch_correction",
+        "de_include_batch_column": "de.include_batch_correction",
         "de_min_samples": "de.min_samples_frac",
         "de_k_genes": "de.k_genes",
         "de_logfc": "de.logfc_thresh",

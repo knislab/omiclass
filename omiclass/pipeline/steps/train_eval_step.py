@@ -133,7 +133,6 @@ class TrainAndEvalStep:
             model = joblib.load(model_path)
 
             report = evaluate_holdout(model, Xte, yte)
-            paths = write_holdout_csvs(train_dir, key, metrics=report)
             cvres = trainer.cv_results.get(key)
             threshold_info = learn_multiclass_thresholds(cvres) if cvres is not None else None
             threshold_report = None
@@ -145,6 +144,12 @@ class TrainAndEvalStep:
                     threshold_info=threshold_info,
                 )
 
+            paths = write_holdout_csvs(
+                train_dir,
+                key,
+                metrics=report,
+                threshold_metrics=threshold_report,
+            )
 
             finalize_report_for_model(
                 run_dir=run_dir,
@@ -185,6 +190,16 @@ class TrainAndEvalStep:
                 "accuracy": report.get("accuracy"),
                 "f1_macro": report.get("f1_macro"),
                 "f1_weighted": report.get("f1_weighted"),
+                "threshold_accuracy": threshold_report.get("accuracy") if threshold_report else np.nan,
+                "threshold_f1_macro": threshold_report.get("f1_macro") if threshold_report else np.nan,
+                "threshold_f1_weighted": threshold_report.get("f1_weighted") if threshold_report else np.nan,
+                "threshold_auroc_ovr_macro": threshold_report.get("auroc_ovr_macro") if threshold_report else np.nan,
+                "threshold_logloss": threshold_report.get("logloss") if threshold_report else np.nan,
+                "threshold_f1_macro_delta": (
+                    threshold_report.get("f1_macro") - report.get("f1_macro")
+                    if threshold_report and report.get("f1_macro") is not None
+                    else np.nan
+                ),
                 "mean_true_class_proba": report.get("mean_true_class_proba", np.nan),
             })
 

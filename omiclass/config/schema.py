@@ -36,6 +36,7 @@ class SurvivalPredictionCfg(BaseModel):
 # ---------- DE ----------
 class DECfg(BaseModel):
     covariates: Optional[List[str]] = None
+    include_batch_correction: bool = False
     min_samples_frac: float = 0.5
     geneset_selection: bool = True
     k_genes: int = 100

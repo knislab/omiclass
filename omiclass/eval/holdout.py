@@ -135,6 +135,7 @@ def evaluate_holdout(model, X_test: pd.DataFrame, y_test: pd.Series) -> Dict[str
         "n_test": int(len(y_true)),
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "f1_macro": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
+        "f1_weighted": float(f1_score(y_true, y_pred, average="weighted", zero_division=0)),
         "auroc_ovr_macro": auroc,
         "logloss": ll,
     }
@@ -225,6 +226,7 @@ def evaluate_holdout_with_thresholds(
         "n_test": int(len(y_true)),
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "f1_macro": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
+        "f1_weighted": float(f1_score(y_true, y_pred, average="weighted", zero_division=0)),
         "auroc_ovr_macro": auroc,
         "logloss": ll,
     }
@@ -260,7 +262,13 @@ def _per_class_rows(report_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
     return rows
 
 
-def write_holdout_csvs(run_dir: Path, model_name: str, *, metrics: Dict[str, Any]) -> dict:
+def write_holdout_csvs(
+    run_dir: Path,
+    model_name: str,
+    *,
+    metrics: Dict[str, Any],
+    threshold_metrics: Dict[str, Any] | None = None,
+) -> dict:
     run_dir = Path(run_dir)
     ####
     tables_dir = run_dir / "tables"
@@ -272,6 +280,7 @@ def write_holdout_csvs(run_dir: Path, model_name: str, *, metrics: Dict[str, Any
         "n_test": metrics.get("n_test"),
         "accuracy": metrics.get("accuracy"),
         "f1_macro": metrics.get("f1_macro"),
+        "f1_weighted": metrics.get("f1_weighted"),
         "auroc_ovr_macro": metrics.get("auroc_ovr_macro"),
         "logloss": metrics.get("logloss"),
     }]).to_csv(test_metrics_path, index=False)
@@ -281,7 +290,47 @@ def write_holdout_csvs(run_dir: Path, model_name: str, *, metrics: Dict[str, Any
     per_class_rows = _per_class_rows(metrics.get("report", {}))
     pd.DataFrame(per_class_rows).to_csv(per_class_path, index=False)
 
-    return {
+    out = {
         "test_metrics_csv": f"train_artifacts/tables/{test_metrics_path.name}",
         "per_class_csv": f"train_artifacts/tables/{per_class_path.name}",
     }
+
+    if threshold_metrics is not None:
+        threshold_metrics_path = tables_dir / f"{model_name}_threshold_optimized_test_metrics.csv"
+        pd.DataFrame([{
+            "n_test": threshold_metrics.get("n_test"),
+            "accuracy": threshold_metrics.get("accuracy"),
+            "f1_macro": threshold_metrics.get("f1_macro"),
+            "f1_weighted": threshold_metrics.get("f1_weighted"),
+            "auroc_ovr_macro": threshold_metrics.get("auroc_ovr_macro"),
+            "logloss": threshold_metrics.get("logloss"),
+        }]).to_csv(threshold_metrics_path, index=False)
+
+        threshold_per_class_path = tables_dir / f"{model_name}_threshold_optimized_per_class.csv"
+        threshold_per_class_rows = _per_class_rows(threshold_metrics.get("report", {}))
+        pd.DataFrame(threshold_per_class_rows).to_csv(threshold_per_class_path, index=False)
+
+        threshold_info = threshold_metrics.get("thresholds", {}) or {}
+        threshold_values = threshold_info.get("thresholds", {}) or {}
+        threshold_classes = threshold_info.get("classes", []) or []
+        threshold_rows = [
+            {
+                "class": cls,
+                "threshold": threshold_values.get(str(cls)),
+                "method": threshold_info.get("method"),
+                "optimized_metric": threshold_info.get("optimized_metric"),
+                "baseline_oof_f1": threshold_info.get("baseline_oof_f1"),
+                "optimized_oof_f1": threshold_info.get("optimized_oof_f1"),
+            }
+            for cls in threshold_classes
+        ]
+        threshold_values_path = tables_dir / f"{model_name}_threshold_optimized_thresholds.csv"
+        pd.DataFrame(threshold_rows).to_csv(threshold_values_path, index=False)
+
+        out.update({
+            "threshold_test_metrics_csv": f"train_artifacts/tables/{threshold_metrics_path.name}",
+            "threshold_per_class_csv": f"train_artifacts/tables/{threshold_per_class_path.name}",
+            "threshold_values_csv": f"train_artifacts/tables/{threshold_values_path.name}",
+        })
+
+    return out

@@ -304,6 +304,7 @@ def finalize_report_for_model(
             "n_test": threshold_metrics.get("n_test"),
             "accuracy": threshold_metrics.get("accuracy"),
             "f1_macro": threshold_metrics.get("f1_macro"),
+            "f1_weighted": threshold_metrics.get("f1_weighted"),
             "auroc_ovr_macro": threshold_metrics.get("auroc_ovr_macro"),
             "logloss": threshold_metrics.get("logloss"),
         }

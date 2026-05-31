@@ -51,18 +51,20 @@ class DEStep:
         de_cfg = ctx.cfg.de
         bc_cfg = ctx.cfg.batch_correction
 
-        # Build DE-only covariates: biological DE covariates + batch covariates.
+        # Build DE-only covariates. Batch-correction covariates are opt-in because
+        # DE designs should not silently change when batch correction is configured.
         de_covariates = list(de_cfg.covariates) if de_cfg.covariates else []
         de_covariates_seen = set(de_covariates)
+        include_batch_correction = bool(getattr(de_cfg, "include_batch_correction", False))
 
         # Case 1: single batch column (e.g., cohort) from metadata.
-        if bc_cfg.batch_column and bc_cfg.batch_column in meta_df.columns:
+        if include_batch_correction and bc_cfg.batch_column and bc_cfg.batch_column in meta_df.columns:
             if bc_cfg.batch_column not in de_covariates_seen:
                 de_covariates.append(bc_cfg.batch_column)
                 de_covariates_seen.add(bc_cfg.batch_column)
 
         # Case 2: multi-column batch representation from external covariate matrix.
-        if bc_cfg.covariates_path:
+        if include_batch_correction and bc_cfg.covariates_path:
             cov_matrix = load_matrix(Path(bc_cfg.covariates_path))
             cov_matrix = cov_matrix.loc[cov_matrix.index.intersection(common_index)]
             cov_matrix = cov_matrix.loc[meta_df.index]
