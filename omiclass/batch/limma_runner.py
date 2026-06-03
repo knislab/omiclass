@@ -41,6 +41,26 @@ class LimmaRunner:
 
         return s.map(_lookup)
 
+    @staticmethod
+    def _restore_category_columns(
+        meta_df: Optional[pd.DataFrame],
+        columns: Sequence[str],
+        category_maps: Optional[dict],
+    ) -> Optional[pd.DataFrame]:
+        if meta_df is None or not category_maps:
+            return meta_df
+
+        out = meta_df.copy()
+        for col in columns:
+            if col not in out.columns or col not in category_maps:
+                continue
+            out[col] = LimmaRunner._series_with_category_names(
+                out[col],
+                category_maps.get(col),
+            ).astype("string")
+        out.attrs.update(meta_df.attrs)
+        return out
+
     def _run_qc_and_plotting(
         self,
         expr_df: pd.DataFrame,
@@ -170,17 +190,28 @@ class LimmaRunner:
         # Filter low-variance genes
         required_meta_cols = [batch_col] + (design_cols if design_cols else [])
         X, M = _align_samples(expr_df, meta_df, required_meta_cols=required_meta_cols)
+        if M is not None:
+            M = self._restore_category_columns(
+                M,
+                required_meta_cols,
+                category_maps,
+            )
         v = X.var(axis=1, skipna=True, numeric_only=True)
         X = X.loc[v > 0]
         if M is not None:
             M = M.loc[X.columns]
         if cov_matrix is not None:
-            common_cov_samples = cov_matrix.index.intersection(X.columns)
+            common_cov_samples = X.columns.intersection(cov_matrix.index)
+            if len(common_cov_samples) == 0:
+                raise ValueError("No overlapping samples between expr_df.columns and cov_matrix.index")
             cov_matrix = cov_matrix.loc[common_cov_samples]
             X = X.loc[:, common_cov_samples]
             if M is not None:
                 M = M.loc[common_cov_samples]
+            else:
+                M = pd.DataFrame(index=X.columns)
 
+        
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         if r_script_path is None:
@@ -209,16 +240,19 @@ class LimmaRunner:
             if have_design:  used_cols |= set(design_cols)
             used_cols = [c for c in used_cols if c in M.columns]
             if used_cols:
-                block = (
-                    M.loc[:, used_cols]
-                    .replace({True: 1.0, False: 0.0})
-                    .apply(pd.to_numeric, errors="coerce")
-                    .astype("float64")
-                    .fillna(float(na_fill))
-                )
-                M.loc[:, used_cols] = block.values
-
-                M.loc[:, used_cols] = M.loc[:, used_cols].fillna(na_fill)
+                categorical_cols = [c for c in used_cols if c in category_maps]
+                numeric_cols = [c for c in used_cols if c not in category_maps]
+                if numeric_cols:
+                    block = (
+                        M.loc[:, numeric_cols]
+                        .replace({True: 1.0, False: 0.0})
+                        .apply(pd.to_numeric, errors="coerce")
+                        .astype("float64")
+                        .fillna(float(na_fill))
+                    )
+                    M.loc[:, numeric_cols] = block
+                if categorical_cols:
+                    M.loc[:, categorical_cols] = M.loc[:, categorical_cols].fillna("__missing__")
         
         # Final checks and design string creation
         design_str = None
@@ -271,6 +305,8 @@ class LimmaRunner:
             final_extra1 = extra1
             if have_covs:
                 C = cov_matrix.loc[X.columns]
+                if not C.index.equals(X.columns):
+                    raise ValueError("cov_matrix rows must be in the same order as expr_df columns")
                 _write_csv(C, cov_filepath)
                 final_extra1 = str(cov_filepath) # Pass the path to R
 
