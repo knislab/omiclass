@@ -1,6 +1,7 @@
 import io
 import matplotlib.pyplot as plt
 import numpy as np
+from omiclass.utils.pdf_export import save_pdf_plot
 
 
 def plot_feature_reduction_curve(result, title: str) -> str:
@@ -25,5 +26,6 @@ def plot_feature_reduction_curve(result, title: str) -> str:
 
     buf = io.StringIO()
     plt.savefig(buf, format="svg")
+    save_pdf_plot(plt.gcf(), "feature_reduction_curve")
     plt.close()
     return buf.getvalue()

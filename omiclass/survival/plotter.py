@@ -36,7 +36,7 @@ def plot_confidence_histogram(
     ax.set_ylabel("Frequency")
     fig.tight_layout()
 
-    svg = fig_to_svg_str(fig)
+    svg = fig_to_svg_str(fig, pdf_name="survival_confidence_histogram")
     plt.close(fig)
     return svg
 
@@ -69,7 +69,7 @@ def plot_confidence_violin(
     ax.tick_params(axis="x", rotation=45)
     fig.tight_layout()
 
-    svg = fig_to_svg_str(fig)
+    svg = fig_to_svg_str(fig, pdf_name="survival_confidence_violin")
     plt.close(fig)
     return svg
 
@@ -172,7 +172,7 @@ def plot_km_and_forest(
     stats["global_p"] = global_p
 
     # Save KM
-    km_svg = fig_to_svg_str(fig_km)
+    km_svg = fig_to_svg_str(fig_km, pdf_name="kaplan_meier")
     plt.close(fig_km)
 
     # ---------- Pairwise log-rank ----------
@@ -250,7 +250,7 @@ def plot_km_and_forest(
         ax_forest.grid(True, axis="x", linestyle="--", alpha=0.5)
         fig_forest.tight_layout()
 
-        forest_svg = fig_to_svg_str(fig_forest)
+        forest_svg = fig_to_svg_str(fig_forest, pdf_name="cox_forest")
         plt.close(fig_forest)
     except Exception as e:
         print(f"[survival] Cox fit failed: {type(e).__name__}: {e}")

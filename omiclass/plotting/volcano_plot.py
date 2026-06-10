@@ -65,7 +65,7 @@ def plot_volcano_from_limma(
     if created:
         ax.figure.tight_layout()
 
-    svg = fig_to_svg_str(ax.figure)
+    svg = fig_to_svg_str(ax.figure, pdf_name="volcano_plot")
     if created:
         plt.close(ax.figure)
 

@@ -18,6 +18,9 @@ class OverrideSpec:
 
 SPEC = OverrideSpec(
     aliases={
+        "PDF": "PDF",
+        "pdf": "PDF",
+
         # project
         "project_name": "project.name",
         "output_dir": "project.out_dir",

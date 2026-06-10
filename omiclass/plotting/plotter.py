@@ -71,7 +71,7 @@ class FinalSummaryPlotter:
         ax.set_xlim(0, 100)           # Set x-axis limit to percentage scale
         
         fig.subplots_adjust(left=0.20, right=0.98, bottom=0.12, top=0.90)
-        svg = fig_to_svg_str(fig)
+        svg = fig_to_svg_str(fig, pdf_name="leaderboard_bar")
         plt.close(fig)
         return svg
     
@@ -145,7 +145,7 @@ class FinalSummaryPlotter:
         ax.set_title(name)
 
         fig.tight_layout()
-        svg = fig_to_svg_str(fig)
+        svg = fig_to_svg_str(fig, pdf_name="confusion_matrix")
         plt.close(fig)
         return svg
 
@@ -175,7 +175,7 @@ class FinalSummaryPlotter:
         ax_pr.set_xlabel("Recall"); ax_pr.set_ylabel("Precision")
         ax_pr.legend(fontsize=8)
         fig_pr.tight_layout()
-        svg_pr =fig_to_svg_str(fig_pr)
+        svg_pr =fig_to_svg_str(fig_pr, pdf_name="macro_precision_recall")
         plt.close(fig_pr)
 
         # ROC
@@ -196,7 +196,7 @@ class FinalSummaryPlotter:
         ax_roc.set_xlabel("False Positive Rate"); ax_roc.set_ylabel("True Positive Rate")
         ax_roc.legend(fontsize=8)
         fig_roc.tight_layout()
-        svg_roc = fig_to_svg_str(fig_roc)
+        svg_roc = fig_to_svg_str(fig_roc, pdf_name="macro_roc")
         plt.close(fig_roc)
 
         return svg_pr, svg_roc
@@ -229,7 +229,7 @@ class FinalSummaryPlotter:
             fig, ax = plt.subplots(figsize=(7, 3))
             ax.axis("off")
             ax.text(0.5, 0.5, "No training CV payload available", ha="center", va="center")
-            svg = fig_to_svg_str(fig)
+            svg = fig_to_svg_str(fig, pdf_name="metric_barplot")
             plt.close(fig)
             return svg
 
@@ -289,7 +289,7 @@ class FinalSummaryPlotter:
         plt.setp(ax.get_xticklabels(), rotation=20, ha="right")
         
         fig.tight_layout()
-        svg = fig_to_svg_str(fig)
+        svg = fig_to_svg_str(fig, pdf_name="metric_barplot")
         plt.close(fig)
         return svg
 

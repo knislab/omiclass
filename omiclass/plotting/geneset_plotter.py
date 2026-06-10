@@ -34,6 +34,6 @@ def plot_geneset_top_frequency_bar(
     ax.set_ylabel("Fold frequency")
     ax.set_title(title)
     fig.tight_layout()
-    svg = fig_to_svg_str(fig)
+    svg = fig_to_svg_str(fig, pdf_name="geneset_top_frequency_bar")
     plt.close(fig)
     return svg

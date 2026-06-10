@@ -76,7 +76,7 @@ class limma_plotter:
         sns.scatterplot(data=df, x="PC1", y="PC2", hue=label_name, s=self.scatter_point_size, ax=ax1)
         ax1.set_xlabel(f"PC1 ({self.pca.explained_variance_ratio_[0]*100:.1f}%)")
         ax1.set_ylabel(f"PC2 ({self.pca.explained_variance_ratio_[1]*100:.1f}%)")
-        svg1 = fig_to_svg_str(fig1)
+        svg1 = fig_to_svg_str(fig1, pdf_name="pca_pc1_pc2")
         plt.close(fig1)
 
         if self.n_pcs >= 4:
@@ -84,7 +84,7 @@ class limma_plotter:
             sns.scatterplot(data=df, x="PC3", y="PC4", hue=label_name, s=self.scatter_point_size, ax=ax2)
             ax2.set_xlabel(f"PC3 ({self.pca.explained_variance_ratio_[2]*100:.1f}%)")
             ax2.set_ylabel(f"PC4 ({self.pca.explained_variance_ratio_[3]*100:.1f}%)")
-            svg2 = fig_to_svg_str(fig2)
+            svg2 = fig_to_svg_str(fig2, pdf_name="pca_pc3_pc4")
             plt.close(fig2)
 
         return svg1, svg2
@@ -242,7 +242,7 @@ class limma_plotter:
                 ax_colors.axis("off")
 
         # Finalize
-        svg = fig_to_svg_str(fig)
+        svg = fig_to_svg_str(fig, pdf_name="sample_dendrogram")
         plt.close(fig)
         return svg
 
@@ -364,7 +364,7 @@ class limma_plotter:
         ax.set_ylabel("Expression")
         plt.xticks(rotation=90)
         plt.tight_layout()
-        svg = fig_to_svg_str(fig)
+        svg = fig_to_svg_str(fig, pdf_name="top_batch_genes_boxplot")
         plt.close(fig)
         return svg
 
@@ -384,7 +384,7 @@ class limma_plotter:
             ax.set_ylabel(col)
 
         plt.tight_layout()
-        svg = fig_to_svg_str(fig)
+        svg = fig_to_svg_str(fig, pdf_name="pc_boxplots")
         plt.close(fig)
         return svg
 
@@ -454,7 +454,7 @@ class limma_plotter:
         fig, ax = plt.subplots(figsize=(1.8*df_res.shape[1], 0.5*df_res.shape[0]+2))
         sns.heatmap(df_res, annot=True, cmap=self.heatmap_cmap, vmin=0, vmax=vmax, ax=ax)
         ax.set_xlabel("Variables"); ax.set_ylabel("PCs")
-        svg = fig_to_svg_str(fig)
+        svg = fig_to_svg_str(fig, pdf_name="pc_batch_heatmap")
         plt.close(fig)
 
         return svg

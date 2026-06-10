@@ -400,6 +400,7 @@ class ModelsCfg(BaseModel):
 
 # ---------- top-level Config ----------
 class Config(BaseModel):
+    PDF: bool = False
     project: ProjectCfg = Field(default_factory=ProjectCfg)
     batch_correction: BatchCorrectionCfg = Field(default_factory=BatchCorrectionCfg)
     runtime: RuntimeCfg = Field(default_factory=RuntimeCfg)

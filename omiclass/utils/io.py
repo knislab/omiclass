@@ -5,6 +5,7 @@ from typing import Union, List, Optional
 from omiclass.errors.errors import DataShapeError
 from io import StringIO
 from omiclass.config.schema import Config
+from omiclass.utils.pdf_export import save_pdf_plot
 
 
 def load_matrix(path: Union[str, Path], numeric: bool = True) -> pd.DataFrame:
@@ -168,9 +169,10 @@ def ensure_path(dirpath: Path) -> Path:
     dirpath.mkdir(parents=True, exist_ok=True)
     return dirpath
 
-def fig_to_svg_str(fig) -> str:
+def fig_to_svg_str(fig, pdf_name: Optional[str] = None) -> str:
     buf = StringIO()
     fig.savefig(buf, format="svg", bbox_inches="tight")
     svg = buf.getvalue()
     buf.close()
+    save_pdf_plot(fig, pdf_name)
     return svg

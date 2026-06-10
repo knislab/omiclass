@@ -20,6 +20,7 @@ from omiclass.pipeline.steps.surface_merker_step import SurfaceMarkerStep
 from omiclass.reporting.sidebar_finalize import finalize_unified_sidebar
 from omiclass.pipeline.steps.rebatch_step import RebatchCorrectionStep
 from omiclass.pipeline.steps.define_genecode_step import DefineGeneCodeStep
+from omiclass.utils.pdf_export import configure_pdf_export
 
 
 
@@ -75,6 +76,8 @@ class PipelineOrchestrator:
         ]
 
     def run(self) -> PipelineRunResult:
+        configure_pdf_export(self.out_dir, enabled=bool(getattr(self.cfg, "PDF", False)))
+
         ctx = RunContext(
             cfg=self.cfg,
             opts=self.opts,
