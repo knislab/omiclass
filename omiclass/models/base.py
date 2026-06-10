@@ -19,5 +19,7 @@ def safe_kwargs(EstimatorCtor, **kwargs):
     to a specific estimator.
     """
     params = inspect.signature(EstimatorCtor.__init__).parameters
+    if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
+        return dict(kwargs)
     allowed = set(params.keys())
     return {k: v for k, v in kwargs.items() if k in allowed}

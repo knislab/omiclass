@@ -23,11 +23,18 @@ def build_lgbm_plain(*, random_state: int, n_jobs: int, **cfg):
     cfg = _canonicalize_lgbm_cfg(cfg)
     base = dict(
         random_state=random_state,
-        n_jobs=n_jobs,
+        seed=random_state,
+        feature_fraction_seed=random_state,
+        bagging_seed=random_state,
+        data_random_seed=random_state,
+        drop_seed=random_state,
+        deterministic=True,
+        force_col_wise=True,
+        n_jobs=1,
         verbosity=-1,   
         verbose=-1,
     )
-    merged = {**base, **cfg}
+    merged = {**cfg, **base}
     return lgb.LGBMClassifier(**safe_kwargs(lgb.LGBMClassifier, **merged))
 
 

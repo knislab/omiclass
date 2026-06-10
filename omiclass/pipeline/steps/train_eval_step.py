@@ -237,9 +237,10 @@ class TrainAndEvalStep:
 
         ascending = not self._is_higher_better_metric(selected_metric_col.replace("_mean", ""))
         cv_leaderboard = cv_leaderboard.sort_values(
-            by=selected_metric_col,
-            ascending=ascending,
+            by=[selected_metric_col, "model"],
+            ascending=[ascending, True],
             kind="mergesort",
+            na_position="last",
         )
         best_model = str(cv_leaderboard.iloc[0]["model"])
         best_model_path = summary.artifact_paths[best_model]

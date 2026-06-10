@@ -148,7 +148,7 @@ def _feature_rank_by_importance(
         return None
 
     mean_imp = np.mean(imps, axis=0)
-    ranked_idx = np.argsort(mean_imp)[::-1]
+    ranked_idx = np.argsort(-mean_imp, kind="mergesort")
     return ranked_idx
 
 
@@ -207,7 +207,7 @@ def inner_select_recipe(
             n_iter=int(tune_iter),
             scoring=tune_scoring,
             cv=splits,
-            n_jobs=int(n_jobs),
+            n_jobs=1,
             random_state=int(seed),
             refit=False,
             verbose=0,
@@ -226,7 +226,7 @@ def inner_select_recipe(
         n_iter=max(5, min(10, int(tune_iter))), 
         scoring=tune_scoring,
         cv=splits,
-        n_jobs=int(n_jobs),
+        n_jobs=1,
         random_state=int(seed),
         refit=False,
         verbose=0,
@@ -245,7 +245,7 @@ def inner_select_recipe(
             n_iter=int(tune_iter),
             scoring=tune_scoring,
             cv=splits,
-            n_jobs=int(n_jobs),
+            n_jobs=1,
             random_state=int(seed),
             refit=False,
             verbose=0,
@@ -271,7 +271,7 @@ def inner_select_recipe(
             n_iter=int(tune_iter),
             scoring=tune_scoring,
             cv=splits,
-            n_jobs=int(n_jobs),
+            n_jobs=1,
             random_state=int(seed),
             refit=False,
             verbose=0,

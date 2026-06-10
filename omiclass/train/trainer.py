@@ -128,9 +128,10 @@ class Trainer:
 
         all_genes = [g for genes in fold_genes for g in genes]
         counts = Counter(all_genes)
+        ranked_counts = sorted(counts.items(), key=lambda kv: (-int(kv[1]), str(kv[0])))
 
         gene_rows: List[Dict[str, Any]] = []
-        for gene, cnt in counts.most_common():
+        for gene, cnt in ranked_counts:
             gene_rows.append(
                 {
                     "section": "gene",
@@ -156,15 +157,13 @@ class Trainer:
             consensus_genes = [g for g, c in counts.items() if c >= consensus_min_folds]
 
             if isinstance(consensus_top_n, int) and consensus_top_n > 0:
-                consensus_genes = [g for g, _ in counts.most_common(consensus_top_n)]
+                consensus_genes = [g for g, _ in ranked_counts[:consensus_top_n]]
 
             consensus_genes = sorted(consensus_genes, key=lambda g: (-counts[g], g))
 
             if len(consensus_genes) < consensus_min_genes:
                 # fallback: take top genes by fold-frequency
-                consensus_genes = [
-                    g for g, _ in counts.most_common(consensus_min_genes)
-                ]
+                consensus_genes = [g for g, _ in ranked_counts[:consensus_min_genes]]
 
         if not gene_df.empty:
             gene_df["in_consensus"] = gene_df["gene"].isin(set(consensus_genes))
@@ -388,6 +387,25 @@ class Trainer:
                 weighted_xgb_multiclass = True
 
         init_params, fit_kwargs = split_init_and_fit_kwargs(key, raw)
+        if "xgboost" in key:
+            init_params.update(
+                random_state=int(r.random_state),
+                seed=int(r.random_state),
+                n_jobs=1,
+                nthread=1,
+            )
+        elif "light_gbm" in key:
+            init_params.update(
+                random_state=int(r.random_state),
+                seed=int(r.random_state),
+                feature_fraction_seed=int(r.random_state),
+                bagging_seed=int(r.random_state),
+                data_random_seed=int(r.random_state),
+                drop_seed=int(r.random_state),
+                deterministic=True,
+                force_col_wise=True,
+                n_jobs=1,
+            )
         if key == "weighted_light_gbm":
             tmp_builder = get_builder(
                 key,
@@ -413,7 +431,7 @@ class Trainer:
             )
             est = est_builder()
             if hasattr(est, "get_params") and "n_jobs" in est.get_params(deep=False):
-                est.set_params(n_jobs=int(r.n_jobs))
+                est.set_params(n_jobs=1)
             return est
             
         if "xgboost" in key:
@@ -547,7 +565,11 @@ class Trainer:
                 f"{metric}_std":  float(df[metric].std(ddof=0)),
             })
 
-        out = pd.DataFrame(rows).sort_values(by=f"{metric}_mean", ascending=False, kind="mergesort")
+        out = pd.DataFrame(rows).sort_values(
+            by=[f"{metric}_mean", "model"],
+            ascending=[False, True],
+            kind="mergesort",
+        )
         return out.iloc[0]["model"]
 
     # ----- stacked -----
@@ -684,8 +706,8 @@ class Trainer:
             return keys[0]
 
         return pd.DataFrame(rows).sort_values(
-            by=f"{metric}_mean",
-            ascending=False,
+            by=[f"{metric}_mean", "model"],
+            ascending=[False, True],
             kind="mergesort",
         ).iloc[0]["model"]
 
@@ -818,5 +840,10 @@ class Trainer:
                 "status": "skipped",
                 "error": f"Missing prerequisites: {', '.join(missing)}",
             })
-        metrics_df = pd.DataFrame(rows).sort_values("f1_macro_mean", ascending=False)
+        metrics_df = pd.DataFrame(rows).sort_values(
+            by=["f1_macro_mean", "model"],
+            ascending=[False, True],
+            kind="mergesort",
+            na_position="last",
+        )
         return TrainSummary(metrics=metrics_df, artifact_paths=paths)

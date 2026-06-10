@@ -20,6 +20,8 @@ LGBM_SPEC = ModelParamSpec(
         "num_leaves","max_depth","learning_rate","n_estimators",
         "min_child_samples","feature_fraction","bagging_fraction","bagging_freq",
         "lambda_l1","lambda_l2","verbosity","random_state","n_jobs",
+        "seed","feature_fraction_seed","bagging_seed","data_random_seed","drop_seed",
+        "deterministic","force_col_wise",
         "objective","metric","num_class","class_weight",
     ),
     # we pass these to fit()
@@ -32,7 +34,7 @@ XGB_SPEC = ModelParamSpec(
         "learning_rate","n_estimators","max_depth","min_child_weight","gamma",
         "reg_alpha","reg_lambda","subsample","colsample_bytree","colsample_bylevel",
         "colsample_bynode","verbosity","random_state","n_jobs","nthread",
-        "objective","num_class","eval_metric","scale_pos_weight",
+        "seed","objective","num_class","eval_metric","scale_pos_weight",
     ),
     allowed_fit=("eval_metric","early_stopping_rounds"),
 )

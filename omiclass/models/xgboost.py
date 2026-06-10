@@ -14,8 +14,8 @@ class XGBNoEarlyStop(xgb.XGBClassifier):
         return super().set_params(**params)
 
 def build_xgboost_plain(*, random_state: int, n_jobs: int, **cfg):
-    merged = dict(random_state=random_state, n_jobs=n_jobs, nthread=n_jobs)
-    merged.update(cfg)
+    merged = dict(cfg)
+    merged.update(random_state=random_state, seed=random_state, n_jobs=1, nthread=1)
     # Remove early-stopping keys BEFORE construction
     for k in _ESTOP_KEYS:
         merged.pop(k, None)
