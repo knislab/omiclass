@@ -94,6 +94,7 @@ SPEC = OverrideSpec(
         "cptac_log2_transform": "cptac_ms_preprocessing.log2_transform",
         "cptac_pseudocount": "cptac_ms_preprocessing.pseudocount",
         "cptac_imputation": "cptac_ms_preprocessing.imputation",
+        "pc_pvalue_heatmap_max": "plots.pc_pvalue_heatmap_max",
 
         # models.random_forest (Defaults & Search Space)
         "rf_oob_score": "models.random_forest.defaults.oob_score",

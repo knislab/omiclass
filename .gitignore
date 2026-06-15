@@ -24,6 +24,8 @@ __pycache__/
 
 # local files
 .DS_Store
+toy_data/
+create_toy_dataset.py
 
 # ignore all files in the tests directory
 tests/

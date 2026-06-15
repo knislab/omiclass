@@ -75,6 +75,20 @@ class CPTACMSPreprocessingCfg(BaseModel):
 # ---------- Surface markers ----------
 class SurfaceMarkerCfg(BaseModel):
     enabled: bool = False
+
+
+# ---------- plots ----------
+class PlotsCfg(BaseModel):
+    pc_pvalue_heatmap_max: Optional[float] = None
+
+    @field_validator("pc_pvalue_heatmap_max")
+    @classmethod
+    def _validate_pc_pvalue_heatmap_max(cls, v):
+        if v is None:
+            return v
+        if float(v) <= 0:
+            raise ValueError("plots.pc_pvalue_heatmap_max must be positive when set.")
+        return float(v)
     
 
 # ---------- Project ----------
@@ -409,6 +423,7 @@ class Config(BaseModel):
     normalization: NormalizationCfg = Field(default_factory=NormalizationCfg)
     cptac_ms_preprocessing: CPTACMSPreprocessingCfg = Field(default_factory=CPTACMSPreprocessingCfg)
     surface_markers: SurfaceMarkerCfg = Field(default_factory=SurfaceMarkerCfg)
+    plots: PlotsCfg = Field(default_factory=PlotsCfg)
 
     @model_validator(mode="after")
     def _final_checks(self):

@@ -29,7 +29,7 @@ class limma_plotter:
         boxplot_width_per_pc: float = 3.5,
         scatter_point_size: float = 70,
         heatmap_cmap: str = "viridis",
-        heatmap_max_logp: float = 20,
+        heatmap_max_logp: Optional[float] = None,
     ):
         self.expr = expr.copy()
         self.n_pcs = n_pcs
@@ -42,6 +42,14 @@ class limma_plotter:
         self.heatmap_max_logp = heatmap_max_logp
 
         self.pc_df, self.pca = self._compute_pca()
+
+    @staticmethod
+    def _neg_log10_pvalue(p: float) -> float:
+        if pd.isna(p):
+            return np.nan
+        if p <= 0:
+            p = np.nextafter(0.0, 1.0)
+        return float(-np.log10(p))
 
     def _compute_pca(self):
         X = self.expr.T.values
@@ -402,12 +410,10 @@ class limma_plotter:
         return scores
 
 
-    def plot_pc_batch_heatmap(
+    def pc_batch_heatmap_values(
         self,
         labels_dict: Dict[str, LabelVector],
-        title: str = "",
-        save_path: Optional[str] = None,
-    ):
+    ) -> pd.DataFrame:
         meta = self._build_meta(labels_dict)
 
         results = {}
@@ -434,7 +440,7 @@ class limma_plotter:
                         vals.append(np.nan)
                         continue
                     p = ttest_ind(a, b, equal_var=False).pvalue
-                    vals.append(min(-np.log10(p) if p > 0 else self.heatmap_max_logp, self.heatmap_max_logp))
+                    vals.append(self._neg_log10_pvalue(p))
             else:
                 for pc in pcs:
                     groups = [m.loc[m[col] == v, pc].dropna() for v in m[col].dropna().unique()]
@@ -443,13 +449,29 @@ class limma_plotter:
                         vals.append(np.nan)
                         continue
                     p = f_oneway(*groups).pvalue
-                    vals.append(min(-np.log10(p) if p > 0 else self.heatmap_max_logp, self.heatmap_max_logp))
+                    vals.append(self._neg_log10_pvalue(p))
             results[col] = vals
 
         df_res = pd.DataFrame(results, index=pcs)
         if "centrum" in df_res.columns: df_res.rename(columns={"centrum": "center"}, inplace=True)
+        return df_res
 
-        vmax = min(self.heatmap_max_logp, np.nanmax(df_res.values)*1.05 if np.isfinite(df_res.values).any() else 1)
+    def plot_pc_batch_heatmap(
+        self,
+        labels_dict: Dict[str, LabelVector],
+        title: str = "",
+        save_path: Optional[str] = None,
+        values_df: Optional[pd.DataFrame] = None,
+        vmax: Optional[float] = None,
+    ):
+        df_res = values_df if values_df is not None else self.pc_batch_heatmap_values(labels_dict)
+
+        if vmax is None:
+            vmax = self.heatmap_max_logp
+        if vmax is None:
+            vals = df_res.to_numpy(dtype=float)
+            vmax = float(np.nanmax(vals)) if np.isfinite(vals).any() else 1.0
+        vmax = max(float(vmax), 1.0)
 
         fig, ax = plt.subplots(figsize=(1.8*df_res.shape[1], 0.5*df_res.shape[0]+2))
         sns.heatmap(df_res, annot=True, cmap=self.heatmap_cmap, vmin=0, vmax=vmax, ax=ax)

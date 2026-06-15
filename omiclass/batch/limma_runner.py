@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import json
 import os
@@ -70,6 +71,8 @@ class LimmaRunner:
         output_dir: Path,
         plot_n_pcs: int,
         prefix: str, # e.g., "orig" or "corr"
+        render_heatmap: bool = True,
+        heatmap_vmax: Optional[float] = None,
     ) -> dict: 
         # 1. Initialize Plotter
         plotter = limma_plotter(expr_df, n_pcs=plot_n_pcs)
@@ -102,10 +105,11 @@ class LimmaRunner:
             if pd.Series(s).dropna().nunique() >= 2
         }
 
-        if heatmap_labels:
+        if render_heatmap and heatmap_labels:
             heatmap_svg = plotter.plot_pc_batch_heatmap(
                 labels_dict=heatmap_labels,
                 title=f"({prefix} correction)",
+                vmax=heatmap_vmax,
             )
         else:
             heatmap_svg = None
@@ -157,6 +161,72 @@ class LimmaRunner:
             "gene_level": gene_assoc, 
         }
 
+    @staticmethod
+    def _pc_heatmap_labels(label_series: dict[str, pd.Series]) -> dict[str, pd.Series]:
+        return {
+            name: s for name, s in label_series.items()
+            if pd.Series(s).dropna().nunique() >= 2
+        }
+
+    def _render_shared_pc_heatmaps(
+        self,
+        *,
+        orig_expr: pd.DataFrame,
+        orig_labels: dict[str, pd.Series],
+        corr_expr: pd.DataFrame,
+        corr_labels: dict[str, pd.Series],
+        plot_n_pcs: int,
+        configured_vmax: Optional[float],
+    ) -> tuple[Optional[str], Optional[str]]:
+        orig_heatmap_labels = self._pc_heatmap_labels(orig_labels)
+        corr_heatmap_labels = self._pc_heatmap_labels(corr_labels)
+        if not orig_heatmap_labels and not corr_heatmap_labels:
+            return None, None
+
+        orig_plotter = limma_plotter(orig_expr, n_pcs=plot_n_pcs)
+        corr_plotter = limma_plotter(corr_expr, n_pcs=plot_n_pcs)
+
+        orig_values = (
+            orig_plotter.pc_batch_heatmap_values(orig_heatmap_labels)
+            if orig_heatmap_labels else None
+        )
+        corr_values = (
+            corr_plotter.pc_batch_heatmap_values(corr_heatmap_labels)
+            if corr_heatmap_labels else None
+        )
+
+        if configured_vmax is not None:
+            shared_vmax = float(configured_vmax)
+        else:
+            finite_maxima = []
+            for values in (orig_values, corr_values):
+                if values is None:
+                    continue
+                arr = values.to_numpy(dtype=float)
+                if np.isfinite(arr).any():
+                    finite_maxima.append(float(np.nanmax(arr)))
+            shared_vmax = max(finite_maxima) if finite_maxima else 1.0
+
+        orig_svg = (
+            orig_plotter.plot_pc_batch_heatmap(
+                labels_dict=orig_heatmap_labels,
+                title="(orig correction)",
+                values_df=orig_values,
+                vmax=shared_vmax,
+            )
+            if orig_heatmap_labels else None
+        )
+        corr_svg = (
+            corr_plotter.plot_pc_batch_heatmap(
+                labels_dict=corr_heatmap_labels,
+                title="(corr correction)",
+                values_df=corr_values,
+                vmax=shared_vmax,
+            )
+            if corr_heatmap_labels else None
+        )
+        return orig_svg, corr_svg
+
     def run_limma(self, 
                   expr_df: pd.DataFrame, 
                   meta_df: Optional[pd.DataFrame], 
@@ -170,6 +240,7 @@ class LimmaRunner:
                   out_csv: str = "limma_results.csv",
                   plot_n_pcs: int = 10,
                   eval_cols: Optional[Sequence[str]] = None,
+                  pc_pvalue_heatmap_max: Optional[float] = None,
             ) -> dict:
         
         self.batch_like_name = batch_col
@@ -360,6 +431,7 @@ class LimmaRunner:
                     output_dir=output_dir,
                     plot_n_pcs=plot_n_pcs,
                     prefix="orig", # Original results
+                    render_heatmap=False,
                 )
                 # Store original results with distinct keys
                 result_dict["plots_orig"] = orig_qc_res["plots"]
@@ -412,7 +484,20 @@ class LimmaRunner:
                     output_dir=output_dir,
                     plot_n_pcs=plot_n_pcs,
                     prefix="corr", # Corrected results
+                    render_heatmap=False,
                 )
+
+                orig_heatmap_svg, corr_heatmap_svg = self._render_shared_pc_heatmaps(
+                    orig_expr=X,
+                    orig_labels=label_series,
+                    corr_expr=expr_corr,
+                    corr_labels=aligned_label_series,
+                    plot_n_pcs=plot_n_pcs,
+                    configured_vmax=pc_pvalue_heatmap_max,
+                )
+                if result_dict.get("plots_orig") is not None:
+                    result_dict["plots_orig"]["heatmap"] = orig_heatmap_svg
+                corr_qc_res["plots"]["heatmap"] = corr_heatmap_svg
 
                 # Store corrected results with standard keys (overwriting any previous placeholder keys)
                 result_dict["plots"] = corr_qc_res["plots"]

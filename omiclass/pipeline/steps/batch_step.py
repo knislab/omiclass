@@ -77,6 +77,7 @@ class BatchCorrectionStep:
             n_pc=bc.n_pcs or 0,
             na_fill=bc.fill_na or None,
             out_csv=limma_out_csv,
+            pc_pvalue_heatmap_max=getattr(ctx.cfg.plots, "pc_pvalue_heatmap_max", None),
         )
 
         X_full_raw = load_matrix(limma_out_dir / limma_out_csv)
