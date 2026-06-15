@@ -14,6 +14,7 @@ from typing import Optional, Sequence, Union, Tuple
 from pathlib import Path
 import tempfile, shutil, logging
 from omiclass.utils.batch import _assert_unique, _align_samples, _write_csv
+from omiclass.utils.canonicalize import canonicalize_numeric_matrix
 from omiclass.plotting.limma_plotter import limma_plotter
 from omiclass.errors.errors import RBackendError, GCError
 
@@ -388,9 +389,18 @@ class LimmaRunner:
             if result_dict['status'] == 'error':
                 raise RuntimeError(f"R execution failed: {result_dict['message']}")
             
-            if M is not None and output_filepath.exists() and label_series:
+            if output_filepath.exists():
                 expr_corr = pd.read_csv(output_filepath, index_col=0)
-                
+                expr_corr = canonicalize_numeric_matrix(expr_corr, decimals=12)
+                expr_corr.to_csv(output_filepath, float_format="%.12f")
+                print(
+                    "[LimmaRunner] Rounded limma_corrected_expression.csv to 12 decimals "
+                    "for reproducible downstream model fitting."
+                )
+            else:
+                expr_corr = None
+
+            if M is not None and expr_corr is not None and label_series:
                 # Align labels to the corrected expression data's columns (important if filtering happened)
                 # Although M columns should match expr_corr columns, this is safer.
                 aligned_label_series = {k: s.reindex(expr_corr.columns) for k, s in label_series.items()}
