@@ -272,13 +272,8 @@ class Trainer:
             raw["class_weight"] = variant_cfg.class_weight
 
         init_params, fit_kwargs = split_init_and_fit_kwargs(key, raw)
-        init_params["n_jobs"] = 1
-        print(
-            f"[Trainer] {key}: RandomForest estimator-level n_jobs=1 "
-            "for reproducibility; runtime n_jobs is reserved for safe outer-level orchestration."
-        )
 
-        base_builder = get_builder(key, random_state=int(r.random_state), n_jobs=1, override_params=init_params,)
+        base_builder = get_builder(key, random_state=int(r.random_state), n_jobs=int(r.n_jobs), override_params=init_params,)
         self.builders[key] = base_builder
 
         prefix = "" if key in ("plain_random_forest", "weighted_random_forest") else "rf__"
