@@ -83,6 +83,15 @@ SPEC = OverrideSpec(
         "de_k_genes": "de.k_genes",
         "de_logfc": "de.logfc_thresh",
         "de_fdr": "de.fdr_thresh",
+        "de_gene_selection_min_genes": "de_gene_selection.min_genes",
+        "de_gene_selection_genes_per_class": "de_gene_selection.max_genes_per_class",
+        "de_gene_selection_min_genes_per_class": "de_gene_selection.min_genes_per_class",
+        "de_gene_selection_max_genes_per_class": "de_gene_selection.max_genes_per_class",
+        "de_gene_selection_max_genes": "de_gene_selection.max_genes",
+        "de_gene_selection_one_vs_rest_fraction": "de_gene_selection.one_vs_rest_fraction",
+        "de_gene_selection_close_pair_fraction": "de_gene_selection.close_pair_fraction",
+        "de_gene_selection_close_pair_count": "de_gene_selection.close_pair_count",
+        "de_gene_selection_pca_components": "de_gene_selection.pca_components",
 
         # Normalization & Surface Markers
         "gene_lengths_path": "normalization.gene_lengths_path",

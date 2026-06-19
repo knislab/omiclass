@@ -44,6 +44,46 @@ class DECfg(BaseModel):
     fdr_thresh: float = 0.05
     min_count: Optional[int] = 10
 
+
+class DEGeneSelectionCfg(BaseModel):
+    min_genes: int = 200
+    genes_per_class: Optional[int] = None
+    min_genes_per_class: int = 20
+    max_genes_per_class: int = 75
+    max_genes: int = 600
+    one_vs_rest_fraction: float = 0.5
+    close_pair_fraction: float = 0.5
+    close_pair_count: Optional[int] = None
+    pca_components: int = 10
+
+    @model_validator(mode="after")
+    def _validate_gene_selection(self):
+        if self.min_genes <= 0:
+            raise ValueError("de_gene_selection.min_genes must be positive.")
+        if self.genes_per_class is not None:
+            if self.genes_per_class <= 0:
+                raise ValueError("de_gene_selection.genes_per_class must be positive when set.")
+            self.max_genes_per_class = self.genes_per_class
+        if self.min_genes_per_class <= 0:
+            raise ValueError("de_gene_selection.min_genes_per_class must be positive.")
+        if self.max_genes_per_class <= 0:
+            raise ValueError("de_gene_selection.max_genes_per_class must be positive.")
+        if self.max_genes_per_class < self.min_genes_per_class:
+            raise ValueError("de_gene_selection.max_genes_per_class must be >= min_genes_per_class.")
+        if self.max_genes <= 0:
+            raise ValueError("de_gene_selection.max_genes must be positive.")
+        if self.max_genes < self.min_genes:
+            raise ValueError("de_gene_selection.max_genes must be >= min_genes.")
+        if self.one_vs_rest_fraction < 0 or self.close_pair_fraction < 0:
+            raise ValueError("DE gene-selection fractions must be non-negative.")
+        if self.one_vs_rest_fraction + self.close_pair_fraction <= 0:
+            raise ValueError("At least one DE gene-selection fraction must be positive.")
+        if self.close_pair_count is not None and self.close_pair_count <= 0:
+            raise ValueError("de_gene_selection.close_pair_count must be positive when set.")
+        if self.pca_components <= 0:
+            raise ValueError("de_gene_selection.pca_components must be positive.")
+        return self
+
 # ---------- Normalization ----------
 class NormalizationCfg(BaseModel):
     gene_lengths_path: Optional[Path] = None
@@ -420,6 +460,7 @@ class Config(BaseModel):
     runtime: RuntimeCfg = Field(default_factory=RuntimeCfg)
     models: ModelsCfg = Field(default_factory=ModelsCfg)
     de: DECfg = Field(default_factory=DECfg)
+    de_gene_selection: DEGeneSelectionCfg = Field(default_factory=DEGeneSelectionCfg)
     normalization: NormalizationCfg = Field(default_factory=NormalizationCfg)
     cptac_ms_preprocessing: CPTACMSPreprocessingCfg = Field(default_factory=CPTACMSPreprocessingCfg)
     surface_markers: SurfaceMarkerCfg = Field(default_factory=SurfaceMarkerCfg)

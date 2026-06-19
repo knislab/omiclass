@@ -9,7 +9,7 @@ import tempfile, shutil
 from omiclass.utils.batch import _assert_unique, _align_samples, _write_csv 
 from omiclass.plotting.volcano_plot import plot_volcano_from_limma
 from omiclass.utils.io import load_matrix
-from omiclass.de.gene_selection import select_marker_genes
+from omiclass.de.gene_selection import compute_target_gene_count, select_marker_genes
 from omiclass.errors.errors import RBackendError, GCError
 from omiclass.reporting.de_report import write_de_geneset_report_html
 from omiclass.utils.debug import debug_volcano_plot_from_limma
@@ -60,6 +60,66 @@ class LimmaVoomRunner:
                 contrast_list.append(contrast_string)
 
         return contrast_list
+
+    @staticmethod
+    def _compute_close_class_pairs(
+            expr_df: pd.DataFrame,
+            meta_df: pd.DataFrame,
+            design_col: str,
+            *,
+            pca_components: int,
+            pair_count: Optional[int],
+    ) -> tuple[pd.DataFrame, list[dict], list[tuple[str, str, float]]]:
+        if expr_df.empty or design_col not in meta_df.columns:
+            return pd.DataFrame(), [], []
+
+        y = meta_df[design_col].astype(str)
+        classes = sorted(y.dropna().unique().tolist())
+        if len(classes) < 2:
+            return pd.DataFrame(), [], []
+
+        X = expr_df.T.loc[meta_df.index]
+        X = X.apply(pd.to_numeric, errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        values = X.to_numpy(dtype=float)
+        if values.size == 0:
+            return pd.DataFrame(), [], []
+
+        if np.nanmin(values) >= 0:
+            values = np.log1p(values)
+        values = values - values.mean(axis=0, keepdims=True)
+        std = values.std(axis=0, keepdims=True)
+        std[std == 0] = 1.0
+        values = values / std
+
+        max_components = min(int(pca_components), values.shape[0] - 1, values.shape[1])
+        if max_components <= 0:
+            scores = values
+        else:
+            u, s, _ = np.linalg.svd(values, full_matrices=False)
+            scores = u[:, :max_components] * s[:max_components]
+
+        score_df = pd.DataFrame(scores, index=X.index)
+        centroids = score_df.groupby(y).mean()
+        distances = pd.DataFrame(0.0, index=centroids.index, columns=centroids.index)
+        pairs: list[tuple[str, str, float]] = []
+
+        for i, class_a in enumerate(classes):
+            for class_b in classes[i + 1:]:
+                if class_a not in centroids.index or class_b not in centroids.index:
+                    continue
+                dist = float(np.linalg.norm(centroids.loc[class_a].to_numpy() - centroids.loc[class_b].to_numpy()))
+                distances.loc[class_a, class_b] = dist
+                distances.loc[class_b, class_a] = dist
+                pairs.append((class_a, class_b, dist))
+
+        pairs = sorted(pairs, key=lambda x: x[2])
+        n_pairs = pair_count if pair_count is not None else max(1, len(classes))
+        selected = pairs[: min(int(n_pairs), len(pairs))]
+        pair_dicts = [
+            {"class_a": class_a, "class_b": class_b}
+            for class_a, class_b, _ in selected
+        ]
+        return distances, pair_dicts, selected
 
 
     def run_limma_voom(self, 
@@ -198,6 +258,7 @@ class LimmaVoomRunner:
                 "min_samples_frac": min_samples_frac,
                 "fdr_threshold": self.de_cfg.fdr_thresh if self.de_cfg.fdr_thresh is not None else 0.05,
                 "logfc_threshold": self.de_cfg.logfc_thresh if self.de_cfg.logfc_thresh is not None else 1.0,
+                "contrast_mode": "one_vs_rest",
             }
             with open(json_filepath, 'w') as f:
                 json.dump(config_data, f, indent=4)
@@ -232,18 +293,88 @@ class LimmaVoomRunner:
             df.set_index('gene_id', inplace=True)
             plot_output_filepath = output_dir
             plot_output_filepath.mkdir(parents=True, exist_ok=True)
+            summary = None
 
             if self.de_cfg.geneset_selection:
                 df = pd.read_csv(output_filepath)
                 df.set_index('gene_id', inplace=True)
+                gs_cfg = self.cfg.de_gene_selection
+                target_k = compute_target_gene_count(
+                    n_classes=M[design_col].nunique(),
+                    min_genes=gs_cfg.min_genes,
+                    max_genes_per_class=gs_cfg.max_genes_per_class,
+                    max_genes=gs_cfg.max_genes,
+                )
+                frac_total = float(gs_cfg.one_vs_rest_fraction) + float(gs_cfg.close_pair_fraction)
+                close_pair_budget = 0 if frac_total <= 0 else int(round(target_k * (float(gs_cfg.close_pair_fraction) / frac_total)))
+
+                train_artifacts_dir = base_output_dir / "train_artifacts"
+                train_artifacts_dir.mkdir(parents=True, exist_ok=True)
+
+                distance_matrix, pair_dicts, close_pairs = self._compute_close_class_pairs(
+                    X,
+                    M,
+                    design_col,
+                    pca_components=gs_cfg.pca_components,
+                    pair_count=gs_cfg.close_pair_count,
+                )
+                if distance_matrix.empty:
+                    pd.DataFrame().to_csv(train_artifacts_dir / "class_distance_matrix.csv")
+                else:
+                    distance_matrix.to_csv(train_artifacts_dir / "class_distance_matrix.csv")
+
+                pairs_df = pd.DataFrame(
+                    [
+                        {"class_a": a, "class_b": b, "distance": d, "rank": i + 1}
+                        for i, (a, b, d) in enumerate(close_pairs)
+                    ],
+                    columns=["class_a", "class_b", "distance", "rank"],
+                )
+                pairs_df.to_csv(train_artifacts_dir / "selected_close_class_pairs.csv", index=False)
+
+                pairwise_df = pd.DataFrame()
+                if close_pair_budget > 0 and pair_dicts:
+                    pairwise_output_filepath = output_dir / out_csv.replace(".csv", "_pairwise_close_class.csv")
+                    pairwise_config = dict(config_data)
+                    pairwise_config.update(
+                        {
+                            "output_filepath": str(pairwise_output_filepath),
+                            "contrast_mode": "pairwise",
+                            "pairwise_pairs": pair_dicts,
+                        }
+                    )
+                    pairwise_json_filepath = temp_dir / "pairwise_config.json"
+                    with open(pairwise_json_filepath, 'w') as f:
+                        json.dump(pairwise_config, f, indent=4)
+                    try:
+                        pairwise_result_str = self.r_voom_func(str(pairwise_json_filepath))[0]
+                    except RRuntimeError as e:
+                        raise RBackendError(
+                            "R function crashed during close-class pairwise DE: " + str(e)
+                        ) from e
+                    pairwise_result_dict = json.loads(pairwise_result_str)
+                    if pairwise_result_dict.get('status') == 'error':
+                        raise RBackendError(
+                            f"Pairwise R execution reported error: {pairwise_result_dict.get('message')}"
+                        )
+                    pairwise_df = pd.read_csv(pairwise_output_filepath)
+                    pairwise_df.set_index('gene_id', inplace=True)
+
                 summary = select_marker_genes(
                     df,
-                    K=self.de_cfg.k_genes if self.de_cfg.k_genes else 100,
+                    K=target_k,
                     logfc_thresh=self.de_cfg.logfc_thresh if self.de_cfg.logfc_thresh is not None else 1.0,
                     fdr_thresh=self.de_cfg.fdr_thresh if self.de_cfg.fdr_thresh is not None else 0.05,
                     n_classes=M[design_col].nunique(),
                     surface_markers=surface_markers,
                     min_surface_markers=self.rt_cfg.min_features if self.rt_cfg.min_features is not None else 20,
+                    pairwise_de_results=pairwise_df,
+                    one_vs_rest_fraction=gs_cfg.one_vs_rest_fraction,
+                    close_pair_fraction=gs_cfg.close_pair_fraction,
+                    min_genes_per_class=gs_cfg.min_genes_per_class,
+                    max_genes_per_class=gs_cfg.max_genes_per_class,
+                    artifacts_dir=train_artifacts_dir,
+                    close_pairs=close_pairs,
                 )
                 gene_list = summary.combined
                 feature_list_path = output_dir / "limma_selected_features.txt"
@@ -253,6 +384,16 @@ class LimmaVoomRunner:
                 gene_list_path.write_text("\n".join(gene_list))
 
             volcano_svgs = []
+            fdr_thresh = self.de_cfg.fdr_thresh if self.de_cfg.fdr_thresh is not None else 0.05
+            logfc_thresh = self.de_cfg.logfc_thresh if self.de_cfg.logfc_thresh is not None else 1.0
+            report_k = len(gene_list) if gene_list is not None else (
+                compute_target_gene_count(
+                    n_classes=M[design_col].nunique(),
+                    min_genes=self.cfg.de_gene_selection.min_genes,
+                    max_genes_per_class=self.cfg.de_gene_selection.max_genes_per_class,
+                    max_genes=self.cfg.de_gene_selection.max_genes,
+                )
+            )
 
             # if Contrast came from R, it should exist
             if "Contrast" in df.columns.tolist():
@@ -266,8 +407,8 @@ class LimmaVoomRunner:
 
                     svg = plot_volcano_from_limma(
                         de_results=sub_path,
-                        fdr_thresh=0.05,
-                        logfc_thresh=1.0,
+                        fdr_thresh=fdr_thresh,
+                        logfc_thresh=logfc_thresh,
                         title=f"{analysis_label}: {contrast_name}",
                         markers=gene_list if gene_list is not None else [],
                     )
@@ -280,7 +421,10 @@ class LimmaVoomRunner:
                     if project_cfg is not None:
                         names = getattr(project_cfg, "classes_names", None)
                     try: 
-                        fix_name = f"{names[(int(contrast_name)-1)]} vs all" if names is not None and int(contrast_name) -1 < len(names) else f"Class {contrast_name}"
+                        if " vs " in str(contrast_name):
+                            fix_name = str(contrast_name)
+                        else:
+                            fix_name = f"{names[(int(contrast_name)-1)]} vs all" if names is not None and int(contrast_name) -1 < len(names) else f"Class {contrast_name}"
                     except Exception:
                         fix_name = f"Class {contrast_name} vs all"
                     volcano_svgs.append((f"{fix_name}", svg))
@@ -288,8 +432,8 @@ class LimmaVoomRunner:
                 # fallback: original single volcano
                 svg = plot_volcano_from_limma(
                     de_results=output_filepath,
-                    fdr_thresh=0.05,
-                    logfc_thresh=1.0,
+                    fdr_thresh=fdr_thresh,
+                    logfc_thresh=logfc_thresh,
                     title=f"{analysis_label} Results",
                     markers=gene_list if gene_list is not None else [],
                 )
@@ -301,12 +445,12 @@ class LimmaVoomRunner:
                 volcano_svgs=volcano_svgs,
                 design_col=design_col,
                 n_classes=M[design_col].nunique(),
-                K=self.de_cfg.k_genes if self.de_cfg.k_genes else 100,
-                fdr_thresh=self.de_cfg.fdr_thresh if self.de_cfg.fdr_thresh is not None else 0.05,
-                logfc_thresh=self.de_cfg.logfc_thresh if self.de_cfg.logfc_thresh is not None else 1.0,
+                K=report_k,
+                fdr_thresh=fdr_thresh,
+                logfc_thresh=logfc_thresh,
                 min_count=min_count,
                 min_samples_frac=min_samples_frac,
-                geneset_summary=summary.__dict__,
+                geneset_summary=summary.__dict__ if summary is not None else None,
                 combined_genes=gene_list,
                 covariates=covariates,
                 cfg=self.cfg,

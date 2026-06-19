@@ -80,12 +80,19 @@ def write_de_geneset_report_html(
     }
 
     # Summary metrics
-    n_pan = len((geneset_summary or {}).get("pan_genes", []) or []) if geneset_summary else 0
+    n_one_vs_rest = len((geneset_summary or {}).get("one_vs_rest_genes", []) or []) if geneset_summary else 0
+    n_pairwise = len((geneset_summary or {}).get("pairwise_genes", []) or []) if geneset_summary else 0
+    selection_summary = (geneset_summary or {}).get("selection_summary", []) or []
+    n_filtered_contrasts = sum(1 for row in selection_summary if str(row.get("selection_pool", "")) == "filtered")
+    n_fallback_contrasts = sum(1 for row in selection_summary if str(row.get("selection_pool", "")) == "fallback")
     n_final = len(combined_genes)
     summary_html = vertical_metric_grid(
         [
             (f"DE {feature_label_plural}", f"{len(df):,}"),
-            ("Pan markers", f"{n_pan:,}"),
+            ("One-vs-rest markers", f"{n_one_vs_rest:,}"),
+            ("Close-pair markers", f"{n_pairwise:,}"),
+            ("Filtered contrasts", f"{n_filtered_contrasts:,}"),
+            ("Fallback contrasts", f"{n_fallback_contrasts:,}"),
             (f"Final {feature_label_singular}-set", f"{n_final:,}"),
             ("Volcano plots", f"{len(volcano_svgs):,}"),
         ]
@@ -108,16 +115,6 @@ def write_de_geneset_report_html(
         )
     else:
         if geneset_summary:
-            genes_html_parts.append(
-                chips_panel(
-                    panel_id="genes_pan",
-                    title="Pan markers",
-                    items=gene_chip_items((geneset_summary.get("pan_genes", []) or [])),
-                    open_by_default=False,
-                    searchable=True,
-                    copyable=True,
-                )
-            )
             for c in (geneset_summary.get("contrast_order", []) or []):
                 items = (geneset_summary.get("by_contrast", {}) or {}).get(c, []) or []
                 class_name = get_class_display_name(c, cfg=cfg, class_values=(geneset_summary.get("contrast_order", []) or []))
@@ -132,6 +129,16 @@ def write_de_geneset_report_html(
                         copyable=True,
                     )
                 )
+            genes_html_parts.append(
+                chips_panel(
+                    panel_id="genes_pairwise_close_class",
+                    title="Close-class pairwise markers",
+                    items=gene_chip_items((geneset_summary.get("pairwise_genes", []) or [])),
+                    open_by_default=False,
+                    searchable=True,
+                    copyable=True,
+                )
+            )
 
         genes_html_parts.append(
             chips_panel(

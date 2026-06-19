@@ -49,7 +49,7 @@ run_limma_voom_de <- function(expr_counts, final_meta_data, config) {
 
     # Rename ONLY the columns that correspond to the design_col factor
     lvls <- levels(final_meta_data[[design_col]])
-    new_cluster_cols <- paste0(design_col, lvls)
+    new_cluster_cols <- make.names(paste0(design_col, lvls), unique = TRUE)
 
     idx <- grep(paste0("^", design_col), colnames(design))
     if (length(idx) != length(lvls)) {
@@ -70,7 +70,7 @@ run_limma_voom_de <- function(expr_counts, final_meta_data, config) {
     fit <- lmFit(v, design)
     fit <- eBayes(fit, trend = TRUE) 
 
-    # 6. Apply Automated Contrasts (ONE-vs-REST, one contrast per class)
+    # 6. Apply Automated Contrasts
 
     # 6.1 identify the cluster coefficient columns produced by model.matrix
     cluster_cols <- grep(paste0("^", design_col), colnames(design), value = TRUE)
@@ -79,12 +79,39 @@ run_limma_voom_de <- function(expr_counts, final_meta_data, config) {
         stop(paste0("Need >=2 levels in ", design_col, ". Found: ", paste(cluster_cols, collapse=", ")))
     }
 
-    # 6.2 build ONE-vs-REST contrasts 
-    contrast_strings <- vapply(cluster_cols, function(target) {
-        others <- setdiff(cluster_cols, target)
-        others_part <- paste(others, collapse = " + ")
-        paste0(target, " - (", others_part, ") / ", length(others))
-    }, character(1))
+    contrast_mode <- if (is.null(config$contrast_mode)) "one_vs_rest" else config$contrast_mode
+    lvls_by_col <- setNames(lvls, new_cluster_cols)
+    coef_by_level <- setNames(new_cluster_cols, lvls)
+
+    if (identical(contrast_mode, "pairwise")) {
+        pairs <- config$pairwise_pairs
+        if (is.null(pairs) || length(pairs) == 0) {
+            stop("pairwise contrast_mode requires config$pairwise_pairs")
+        }
+        contrast_strings <- vapply(pairs, function(pair) {
+            class_a <- as.character(pair$class_a)
+            class_b <- as.character(pair$class_b)
+            coef_a <- coef_by_level[[class_a]]
+            coef_b <- coef_by_level[[class_b]]
+            if (is.null(coef_a) || is.null(coef_b) || !(coef_a %in% cluster_cols) || !(coef_b %in% cluster_cols)) {
+                stop(paste0("Pairwise classes not found in design: ", class_a, ", ", class_b))
+            }
+            paste0(coef_a, " - ", coef_b)
+        }, character(1))
+        contrast_labels <- vapply(pairs, function(pair) {
+            paste0(as.character(pair$class_a), " vs ", as.character(pair$class_b))
+        }, character(1))
+    } else {
+        # 6.2 build ONE-vs-REST contrasts
+        contrast_strings <- vapply(cluster_cols, function(target) {
+            others <- setdiff(cluster_cols, target)
+            others_part <- paste(others, collapse = " + ")
+            paste0(target, " - (", others_part, ") / ", length(others))
+        }, character(1))
+        contrast_labels <- vapply(cluster_cols, function(target) {
+            paste0(lvls_by_col[[target]], " vs all")
+        }, character(1))
+    }
 
     contrast_matrix <- makeContrasts(contrasts = contrast_strings, levels = design)
 
@@ -93,37 +120,13 @@ run_limma_voom_de <- function(expr_counts, final_meta_data, config) {
 
     toptable_list <- list()
     for (i in seq_len(ncol(contrast_matrix))) {
-        contrast_name <- as.character(i)
         res <- topTable(fit2, coef = i, number = Inf, sort.by = "P")
         res$gene_id <- rownames(res)
         rownames(res) <- NULL
-        res$Contrast <- contrast_name
+        res$Contrast <- contrast_labels[[i]]
         toptable_list[[i]] <- res
     }
     toptable_res <- do.call(rbind, toptable_list)
-    # Flag rows passing both thresholds
-toptable_res$Pass <- (toptable_res$adj.P.Val <= fdr_thresh) &
-                     (abs(toptable_res$logFC) >= logfc_thresh)
-
-# Score for tie-breaking (higher = stronger)
-toptable_res$Score <- abs(toptable_res$logFC) * (1 - toptable_res$adj.P.Val)
-
-# Collapse duplicates by gene_id using your rule
-toptable_res <- do.call(rbind, lapply(
-    split(toptable_res, toptable_res$gene_id),
-    function(df) {
-        if (sum(df$Pass, na.rm = TRUE) == 1) {
-            df[df$Pass, , drop = FALSE][1, , drop = FALSE]
-        } else {
-            df[which.max(df$Score), , drop = FALSE]
-        }
-    }
-))
-
-# Clean up helper columns
-toptable_res$Pass <- NULL
-toptable_res$Score <- NULL
-
 
     return(toptable_res)
 }
@@ -139,7 +142,7 @@ run_limma_de <- function(expr_matrix, final_meta_data, config) {
     design <- model.matrix(as.formula(design_formula_str), data = final_meta_data)
 
     lvls <- levels(final_meta_data[[design_col]])
-    new_cluster_cols <- paste0(design_col, lvls)
+    new_cluster_cols <- make.names(paste0(design_col, lvls), unique = TRUE)
     idx <- grep(paste0("^", design_col), colnames(design))
     if (length(idx) != length(lvls)) {
         stop(paste0(
@@ -158,11 +161,38 @@ run_limma_de <- function(expr_matrix, final_meta_data, config) {
         stop(paste0("Need >=2 levels in ", design_col, ". Found: ", paste(cluster_cols, collapse=", ")))
     }
 
-    contrast_strings <- vapply(cluster_cols, function(target) {
-        others <- setdiff(cluster_cols, target)
-        others_part <- paste(others, collapse = " + ")
-        paste0(target, " - (", others_part, ") / ", length(others))
-    }, character(1))
+    contrast_mode <- if (is.null(config$contrast_mode)) "one_vs_rest" else config$contrast_mode
+    lvls_by_col <- setNames(lvls, new_cluster_cols)
+    coef_by_level <- setNames(new_cluster_cols, lvls)
+
+    if (identical(contrast_mode, "pairwise")) {
+        pairs <- config$pairwise_pairs
+        if (is.null(pairs) || length(pairs) == 0) {
+            stop("pairwise contrast_mode requires config$pairwise_pairs")
+        }
+        contrast_strings <- vapply(pairs, function(pair) {
+            class_a <- as.character(pair$class_a)
+            class_b <- as.character(pair$class_b)
+            coef_a <- coef_by_level[[class_a]]
+            coef_b <- coef_by_level[[class_b]]
+            if (is.null(coef_a) || is.null(coef_b) || !(coef_a %in% cluster_cols) || !(coef_b %in% cluster_cols)) {
+                stop(paste0("Pairwise classes not found in design: ", class_a, ", ", class_b))
+            }
+            paste0(coef_a, " - ", coef_b)
+        }, character(1))
+        contrast_labels <- vapply(pairs, function(pair) {
+            paste0(as.character(pair$class_a), " vs ", as.character(pair$class_b))
+        }, character(1))
+    } else {
+        contrast_strings <- vapply(cluster_cols, function(target) {
+            others <- setdiff(cluster_cols, target)
+            others_part <- paste(others, collapse = " + ")
+            paste0(target, " - (", others_part, ") / ", length(others))
+        }, character(1))
+        contrast_labels <- vapply(cluster_cols, function(target) {
+            paste0(lvls_by_col[[target]], " vs all")
+        }, character(1))
+    }
 
     contrast_matrix <- makeContrasts(contrasts = contrast_strings, levels = design)
     fit2 <- contrasts.fit(fit, contrast_matrix)
@@ -170,29 +200,13 @@ run_limma_de <- function(expr_matrix, final_meta_data, config) {
 
     toptable_list <- list()
     for (i in seq_len(ncol(contrast_matrix))) {
-        contrast_name <- as.character(i)
         res <- topTable(fit2, coef = i, number = Inf, sort.by = "P")
         res$gene_id <- rownames(res)
         rownames(res) <- NULL
-        res$Contrast <- contrast_name
+        res$Contrast <- contrast_labels[[i]]
         toptable_list[[i]] <- res
     }
     toptable_res <- do.call(rbind, toptable_list)
-    toptable_res$Pass <- (toptable_res$adj.P.Val <= fdr_thresh) &
-                         (abs(toptable_res$logFC) >= logfc_thresh)
-    toptable_res$Score <- abs(toptable_res$logFC) * (1 - toptable_res$adj.P.Val)
-    toptable_res <- do.call(rbind, lapply(
-        split(toptable_res, toptable_res$gene_id),
-        function(df) {
-            if (sum(df$Pass, na.rm = TRUE) == 1) {
-                df[df$Pass, , drop = FALSE][1, , drop = FALSE]
-            } else {
-                df[which.max(df$Score), , drop = FALSE]
-            }
-        }
-    ))
-    toptable_res$Pass <- NULL
-    toptable_res$Score <- NULL
     return(toptable_res)
 }
 
