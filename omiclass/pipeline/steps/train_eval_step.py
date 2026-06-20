@@ -23,6 +23,7 @@ from omiclass.eval.feature_reduction_runner import FeatureReductionStep
 from omiclass.utils.pipeline import apply_batch_holdout
 from omiclass.train.tune import resolve_cv_folds
 from omiclass.config.loaders import freeze_config
+from omiclass.plotting.framework import PlottingFramework
 
 
 if TYPE_CHECKING:
@@ -39,6 +40,12 @@ class TrainAndEvalStep:
             return True
         lower_better_tokens = ("loss", "error", "rmse", "mae", "mse")
         return not any(tok in m for tok in lower_better_tokens)
+
+    @staticmethod
+    def _is_b_all_run(ctx: RunContext) -> bool:
+        name = str(getattr(ctx.cfg.project, "name", "")).lower()
+        compact = "".join(ch for ch in name if ch.isalnum())
+        return "ball" in compact
 
     def should_run(self, ctx: RunContext) -> bool:
         if ctx.opts.mode == "clean_and_predict":
@@ -252,6 +259,53 @@ class TrainAndEvalStep:
         )
 
         class_name_map = _build_class_name_map(y, ctx.cfg)
+
+        if ctx.cfg.PDF:
+            is_b_all = self._is_b_all_run(ctx)
+            corrected_variant = "holdout_test" if is_b_all else "corrected"
+            selected_payload = per_model_payload[best_model]
+            pdf_variants: Dict[str, Dict[str, Any]] = {
+                corrected_variant: {
+                    "sample_ids": Xte.index.to_numpy(),
+                    "y_true": yte.to_numpy(),
+                    "y_pred": selected_payload["y_pred"],
+                    "y_proba": selected_payload["y_proba"],
+                    "labels": sorted(np.unique(yte.astype(int))).copy(),
+                }
+            }
+
+            # For batch-corrected non-B-ALL runs, evaluate the selected model on
+            # the same holdout samples before correction. This is inference only;
+            # no model is retrained.
+            if not is_b_all and ctx.cache.get("X_uncorrected") is not None:
+                X_uncorrected, _ = dp.build_xy_from_corrected(
+                    X_full_raw=ctx.cache["X_uncorrected"],
+                    gene_list=gene_list,
+                )
+                missing_test = Xte.index.difference(X_uncorrected.index)
+                if len(missing_test) == 0:
+                    uncorrected_report = evaluate_holdout(
+                        joblib.load(best_model_path),
+                        X_uncorrected.loc[Xte.index],
+                        yte,
+                    )
+                    uncorrected_payload = uncorrected_report["plot_payload"]
+                    pdf_variants["uncorrected"] = {
+                        "sample_ids": Xte.index.to_numpy(),
+                        "y_true": yte.to_numpy(),
+                        "y_pred": uncorrected_payload["y_pred"],
+                        "y_proba": uncorrected_payload["y_proba"],
+                        "labels": sorted(np.unique(yte.astype(int))).copy(),
+                    }
+
+            PlottingFramework.save_classification_data(
+                ctx.out_dir / "pdf_plots" / "base_files",
+                variants=pdf_variants,
+                selected_model=best_model,
+                class_name_map=class_name_map,
+                is_b_all=is_b_all,
+                curve_variant=corrected_variant,
+            )
         
         plotter = FinalSummaryPlotter(
             labels=labels_for_plot,

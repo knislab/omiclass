@@ -21,6 +21,7 @@ from omiclass.reporting.sidebar_finalize import finalize_unified_sidebar
 from omiclass.pipeline.steps.rebatch_step import RebatchCorrectionStep
 from omiclass.pipeline.steps.define_genecode_step import DefineGeneCodeStep
 from omiclass.utils.pdf_export import configure_pdf_export
+from omiclass.plotting.framework import PlottingFramework
 
 
 
@@ -89,6 +90,13 @@ class PipelineOrchestrator:
         for step in self.steps:
             if step.should_run(ctx):
                 step.run(ctx)
+
+        if bool(getattr(self.cfg, "PDF", False)):
+            manifest = self.out_dir / "pdf_plots" / "base_files" / PlottingFramework.MANIFEST
+            if manifest.exists():
+                generated = PlottingFramework(self.out_dir).generate_all()
+                ctx.artifacts["publication_pdf_dir"] = self.out_dir / "pdf_plots" / "publication"
+                print(f"[PDF] Generated {len(generated)} publication plots from saved base data.")
 
         # render html reports 
         finalize_unified_sidebar(Path(ctx.out_dir))

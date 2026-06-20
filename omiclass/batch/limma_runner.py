@@ -17,6 +17,7 @@ import tempfile, shutil, logging
 from omiclass.utils.batch import _assert_unique, _align_samples, _write_csv
 from omiclass.utils.canonicalize import canonicalize_numeric_matrix
 from omiclass.plotting.limma_plotter import limma_plotter
+from omiclass.plotting.framework import PlottingFramework
 from omiclass.errors.errors import RBackendError, GCError
 
 class LimmaRunner:
@@ -227,6 +228,47 @@ class LimmaRunner:
         )
         return orig_svg, corr_svg
 
+    @staticmethod
+    def _save_pdf_pca_data(
+        *,
+        base_dir: Path,
+        orig_expr: pd.DataFrame,
+        corr_expr: pd.DataFrame,
+        labels: dict[str, pd.Series],
+        plot_n_pcs: int,
+        batch_col: Optional[str],
+        configured_vmax: Optional[float],
+    ) -> None:
+        """Save compact PCA coordinates/statistics, not the full expression matrices."""
+        orig_plotter = limma_plotter(orig_expr, n_pcs=plot_n_pcs)
+        corr_plotter = limma_plotter(corr_expr, n_pcs=plot_n_pcs)
+        usable_labels = LimmaRunner._pc_heatmap_labels(labels)
+        before_assoc = orig_plotter.pc_batch_heatmap_values(usable_labels)
+        after_assoc = corr_plotter.pc_batch_heatmap_values(usable_labels)
+        metadata = pd.DataFrame(
+            {name: pd.Series(values).reindex(orig_plotter.pc_df.index) for name, values in labels.items()},
+            index=orig_plotter.pc_df.index,
+        )
+
+        cohort_column = next((c for c in labels if str(c).lower() == "cohort"), None)
+        if cohort_column is None and batch_col in labels:
+            cohort_column = batch_col
+        if cohort_column is None and labels:
+            cohort_column = next(iter(labels))
+
+        PlottingFramework.save_pca_data(
+            base_dir,
+            before_scores=orig_plotter.pc_df,
+            after_scores=corr_plotter.pc_df,
+            metadata=metadata,
+            before_variance=orig_plotter.pca.explained_variance_ratio_,
+            after_variance=corr_plotter.pca.explained_variance_ratio_,
+            before_associations=before_assoc,
+            after_associations=after_assoc,
+            cohort_column=cohort_column,
+            heatmap_vmax=configured_vmax,
+        )
+
     def run_limma(self, 
                   expr_df: pd.DataFrame, 
                   meta_df: Optional[pd.DataFrame], 
@@ -241,6 +283,7 @@ class LimmaRunner:
                   plot_n_pcs: int = 10,
                   eval_cols: Optional[Sequence[str]] = None,
                   pc_pvalue_heatmap_max: Optional[float] = None,
+                  pdf_base_dir: Optional[Union[str, Path]] = None,
             ) -> dict:
         
         self.batch_like_name = batch_col
@@ -421,6 +464,16 @@ class LimmaRunner:
                                 M[c],
                                 category_maps.get(c),
                             )
+
+                # Cohort is the publication PCA color requested by the PDF
+                # workflow, even when it is not part of the correction design.
+                if pdf_base_dir is not None:
+                    cohort_col = next((c for c in M.columns if str(c).lower() == "cohort"), None)
+                    if cohort_col is not None and cohort_col not in label_series:
+                        label_series[cohort_col] = self._series_with_category_names(
+                            M[cohort_col],
+                            category_maps.get(cohort_col),
+                        )
                             
             result_dict = {}
             if M is not None and label_series:
@@ -498,6 +551,17 @@ class LimmaRunner:
                 if result_dict.get("plots_orig") is not None:
                     result_dict["plots_orig"]["heatmap"] = orig_heatmap_svg
                 corr_qc_res["plots"]["heatmap"] = corr_heatmap_svg
+
+                if pdf_base_dir is not None:
+                    self._save_pdf_pca_data(
+                        base_dir=Path(pdf_base_dir),
+                        orig_expr=X,
+                        corr_expr=expr_corr,
+                        labels=aligned_label_series,
+                        plot_n_pcs=plot_n_pcs,
+                        batch_col=batch_col,
+                        configured_vmax=pc_pvalue_heatmap_max,
+                    )
 
                 # Store corrected results with standard keys (overwriting any previous placeholder keys)
                 result_dict["plots"] = corr_qc_res["plots"]

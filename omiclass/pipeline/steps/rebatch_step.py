@@ -75,7 +75,9 @@ class RebatchCorrectionStep:
             n_pc=bc.n_pcs or 0,
             na_fill=bc.fill_na or None,
             out_csv=limma_out_csv,
+            eval_cols=(ctx.cfg.de.covariates or None) if ctx.cfg.PDF else None,
             pc_pvalue_heatmap_max=getattr(ctx.cfg.plots, "pc_pvalue_heatmap_max", None),
+            pdf_base_dir=(ctx.out_dir / "pdf_plots" / "base_files") if ctx.cfg.PDF else None,
         )
 
         X_full_raw = load_matrix(limma_out_dir / limma_out_csv)
