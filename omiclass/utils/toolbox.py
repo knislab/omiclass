@@ -176,13 +176,30 @@ def get_class_display_name(c: Any, cfg: Any = None, class_values: Optional[Seque
         else:
             classes_names = getattr(project_cfg, "classes_names", []) or []
 
+    raw_value = str(c)
+
+    # DE contrasts are stored as labels such as "0 vs all" or "0 vs 1".
+    # Map each class token while preserving the contrast wording.
+    if " vs " in raw_value:
+        return " vs ".join(
+            part if part.strip().lower() == "all" else get_class_display_name(
+                part.strip(), cfg=cfg, class_values=class_values
+            )
+            for part in raw_value.split(" vs ")
+        )
+
     try:
         idx = int(c)
 
         # Detect true 1-based labels only when the full class label set is available
         is_one_based = False
         if class_values is not None and len(class_values) > 0:
-            class_idxs = sorted(int(x) for x in class_values)
+            class_idxs = []
+            for value in class_values:
+                # One-vs-rest contrasts carry the class ID before " vs all".
+                token = str(value).split(" vs ", 1)[0].strip()
+                class_idxs.append(int(token))
+            class_idxs = sorted(set(class_idxs))
             is_one_based = class_idxs == list(range(1, len(class_idxs) + 1))
 
         if is_one_based:
@@ -194,5 +211,4 @@ def get_class_display_name(c: Any, cfg: Any = None, class_values: Optional[Seque
     except (TypeError, ValueError):
         pass
 
-    c = str(c).replace("_", " ")
-    return str(c)
+    return raw_value.replace("_", " ")

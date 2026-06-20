@@ -13,6 +13,7 @@ from omiclass.de.gene_selection import compute_target_gene_count, select_marker_
 from omiclass.errors.errors import RBackendError, GCError
 from omiclass.reporting.de_report import write_de_geneset_report_html
 from omiclass.utils.debug import debug_volcano_plot_from_limma
+from omiclass.utils.toolbox import get_class_display_name
 try:
     # rpy2 >= 3.5
     from rpy2.rinterface_lib.embedded import RRuntimeError
@@ -398,7 +399,13 @@ class LimmaVoomRunner:
             # if Contrast came from R, it should exist
             if "Contrast" in df.columns.tolist():
                 df2 = df.dropna(subset=["Contrast"])
+                contrast_values = df2["Contrast"].astype(str).drop_duplicates().tolist()
                 for contrast_name, sub in df2.groupby("Contrast"):
+                    display_name = get_class_display_name(
+                        contrast_name,
+                        cfg=self.cfg,
+                        class_values=contrast_values,
+                    )
                     # write a temp CSV for this contrast
                     safe = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in str(contrast_name))
                     safe = safe.split("_")[0] + "_vs_all"
@@ -409,25 +416,14 @@ class LimmaVoomRunner:
                         de_results=sub_path,
                         fdr_thresh=fdr_thresh,
                         logfc_thresh=logfc_thresh,
-                        title=f"{analysis_label}: {contrast_name}",
+                        title=f"{analysis_label}: {display_name}",
                         markers=gene_list if gene_list is not None else [],
                     )
                     # remove temp sub csv and plot directory
                     if sub_path.exists():
                         os.remove(sub_path)
 
-                    names = None
-                    project_cfg = getattr(self.cfg, "project", None)
-                    if project_cfg is not None:
-                        names = getattr(project_cfg, "classes_names", None)
-                    try: 
-                        if " vs " in str(contrast_name):
-                            fix_name = str(contrast_name)
-                        else:
-                            fix_name = f"{names[(int(contrast_name)-1)]} vs all" if names is not None and int(contrast_name) -1 < len(names) else f"Class {contrast_name}"
-                    except Exception:
-                        fix_name = f"Class {contrast_name} vs all"
-                    volcano_svgs.append((f"{fix_name}", svg))
+                    volcano_svgs.append((display_name, svg))
             else:
                 # fallback: original single volcano
                 svg = plot_volcano_from_limma(
