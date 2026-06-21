@@ -69,6 +69,7 @@ class PlottingFramework:
         class_name_map: Mapping[int, str],
         is_b_all: bool,
         curve_variant: str = "corrected",
+        curve_models: Optional[Mapping[str, Mapping[str, Any]]] = None,
     ) -> Path:
         """Persist y_true, y_pred and y_proba for each available evaluation."""
         base_dir = Path(base_dir)
@@ -98,6 +99,27 @@ class PlottingFramework:
             frame.to_csv(class_dir / filename, index=False)
             files[variant] = f"classification/{filename}"
 
+        curve_files: dict[str, str] = {}
+        curve_dir = class_dir / "curves"
+        for model, payload in (curve_models or {}).items():
+            y_true = np.asarray(payload["y_true"]).reshape(-1)
+            proba = np.asarray(payload["y_proba"])
+            if proba.ndim == 1:
+                proba = np.column_stack([1.0 - proba, proba])
+            labels = list(payload.get("labels") or sorted(class_name_map))
+            if len(labels) != proba.shape[1]:
+                labels = list(range(proba.shape[1]))
+            if len(y_true) != proba.shape[0]:
+                raise ValueError(f"Inconsistent curve payload lengths for '{model}'.")
+
+            curve_dir.mkdir(parents=True, exist_ok=True)
+            frame = pd.DataFrame({"y_true": y_true})
+            for col, label in enumerate(labels):
+                frame[f"proba__{label}"] = proba[:, col]
+            filename = f"{PlottingFramework._safe_name(model)}.csv"
+            frame.to_csv(curve_dir / filename, index=False)
+            curve_files[str(model)] = f"classification/curves/{filename}"
+
         return PlottingFramework._update_manifest(
             base_dir,
             classification={
@@ -106,6 +128,7 @@ class PlottingFramework:
                 "class_name_map": {str(k): str(v) for k, v in class_name_map.items()},
                 "is_b_all": bool(is_b_all),
                 "curve_variant": curve_variant if curve_variant in files else next(iter(files), None),
+                "curve_files": curve_files,
             },
         )
 
@@ -203,9 +226,16 @@ class PlottingFramework:
             variants = [preferred] if preferred in variants else variants[:1]
         return [self.plot_confusion_matrix(variant) for variant in variants]
 
-    def _curve_arrays(self) -> tuple[np.ndarray, np.ndarray, list[str]]:
-        config = self.manifest["classification"]
-        frame = self._classification_frame(config["curve_variant"])
+    @staticmethod
+    def _normalize_model_name(name: Any) -> str:
+        return "".join(char for char in str(name).casefold() if char.isalnum())
+
+    @staticmethod
+    def _display_model_name(name: Any) -> str:
+        return str(name).replace("_", " ").strip().title()
+
+    def _curve_arrays_from_file(self, relative: str) -> tuple[np.ndarray, np.ndarray, list[str]]:
+        frame = pd.read_csv(self._base_file(relative))
         probability_columns = [c for c in frame.columns if c.startswith("proba__")]
         return (
             frame["y_true"].to_numpy(),
@@ -213,49 +243,105 @@ class PlottingFramework:
             [c.split("proba__", 1)[1] for c in probability_columns],
         )
 
+    def _curve_model_arrays(self) -> list[tuple[str, np.ndarray, np.ndarray, list[str]]]:
+        config = self.manifest["classification"]
+        curve_files = config.get("curve_files") or {}
+        if curve_files:
+            return [
+                (model, *self._curve_arrays_from_file(relative))
+                for model, relative in curve_files.items()
+            ]
+
+        # Backward compatibility for manifests created before per-model curve
+        # data was persisted.
+        relative = config.get("files", {}).get(config.get("curve_variant"))
+        if not relative:
+            raise KeyError("No saved classification curve data was found.")
+        return [(config["selected_model"], *self._curve_arrays_from_file(relative))]
+
+    def _style_curve_legend(self, ax) -> None:
+        selected = self._normalize_model_name(
+            self.manifest["classification"].get("selected_model", "")
+        )
+        legend = ax.get_legend()
+        if legend is None:
+            return
+        for text in legend.get_texts():
+            model = text.get_text().split(" (", 1)[0]
+            if self._normalize_model_name(model) == selected:
+                text.set_fontweight("bold")
+
     def plot_pr_curve(self) -> Path:
-        y_true, probabilities, labels = self._curve_arrays()
         recall_grid = np.linspace(0, 1, 500)
-        curves = []
-        scores = []
-        for col, label in enumerate(labels):
-            binary = (y_true.astype(str) == str(label)).astype(int)
-            if np.unique(binary).size < 2:
-                continue
-            precision, recall, _ = precision_recall_curve(binary, probabilities[:, col])
-            order = np.argsort(recall)
-            curves.append(np.interp(recall_grid, recall[order], precision[order]))
-            scores.append(average_precision_score(binary, probabilities[:, col]))
-        if not curves:
+        items = []
+        for model, y_true, probabilities, labels in self._curve_model_arrays():
+            curves, scores = [], []
+            for col, label in enumerate(labels):
+                binary = (y_true.astype(str) == str(label)).astype(int)
+                if np.unique(binary).size < 2:
+                    continue
+                precision, recall, _ = precision_recall_curve(binary, probabilities[:, col])
+                order = np.argsort(recall)
+                curves.append(np.interp(recall_grid, recall[order], precision[order]))
+                scores.append(average_precision_score(binary, probabilities[:, col]))
+            if curves:
+                items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
+        if not items:
             raise ValueError("PR curve requires at least one class with positive and negative samples.")
+        items.sort(key=lambda item: item[2], reverse=True)
+
         fig, ax = plt.subplots(figsize=(6.5, 5))
-        model = self.manifest["classification"]["selected_model"]
-        ax.plot(recall_grid, np.mean(curves, axis=0), label=f"{model} (AUPRC={np.mean(scores):.3f})")
+        selected = self._normalize_model_name(self.manifest["classification"]["selected_model"])
+        for model, curve, score in items:
+            is_selected = self._normalize_model_name(model) == selected
+            display_name = self._display_model_name(model)
+            ax.plot(
+                recall_grid,
+                curve,
+                label=f"{display_name} (AUPRC={score:.3f})",
+                linewidth=3.0 if is_selected else 1.5,
+                zorder=10 if is_selected else 2,
+            )
         ax.set(xlabel="Recall", ylabel="Precision")
         ax.legend(fontsize=8)
+        self._style_curve_legend(ax)
         fig.tight_layout()
         return self._save(fig, "precision_recall_curve.pdf")
 
     def plot_roc_curve(self) -> Path:
-        y_true, probabilities, labels = self._curve_arrays()
         fpr_grid = np.linspace(0, 1, 500)
-        curves = []
-        scores = []
-        for col, label in enumerate(labels):
-            binary = (y_true.astype(str) == str(label)).astype(int)
-            if np.unique(binary).size < 2:
-                continue
-            fpr, tpr, _ = roc_curve(binary, probabilities[:, col])
-            curves.append(np.interp(fpr_grid, fpr, tpr, left=0, right=1))
-            scores.append(auc(fpr, tpr))
-        if not curves:
+        items = []
+        for model, y_true, probabilities, labels in self._curve_model_arrays():
+            curves, scores = [], []
+            for col, label in enumerate(labels):
+                binary = (y_true.astype(str) == str(label)).astype(int)
+                if np.unique(binary).size < 2:
+                    continue
+                fpr, tpr, _ = roc_curve(binary, probabilities[:, col])
+                curves.append(np.interp(fpr_grid, fpr, tpr, left=0, right=1))
+                scores.append(auc(fpr, tpr))
+            if curves:
+                items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
+        if not items:
             raise ValueError("ROC curve requires at least one class with positive and negative samples.")
+        items.sort(key=lambda item: item[2], reverse=True)
+
         fig, ax = plt.subplots(figsize=(6.5, 5))
         ax.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="0.5")
-        model = self.manifest["classification"]["selected_model"]
-        ax.plot(fpr_grid, np.mean(curves, axis=0), label=f"{model} (AUROC={np.mean(scores):.3f})")
+        selected = self._normalize_model_name(self.manifest["classification"]["selected_model"])
+        for model, curve, score in items:
+            is_selected = self._normalize_model_name(model) == selected
+            display_name = self._display_model_name(model)
+            ax.plot(
+                fpr_grid,
+                curve,
+                label=f"{display_name} (AUROC={score:.3f})",
+                linewidth=3.0 if is_selected else 1.5,
+                zorder=10 if is_selected else 2,
+            )
         ax.set(xlabel="False Positive Rate", ylabel="True Positive Rate")
         ax.legend(fontsize=8)
+        self._style_curve_legend(ax)
         fig.tight_layout()
         return self._save(fig, "roc_curve.pdf")
 

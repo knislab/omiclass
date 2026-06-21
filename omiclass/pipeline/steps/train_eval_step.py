@@ -305,6 +305,14 @@ class TrainAndEvalStep:
                 class_name_map=class_name_map,
                 is_b_all=is_b_all,
                 curve_variant=corrected_variant,
+                curve_models={
+                    model_name: {
+                        "y_true": ytr.to_numpy(),
+                        "y_proba": payload["y_proba"],
+                        "labels": train_label_index.tolist(),
+                    }
+                    for model_name, payload in per_model_train_payload.items()
+                },
             )
         
         plotter = FinalSummaryPlotter(
