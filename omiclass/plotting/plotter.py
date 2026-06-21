@@ -150,15 +150,28 @@ class FinalSummaryPlotter:
         return svg
 
 
-    def plot_macro_pr_and_roc(self) -> Tuple[Path, Path]:
+    def plot_macro_pr_and_roc(self, bold_model_key: Optional[str] = None) -> Tuple[Path, Path]:
         label_index = self._get_label_index()
         K = len(label_index)
         Y = np.column_stack([(self.y_true_train == k).astype(int) for k in label_index])
         grid_pr = np.linspace(0, 1, 500)
         grid_fpr = np.linspace(0, 1, 500)
+        # bold helper
+        def _bold_legend_model(ax):
+            if bold_model_key is None:
+                return
+
+            legend = ax.get_legend()
+            if legend is None:
+                return
+
+            for text in legend.get_texts():
+                if text.get_text().startswith(f"{bold_model_key} "):
+                    text.set_fontweight("bold")
 
         # PR
         fig_pr, ax_pr = plt.subplots(figsize=(6.5, 5))
+        pr_items = []
         for name, res in self.per_model_train.items():
             P = np.asarray(res["y_proba"])
             P = self._ensure_proba_shape(P, K)
@@ -167,13 +180,33 @@ class FinalSummaryPlotter:
             for k in range(K):
                 precision, recall, _ = precision_recall_curve(Y[:, k], P[:, k])
                 order = np.argsort(recall)
-                recall_s = recall[order]; precision_s = precision[order]
-                prs.append(np.interp(grid_pr, recall_s, precision_s,left=precision_s[0], right=precision_s[-1]))
+                recall_s = recall[order]
+                precision_s = precision[order]
+                prs.append(
+                    np.interp(
+                        grid_pr,
+                        recall_s,
+                        precision_s,
+                        left=precision_s[0],
+                        right=precision_s[-1],
+                    )
+                )
+
             macro_precision = np.mean(np.vstack(prs), axis=0)
             ap_macro = average_precision_score(Y, P[:, :K], average="macro")
-            ax_pr.plot(grid_pr, macro_precision, label=f"{name} (AUPRC={ap_macro:.3f})")
-        ax_pr.set_xlabel("Recall"); ax_pr.set_ylabel("Precision")
+
+            pr_items.append((name, macro_precision, ap_macro))
+
+        pr_items.sort(key=lambda x: x[2], reverse=True)
+
+        for name, macro_precision, ap_macro in pr_items:
+            ax_pr.plot(
+                grid_pr,
+                macro_precision,
+                label=f"{name} (AUPRC={ap_macro:.3f})",
+            )
         ax_pr.legend(fontsize=8)
+        _bold_legend_model(ax_pr)
         fig_pr.tight_layout()
         svg_pr =fig_to_svg_str(fig_pr, pdf_name="macro_precision_recall")
         plt.close(fig_pr)
@@ -181,6 +214,8 @@ class FinalSummaryPlotter:
         # ROC
         fig_roc, ax_roc = plt.subplots(figsize=(6.5, 5))
         ax_roc.plot([0, 1], [0, 1], linestyle="--", linewidth=1)
+        roc_items = []
+
         for name, res in self.per_model_train.items():
             P = np.asarray(res["y_proba"])
             P = self._ensure_proba_shape(P, K)
@@ -190,11 +225,23 @@ class FinalSummaryPlotter:
                 fpr, tpr, _ = roc_curve(Y[:, k], P[:, k])
                 tprs.append(np.interp(grid_fpr, fpr, tpr, left=0, right=1))
                 aucs.append(auc(fpr, tpr))
+
             macro_tpr = np.mean(np.vstack(tprs), axis=0)
             macro_auc = float(np.mean(aucs))
-            ax_roc.plot(grid_fpr, macro_tpr, label=f"{name} (AUROC={macro_auc:.3f})")
+
+            roc_items.append((name, macro_tpr, macro_auc))
+
+        roc_items.sort(key=lambda x: x[2], reverse=True)
+
+        for name, macro_tpr, macro_auc in roc_items:
+            ax_roc.plot(
+                grid_fpr,
+                macro_tpr,
+                label=f"{name} (AUROC={macro_auc:.3f})",
+            )
         ax_roc.set_xlabel("False Positive Rate"); ax_roc.set_ylabel("True Positive Rate")
         ax_roc.legend(fontsize=8)
+        _bold_legend_model(ax_roc)
         fig_roc.tight_layout()
         svg_roc = fig_to_svg_str(fig_roc, pdf_name="macro_roc")
         plt.close(fig_roc)

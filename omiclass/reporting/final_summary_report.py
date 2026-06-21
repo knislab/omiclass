@@ -172,7 +172,7 @@ def render_final_summary_html(
         leaderboard_df = clean_leaderboard_df(leaderboard_df)
     
     cm_grid_svg = plotter.plot_confusion_matrices(best_model_key=selected_model)
-    pr_svg, roc_svg = plotter.plot_macro_pr_and_roc()
+    pr_svg, roc_svg = plotter.plot_macro_pr_and_roc(bold_model_key=selected_model)
     metrics_svg = plotter.plot_metric_barplot()
 
 
