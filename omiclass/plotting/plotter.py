@@ -79,19 +79,10 @@ class FinalSummaryPlotter:
         if key in self.per_model:
             return key
 
-        def normalize(s):
-            return (
-                str(s)
-                .lower()
-                .replace("_", "")
-                .replace("-", "")
-                .replace(" ", "")
-            )
-
-        target = normalize(key)
+        target = self._normalize_model_key(key)
 
         for existing_key in self.per_model.keys():
-            if normalize(existing_key) == target:
+            if self._normalize_model_key(existing_key) == target:
                 return existing_key
 
         raise KeyError(
@@ -156,9 +147,16 @@ class FinalSummaryPlotter:
         Y = np.column_stack([(self.y_true_train == k).astype(int) for k in label_index])
         grid_pr = np.linspace(0, 1, 500)
         grid_fpr = np.linspace(0, 1, 500)
-        # bold helper
+        selected_model_key = self._normalize_model_key(bold_model_key)
+
+        def _is_selected(name: str) -> bool:
+            return bool(
+                selected_model_key
+                and self._normalize_model_key(name) == selected_model_key
+            )
+
         def _bold_legend_model(ax):
-            if bold_model_key is None:
+            if not selected_model_key:
                 return
 
             legend = ax.get_legend()
@@ -166,7 +164,8 @@ class FinalSummaryPlotter:
                 return
 
             for text in legend.get_texts():
-                if text.get_text().startswith(f"{bold_model_key} "):
+                model_name = text.get_text().split(" (", 1)[0]
+                if _is_selected(model_name):
                     text.set_fontweight("bold")
 
         # PR
@@ -200,10 +199,13 @@ class FinalSummaryPlotter:
         pr_items.sort(key=lambda x: x[2], reverse=True)
 
         for name, macro_precision, ap_macro in pr_items:
+            selected = _is_selected(name)
             ax_pr.plot(
                 grid_pr,
                 macro_precision,
                 label=f"{name} (AUPRC={ap_macro:.3f})",
+                linewidth=3.0 if selected else 1.5,
+                zorder=10 if selected else 2,
             )
         ax_pr.legend(fontsize=8)
         _bold_legend_model(ax_pr)
@@ -234,10 +236,13 @@ class FinalSummaryPlotter:
         roc_items.sort(key=lambda x: x[2], reverse=True)
 
         for name, macro_tpr, macro_auc in roc_items:
+            selected = _is_selected(name)
             ax_roc.plot(
                 grid_fpr,
                 macro_tpr,
                 label=f"{name} (AUROC={macro_auc:.3f})",
+                linewidth=3.0 if selected else 1.5,
+                zorder=10 if selected else 2,
             )
         ax_roc.set_xlabel("False Positive Rate"); ax_roc.set_ylabel("True Positive Rate")
         ax_roc.legend(fontsize=8)
@@ -341,6 +346,12 @@ class FinalSummaryPlotter:
         return svg
 
     # ---------- utils ----------
+    @staticmethod
+    def _normalize_model_key(name: Optional[str]) -> str:
+        if name is None:
+            return ""
+        return "".join(char for char in str(name).casefold() if char.isalnum())
+
     def _ensure_proba_shape(self, P: np.ndarray, K: int) -> np.ndarray:
         """
         Return probabilities with shape (n, K). Handles binary (n,) or (n,1) or (n,2).
