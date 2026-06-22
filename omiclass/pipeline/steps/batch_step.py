@@ -83,6 +83,11 @@ class BatchCorrectionStep:
             pc_pvalue_heatmap_max=getattr(ctx.cfg.plots, "pc_pvalue_heatmap_max", None),
             pdf_base_dir=(ctx.out_dir / "pdf_plots" / "base_files") if ctx.cfg.PDF else None,
         )
+        if ctx.cfg.PDF and not limma_run_res.get("pdf_pca_base_saved", False):
+            raise RuntimeError(
+                "PDF export was enabled, but PCA regeneration data was not saved "
+                "after batch correction."
+            )
 
         X_full_raw = load_matrix(limma_out_dir / limma_out_csv)
 

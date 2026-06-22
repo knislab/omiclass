@@ -44,7 +44,41 @@ class PlottingFramework:
             raise FileNotFoundError(
                 f"Plot base-data manifest not found: {path}. Run the pipeline with PDF: true."
             )
-        return json.loads(path.read_text(encoding="utf-8"))
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+
+        # Repair manifests from early PDF-framework runs where PCA CSVs were
+        # written but the top-level pca entry was accidentally omitted.
+        if "pca" not in manifest:
+            pca_dir = base_dir / "pca"
+            required = {
+                "before_scores": pca_dir / "before_scores.csv",
+                "after_scores": pca_dir / "after_scores.csv",
+                "before_associations": pca_dir / "before_associations.csv",
+                "after_associations": pca_dir / "after_associations.csv",
+                "explained_variance": pca_dir / "explained_variance.json",
+            }
+            if all(file.exists() for file in required.values()):
+                score_columns = pd.read_csv(required["before_scores"], nrows=0).columns
+                metadata_columns = [
+                    column for column in score_columns
+                    if column != "sample_id" and not re.fullmatch(r"PC\d+", str(column))
+                ]
+                cohort_column = next(
+                    (column for column in metadata_columns if str(column).casefold() == "cohort"),
+                    metadata_columns[0] if metadata_columns else None,
+                )
+                manifest["pca"] = {
+                    key: file.relative_to(base_dir).as_posix()
+                    for key, file in required.items()
+                }
+                manifest["pca"].update(
+                    {"cohort_column": cohort_column, "heatmap_vmax": None}
+                )
+                path.write_text(
+                    json.dumps(manifest, indent=2, sort_keys=True),
+                    encoding="utf-8",
+                )
+        return manifest
 
     @staticmethod
     def _update_manifest(base_dir: Path, **updates: Any) -> Path:
@@ -129,6 +163,7 @@ class PlottingFramework:
                 "is_b_all": bool(is_b_all),
                 "curve_variant": curve_variant if curve_variant in files else next(iter(files), None),
                 "curve_files": curve_files,
+                "curve_model_order": list(curve_files),
             },
         )
 
@@ -227,10 +262,6 @@ class PlottingFramework:
         return [self.plot_confusion_matrix(variant) for variant in variants]
 
     @staticmethod
-    def _normalize_model_name(name: Any) -> str:
-        return "".join(char for char in str(name).casefold() if char.isalnum())
-
-    @staticmethod
     def _display_model_name(name: Any) -> str:
         return str(name).replace("_", " ").strip().title()
 
@@ -247,9 +278,11 @@ class PlottingFramework:
         config = self.manifest["classification"]
         curve_files = config.get("curve_files") or {}
         if curve_files:
+            model_order = config.get("curve_model_order") or list(curve_files)
             return [
-                (model, *self._curve_arrays_from_file(relative))
-                for model, relative in curve_files.items()
+                (model, *self._curve_arrays_from_file(curve_files[model]))
+                for model in model_order
+                if model in curve_files
             ]
 
         # Backward compatibility for manifests created before per-model curve
@@ -258,18 +291,6 @@ class PlottingFramework:
         if not relative:
             raise KeyError("No saved classification curve data was found.")
         return [(config["selected_model"], *self._curve_arrays_from_file(relative))]
-
-    def _style_curve_legend(self, ax) -> None:
-        selected = self._normalize_model_name(
-            self.manifest["classification"].get("selected_model", "")
-        )
-        legend = ax.get_legend()
-        if legend is None:
-            return
-        for text in legend.get_texts():
-            model = text.get_text().split(" (", 1)[0]
-            if self._normalize_model_name(model) == selected:
-                text.set_fontweight("bold")
 
     def plot_pr_curve(self) -> Path:
         recall_grid = np.linspace(0, 1, 500)
@@ -288,23 +309,16 @@ class PlottingFramework:
                 items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
         if not items:
             raise ValueError("PR curve requires at least one class with positive and negative samples.")
-        items.sort(key=lambda item: item[2], reverse=True)
-
         fig, ax = plt.subplots(figsize=(6.5, 5))
-        selected = self._normalize_model_name(self.manifest["classification"]["selected_model"])
         for model, curve, score in items:
-            is_selected = self._normalize_model_name(model) == selected
             display_name = self._display_model_name(model)
             ax.plot(
                 recall_grid,
                 curve,
                 label=f"{display_name} (AUPRC={score:.3f})",
-                linewidth=3.0 if is_selected else 1.5,
-                zorder=10 if is_selected else 2,
             )
         ax.set(xlabel="Recall", ylabel="Precision")
         ax.legend(fontsize=8)
-        self._style_curve_legend(ax)
         fig.tight_layout()
         return self._save(fig, "precision_recall_curve.pdf")
 
@@ -324,24 +338,17 @@ class PlottingFramework:
                 items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
         if not items:
             raise ValueError("ROC curve requires at least one class with positive and negative samples.")
-        items.sort(key=lambda item: item[2], reverse=True)
-
         fig, ax = plt.subplots(figsize=(6.5, 5))
         ax.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="0.5")
-        selected = self._normalize_model_name(self.manifest["classification"]["selected_model"])
         for model, curve, score in items:
-            is_selected = self._normalize_model_name(model) == selected
             display_name = self._display_model_name(model)
             ax.plot(
                 fpr_grid,
                 curve,
                 label=f"{display_name} (AUROC={score:.3f})",
-                linewidth=3.0 if is_selected else 1.5,
-                zorder=10 if is_selected else 2,
             )
         ax.set(xlabel="False Positive Rate", ylabel="True Positive Rate")
         ax.legend(fontsize=8)
-        self._style_curve_legend(ax)
         fig.tight_layout()
         return self._save(fig, "roc_curve.pdf")
 

@@ -552,21 +552,30 @@ class LimmaRunner:
                     result_dict["plots_orig"]["heatmap"] = orig_heatmap_svg
                 corr_qc_res["plots"]["heatmap"] = corr_heatmap_svg
 
-                if pdf_base_dir is not None:
-                    self._save_pdf_pca_data(
-                        base_dir=Path(pdf_base_dir),
-                        orig_expr=X,
-                        corr_expr=expr_corr,
-                        labels=aligned_label_series,
-                        plot_n_pcs=plot_n_pcs,
-                        batch_col=batch_col,
-                        configured_vmax=pc_pvalue_heatmap_max,
-                    )
-
                 # Store corrected results with standard keys (overwriting any previous placeholder keys)
                 result_dict["plots"] = corr_qc_res["plots"]
                 result_dict["silhouette_scores"] = corr_qc_res["silhouette_scores"]
                 result_dict["gene_level"] = corr_qc_res.get("gene_level")
+
+            # PDF regeneration data is deliberately independent of HTML/QC
+            # rendering. PCA coordinates and variance can always be saved once
+            # correction succeeds; metadata associations are included whenever
+            # usable labels are available.
+            if pdf_base_dir is not None and expr_corr is not None:
+                pdf_labels = {
+                    key: values.reindex(expr_corr.columns)
+                    for key, values in label_series.items()
+                }
+                self._save_pdf_pca_data(
+                    base_dir=Path(pdf_base_dir),
+                    orig_expr=X,
+                    corr_expr=expr_corr,
+                    labels=pdf_labels,
+                    plot_n_pcs=plot_n_pcs,
+                    batch_col=batch_col,
+                    configured_vmax=pc_pvalue_heatmap_max,
+                )
+                result_dict["pdf_pca_base_saved"] = True
 
             # Final cleanup and state
             result_dict["state"] = state
