@@ -25,6 +25,8 @@ class GeneSetSelectionSummary:
     close_pair_budget: int = 0
     one_vs_rest_genes: List[str] = field(default_factory=list)
     pairwise_genes: List[str] = field(default_factory=list)
+    pairwise_by_contrast: Dict[str, List[str]] = field(default_factory=dict)
+    pairwise_contrast_order: List[str] = field(default_factory=list)
     close_pairs: List[Tuple[str, str, float]] = field(default_factory=list)
     selection_summary: List[Dict[str, object]] = field(default_factory=list)
 
@@ -465,6 +467,14 @@ def select_marker_genes(
 
     contrast_order = ovr_df["Contrast"].dropna().astype(str).drop_duplicates().tolist() if not ovr_df.empty else []
     by_contrast = _records_by_contrast([r for r in final_records if r.get("source") == "one_vs_rest"])
+    pairwise_contrast_order = (
+        pair_df["Contrast"].dropna().astype(str).drop_duplicates().tolist()
+        if not pair_df.empty
+        else []
+    )
+    pairwise_by_contrast = _records_by_contrast(
+        [r for r in final_records if r.get("source") == "pairwise_close_class"]
+    )
 
     return GeneSetSelectionSummary(
         K=K,
@@ -482,6 +492,8 @@ def select_marker_genes(
         close_pair_budget=pair_budget,
         one_vs_rest_genes=one_vs_rest_genes,
         pairwise_genes=pairwise_genes,
+        pairwise_by_contrast=pairwise_by_contrast,
+        pairwise_contrast_order=pairwise_contrast_order,
         close_pairs=list(close_pairs or []),
         selection_summary=selection_summary,
     )

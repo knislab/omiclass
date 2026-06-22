@@ -129,16 +129,25 @@ def write_de_geneset_report_html(
                         copyable=True,
                     )
                 )
-            genes_html_parts.append(
-                chips_panel(
-                    panel_id="genes_pairwise_close_class",
-                    title="Close-class pairwise markers",
-                    items=gene_chip_items((geneset_summary.get("pairwise_genes", []) or [])),
-                    open_by_default=False,
-                    searchable=True,
-                    copyable=True,
+            pairwise_order = geneset_summary.get("pairwise_contrast_order", []) or []
+            pairwise_by_contrast = geneset_summary.get("pairwise_by_contrast", {}) or {}
+            class_values = geneset_summary.get("contrast_order", []) or []
+            for i, contrast in enumerate(pairwise_order):
+                display_name = get_class_display_name(
+                    contrast,
+                    cfg=cfg,
+                    class_values=class_values,
                 )
-            )
+                genes_html_parts.append(
+                    chips_panel(
+                        panel_id=f"genes_pairwise_close_class_{i}",
+                        title=f"Close-class pairwise: {display_name}",
+                        items=gene_chip_items(pairwise_by_contrast.get(str(contrast), []) or []),
+                        open_by_default=False,
+                        searchable=True,
+                        copyable=True,
+                    )
+                )
 
         genes_html_parts.append(
             chips_panel(

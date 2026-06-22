@@ -295,6 +295,7 @@ class LimmaVoomRunner:
             plot_output_filepath = output_dir
             plot_output_filepath.mkdir(parents=True, exist_ok=True)
             summary = None
+            pairwise_df = pd.DataFrame()
 
             if self.de_cfg.geneset_selection:
                 df = pd.read_csv(output_filepath)
@@ -333,7 +334,6 @@ class LimmaVoomRunner:
                 )
                 pairs_df.to_csv(train_artifacts_dir / "selected_close_class_pairs.csv", index=False)
 
-                pairwise_df = pd.DataFrame()
                 if close_pair_budget > 0 and pair_dicts:
                     pairwise_output_filepath = output_dir / out_csv.replace(".csv", "_pairwise_close_class.csv")
                     pairwise_config = dict(config_data)
@@ -396,6 +396,7 @@ class LimmaVoomRunner:
                 )
             )
 
+            contrast_values = []
             # if Contrast came from R, it should exist
             if "Contrast" in df.columns.tolist():
                 df2 = df.dropna(subset=["Contrast"])
@@ -434,6 +435,39 @@ class LimmaVoomRunner:
                     markers=gene_list if gene_list is not None else [],
                 )
                 volcano_svgs.append(("Volcano", svg))
+
+            if not pairwise_df.empty and "Contrast" in pairwise_df.columns:
+                pairwise_contrasts = (
+                    summary.pairwise_contrast_order
+                    if summary is not None
+                    else pairwise_df["Contrast"].dropna().astype(str).drop_duplicates().tolist()
+                )
+                pairwise_markers = summary.pairwise_by_contrast if summary is not None else {}
+                for contrast_name in pairwise_contrasts:
+                    sub = pairwise_df[pairwise_df["Contrast"].astype(str) == str(contrast_name)]
+                    if sub.empty:
+                        continue
+                    display_name = get_class_display_name(
+                        contrast_name,
+                        cfg=self.cfg,
+                        class_values=contrast_values,
+                    )
+                    safe = "".join(
+                        ch if ch.isalnum() or ch in "._-" else "_"
+                        for ch in str(contrast_name)
+                    )
+                    sub_path = plot_output_filepath / f"limma_voom_de_pairwise_{safe}.csv"
+                    sub.to_csv(sub_path, index=True)
+                    svg = plot_volcano_from_limma(
+                        de_results=sub_path,
+                        fdr_thresh=fdr_thresh,
+                        logfc_thresh=logfc_thresh,
+                        title=f"{analysis_label} close-class pairwise: {display_name}",
+                        markers=pairwise_markers.get(str(contrast_name), []),
+                    )
+                    if sub_path.exists():
+                        os.remove(sub_path)
+                    volcano_svgs.append((f"Close-class pairwise: {display_name}", svg))
 
             write_de_geneset_report_html(
                 output_dir=base_output_dir,
