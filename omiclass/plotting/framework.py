@@ -233,10 +233,12 @@ class PlottingFramework:
     def _base_file(self, relative: str, base_dir: Path | None = None) -> Path:
         return (base_dir or self.base_dir) / relative
 
-    def _save(self, fig, filename: str) -> Path:
+    def _save(self, fig, filename: str, show: bool = False) -> Path:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         path = self.output_dir / filename
         fig.savefig(path, format="pdf", bbox_inches="tight")
+        if show:
+            plt.show()
         plt.close(fig)
         return path
 
@@ -272,6 +274,7 @@ class PlottingFramework:
     def plot_confusion_matrix(
         self,
         variant: str | None = None,
+        show: bool = False,
         *,
         run_dir: str | Path | None = None,
         label: str | None = None,
@@ -301,18 +304,19 @@ class PlottingFramework:
         ax.set(xlabel="Predicted", ylabel="True", title=f"{config['selected_model']} — {plot_label}")
         ax.tick_params(axis="x", rotation=45)
         fig.tight_layout()
-        return self._save(fig, f"confusion_matrix_{self._safe_name(plot_label)}.pdf")
+        return self._save(fig, f"confusion_matrix_{self._safe_name(plot_label)}.pdf", show=show)
 
     def plot_confusion_matrices(
         self,
         uncorrected_run_dir: str | Path | None = None,
+        show: bool = False,
     ) -> list[Path]:
         config = self.manifest.get("classification", {})
         variants = list(config.get("files", {}))
         if config.get("is_b_all"):
             preferred = config.get("curve_variant")
             variants = [preferred] if preferred in variants else variants[:1]
-            return [self.plot_confusion_matrix(variant) for variant in variants]
+            return [self.plot_confusion_matrix(variant, show=show) for variant in variants]
 
         uncorrected_run_dir = uncorrected_run_dir or self.uncorrected_run_dir
         if uncorrected_run_dir is not None:
@@ -321,11 +325,12 @@ class PlottingFramework:
                 preferred=("corrected", "holdout_test"),
             )
             return [
-                self.plot_confusion_matrix(corrected_variant, label="corrected"),
+                self.plot_confusion_matrix(corrected_variant, label="corrected", show=show),
                 self.plot_confusion_matrix(
                     run_dir=uncorrected_run_dir,
                     label="uncorrected",
                     preferred_variants=("uncorrected", "corrected", "holdout_test"),
+                    show=show,
                 ),
             ]
 
@@ -362,7 +367,7 @@ class PlottingFramework:
             raise KeyError("No saved classification curve data was found.")
         return [(config["selected_model"], *self._curve_arrays_from_file(relative))]
 
-    def plot_pr_curve(self) -> Path:
+    def plot_pr_curve(self, show: bool = False) -> Path:
         recall_grid = np.linspace(0, 1, 500)
         items = []
         for model, y_true, probabilities, labels in self._curve_model_arrays():
@@ -390,9 +395,9 @@ class PlottingFramework:
         ax.set(xlabel="Recall", ylabel="Precision")
         ax.legend(fontsize=8)
         fig.tight_layout()
-        return self._save(fig, "precision_recall_curve.pdf")
+        return self._save(fig, "precision_recall_curve.pdf", show=show)
 
-    def plot_roc_curve(self) -> Path:
+    def plot_roc_curve(self, show: bool = False) -> Path:
         fpr_grid = np.linspace(0, 1, 500)
         items = []
         for model, y_true, probabilities, labels in self._curve_model_arrays():
@@ -420,9 +425,9 @@ class PlottingFramework:
         ax.set(xlabel="False Positive Rate", ylabel="True Positive Rate")
         ax.legend(fontsize=8)
         fig.tight_layout()
-        return self._save(fig, "roc_curve.pdf")
+        return self._save(fig, "roc_curve.pdf", show=show)
 
-    def plot_pc_metadata_heatmaps(self) -> list[Path]:
+    def plot_pc_metadata_heatmaps(self, show: bool = False) -> list[Path]:
         config = self.manifest.get("pca", {})
         frames = {
             "before": pd.read_csv(self._base_file(config["before_associations"]), index_col=0),
@@ -442,10 +447,10 @@ class PlottingFramework:
             sns.heatmap(frame, annot=True, cmap="viridis", vmin=0, vmax=vmax, ax=ax)
             ax.set(xlabel="Metadata variables", ylabel="Principal components", title=f"PC associations — {state} correction")
             fig.tight_layout()
-            paths.append(self._save(fig, f"pc_metadata_associations_{state}.pdf"))
+            paths.append(self._save(fig, f"pc_metadata_associations_{state}.pdf", show=show))
         return paths
 
-    def plot_pca_scatter(self, state: str) -> Path:
+    def plot_pca_scatter(self, state: str, show: bool = False) -> Path:
         if state not in {"before", "after"}:
             raise ValueError("state must be 'before' or 'after'")
         config = self.manifest["pca"]
@@ -463,18 +468,18 @@ class PlottingFramework:
         sns.scatterplot(data=frame, x="PC1", y="PC2", hue=cohort, s=45, ax=ax)
         ax.set(xlabel=x_label, ylabel=y_label, title=f"PCA by {cohort} — {state} correction")
         fig.tight_layout()
-        return self._save(fig, f"pca_pc1_pc2_{state}.pdf")
+        return self._save(fig, f"pca_pc1_pc2_{state}.pdf", show=show)
 
-    def plot_pca_scatters(self) -> list[Path]:
-        return [self.plot_pca_scatter("before"), self.plot_pca_scatter("after")]
+    def plot_pca_scatters(self, show: bool = False) -> list[Path]:
+        return [self.plot_pca_scatter("before", show=show), self.plot_pca_scatter("after", show=show)]
 
-    def generate_all(self) -> list[Path]:
+    def generate_all(self, show: bool = False) -> list[Path]:
         paths: list[Path] = []
         if self.manifest.get("classification"):
             paths.extend(self.plot_confusion_matrices())
-            paths.extend([self.plot_pr_curve(), self.plot_roc_curve()])
+            paths.extend([self.plot_pr_curve(), self.plot_roc_curve(show=show)])
         if self.manifest.get("pca"):
-            paths.extend(self.plot_pc_metadata_heatmaps())
+            paths.extend(self.plot_pc_metadata_heatmaps(show=show))
             if self.manifest["pca"].get("cohort_column"):
-                paths.extend(self.plot_pca_scatters())
+                paths.extend(self.plot_pca_scatters(show=show))
         return paths
