@@ -58,7 +58,8 @@ class TrainAndEvalStep:
         dp = DataProcessor(ctx.cfg)
 
         # Choose which expression matrix to use: corrected vs original
-        if "X_corrected" in ctx.cache:
+        using_batch_corrected_matrix = "X_corrected" in ctx.cache
+        if using_batch_corrected_matrix:
             X_full_raw = ctx.cache["X_corrected"]
         else:
             X_full_raw = ctx.cache["full_expr"]
@@ -262,10 +263,14 @@ class TrainAndEvalStep:
 
         if ctx.cfg.PDF:
             is_b_all = self._is_b_all_run(ctx)
-            corrected_variant = "holdout_test" if is_b_all else "corrected"
+            run_variant = (
+                "holdout_test"
+                if is_b_all
+                else ("corrected" if using_batch_corrected_matrix else "uncorrected")
+            )
             selected_payload = per_model_payload[best_model]
             pdf_variants: Dict[str, Dict[str, Any]] = {
-                corrected_variant: {
+                run_variant: {
                     "sample_ids": Xte.index.to_numpy(),
                     "y_true": yte.to_numpy(),
                     "y_pred": selected_payload["y_pred"],
@@ -274,37 +279,13 @@ class TrainAndEvalStep:
                 }
             }
 
-            # For batch-corrected non-B-ALL runs, evaluate the selected model on
-            # the same holdout samples before correction. This is inference only;
-            # no model is retrained.
-            if not is_b_all and ctx.cache.get("X_uncorrected") is not None:
-                X_uncorrected, _ = dp.build_xy_from_corrected(
-                    X_full_raw=ctx.cache["X_uncorrected"],
-                    gene_list=gene_list,
-                )
-                missing_test = Xte.index.difference(X_uncorrected.index)
-                if len(missing_test) == 0:
-                    uncorrected_report = evaluate_holdout(
-                        joblib.load(best_model_path),
-                        X_uncorrected.loc[Xte.index],
-                        yte,
-                    )
-                    uncorrected_payload = uncorrected_report["plot_payload"]
-                    pdf_variants["uncorrected"] = {
-                        "sample_ids": Xte.index.to_numpy(),
-                        "y_true": yte.to_numpy(),
-                        "y_pred": uncorrected_payload["y_pred"],
-                        "y_proba": uncorrected_payload["y_proba"],
-                        "labels": sorted(np.unique(yte.astype(int))).copy(),
-                    }
-
             PlottingFramework.save_classification_data(
                 ctx.out_dir / "pdf_plots" / "base_files",
                 variants=pdf_variants,
                 selected_model=best_model,
                 class_name_map=class_name_map,
                 is_b_all=is_b_all,
-                curve_variant=corrected_variant,
+                curve_variant=run_variant,
                 curve_models={
                     model_name: {
                         "y_true": ytr.to_numpy(),

@@ -42,9 +42,6 @@ class BatchCorrectionStep:
         if did_log:
             ctx.cache["_did_log_transform"] = True
         ctx.cache["_log_transform_reason"] = log_reason
-        if ctx.cfg.PDF:
-            ctx.cache["X_uncorrected"] = full_expr
-
         bc = ctx.cfg.batch_correction
         dp = DataProcessor(ctx.cfg)
         meta_df, cov_matrix = dp.load_batch_metadata(
