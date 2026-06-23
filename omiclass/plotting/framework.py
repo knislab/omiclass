@@ -28,14 +28,26 @@ class PlottingFramework:
 
     MANIFEST = "manifest.json"
 
-    def __init__(self, run_dir: str | Path, output_dir: str | Path | None = None):
+    def __init__(
+        self,
+        run_dir: str | Path,
+        output_dir: str | Path | None = None,
+        uncorrected_run_dir: str | Path | None = None,
+    ):
         matplotlib.rcParams["pdf.fonttype"] = 42
         matplotlib.rcParams["ps.fonttype"] = 42
         run_dir = Path(run_dir)
         self.pdf_dir = run_dir if run_dir.name == "pdf_plots" else run_dir / "pdf_plots"
         self.base_dir = self.pdf_dir / "base_files"
         self.output_dir = Path(output_dir) if output_dir else self.pdf_dir / "publication"
+        self.uncorrected_run_dir = Path(uncorrected_run_dir) if uncorrected_run_dir else None
         self.manifest = self._read_manifest(self.base_dir)
+
+    @staticmethod
+    def _base_dir_from_run(run_dir: str | Path) -> Path:
+        run_dir = Path(run_dir)
+        pdf_dir = run_dir if run_dir.name == "pdf_plots" else run_dir / "pdf_plots"
+        return pdf_dir / "base_files"
 
     @staticmethod
     def _read_manifest(base_dir: Path) -> dict[str, Any]:
@@ -218,8 +230,8 @@ class PlottingFramework:
             },
         )
 
-    def _base_file(self, relative: str) -> Path:
-        return self.base_dir / relative
+    def _base_file(self, relative: str, base_dir: Path | None = None) -> Path:
+        return (base_dir or self.base_dir) / relative
 
     def _save(self, fig, filename: str) -> Path:
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -228,37 +240,95 @@ class PlottingFramework:
         plt.close(fig)
         return path
 
-    def _classification_frame(self, variant: str) -> pd.DataFrame:
-        config = self.manifest.get("classification", {})
+    @staticmethod
+    def _preferred_classification_variant(
+        config: Mapping[str, Any],
+        preferred: Sequence[str] = (),
+    ) -> str:
+        files = config.get("files", {})
+        for variant in preferred:
+            if variant in files:
+                return variant
+        curve_variant = config.get("curve_variant")
+        if curve_variant in files:
+            return str(curve_variant)
+        if files:
+            return next(iter(files))
+        raise KeyError("No saved classification data was found.")
+
+    def _classification_frame(
+        self,
+        variant: str,
+        *,
+        manifest: Mapping[str, Any] | None = None,
+        base_dir: Path | None = None,
+    ) -> pd.DataFrame:
+        config = (manifest or self.manifest).get("classification", {})
         relative = config.get("files", {}).get(variant)
         if not relative:
             raise KeyError(f"No saved classification data for variant '{variant}'.")
-        return pd.read_csv(self._base_file(relative))
+        return pd.read_csv(self._base_file(relative, base_dir))
 
-    def plot_confusion_matrix(self, variant: str) -> Path:
-        config = self.manifest["classification"]
-        frame = self._classification_frame(variant)
+    def plot_confusion_matrix(
+        self,
+        variant: str | None = None,
+        *,
+        run_dir: str | Path | None = None,
+        label: str | None = None,
+        preferred_variants: Sequence[str] = (),
+    ) -> Path:
+        if run_dir is None:
+            manifest = self.manifest
+            base_dir = self.base_dir
+        else:
+            base_dir = self._base_dir_from_run(run_dir)
+            manifest = self._read_manifest(base_dir)
+
+        config = manifest["classification"]
+        variant = variant or self._preferred_classification_variant(config, preferred_variants)
+        frame = self._classification_frame(variant, manifest=manifest, base_dir=base_dir)
         labels = sorted(set(frame["y_true"]).union(frame["y_pred"]))
         cm = confusion_matrix(frame["y_true"], frame["y_pred"], labels=labels)
         row_sums = cm.sum(axis=1, keepdims=True)
         normalized = np.divide(cm, row_sums, out=np.zeros_like(cm, dtype=float), where=row_sums != 0) * 100
         names = config.get("class_name_map", {})
         display = [names.get(str(int(x)) if float(x).is_integer() else str(x), str(x)) for x in labels]
+        plot_label = label or variant
 
         fig, ax = plt.subplots(figsize=(6 + 0.35 * len(labels), 4.8 + 0.35 * len(labels)))
         sns.heatmap(normalized, annot=True, fmt=".0f", cmap="Blues", vmin=0, vmax=100,
                     xticklabels=display, yticklabels=display, cbar_kws={"label": "Row-normalized (%)"}, ax=ax)
-        ax.set(xlabel="Predicted", ylabel="True", title=f"{config['selected_model']} — {variant}")
+        ax.set(xlabel="Predicted", ylabel="True", title=f"{config['selected_model']} — {plot_label}")
         ax.tick_params(axis="x", rotation=45)
         fig.tight_layout()
-        return self._save(fig, f"confusion_matrix_{self._safe_name(variant)}.pdf")
+        return self._save(fig, f"confusion_matrix_{self._safe_name(plot_label)}.pdf")
 
-    def plot_confusion_matrices(self) -> list[Path]:
+    def plot_confusion_matrices(
+        self,
+        uncorrected_run_dir: str | Path | None = None,
+    ) -> list[Path]:
         config = self.manifest.get("classification", {})
         variants = list(config.get("files", {}))
         if config.get("is_b_all"):
             preferred = config.get("curve_variant")
             variants = [preferred] if preferred in variants else variants[:1]
+            return [self.plot_confusion_matrix(variant) for variant in variants]
+
+        uncorrected_run_dir = uncorrected_run_dir or self.uncorrected_run_dir
+        if uncorrected_run_dir is not None:
+            corrected_variant = self._preferred_classification_variant(
+                config,
+                preferred=("corrected", "holdout_test"),
+            )
+            return [
+                self.plot_confusion_matrix(corrected_variant, label="corrected"),
+                self.plot_confusion_matrix(
+                    run_dir=uncorrected_run_dir,
+                    label="uncorrected",
+                    preferred_variants=("uncorrected", "corrected", "holdout_test"),
+                ),
+            ]
+
         return [self.plot_confusion_matrix(variant) for variant in variants]
 
     @staticmethod
