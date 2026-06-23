@@ -37,11 +37,13 @@ class PlottingFramework:
         matplotlib.rcParams["pdf.fonttype"] = 42
         matplotlib.rcParams["ps.fonttype"] = 42
         run_dir = Path(run_dir)
+        self.run_dir = run_dir.parent if run_dir.name == "pdf_plots" else run_dir
         self.pdf_dir = run_dir if run_dir.name == "pdf_plots" else run_dir / "pdf_plots"
         self.base_dir = self.pdf_dir / "base_files"
         self.output_dir = Path(output_dir) if output_dir else self.pdf_dir / "publication"
         self.uncorrected_run_dir = Path(uncorrected_run_dir) if uncorrected_run_dir else None
         self.manifest = self._read_manifest(self.base_dir)
+        self.selected_model = self.manifest.get("classification", {}).get("selected_model")
 
     @staticmethod
     def _base_dir_from_run(run_dir: str | Path) -> Path:
@@ -116,6 +118,7 @@ class PlottingFramework:
         is_b_all: bool,
         curve_variant: str = "corrected",
         curve_models: Optional[Mapping[str, Mapping[str, Any]]] = None,
+        curve_source: str | None = None,
     ) -> Path:
         """Persist y_true, y_pred and y_proba for each available evaluation."""
         base_dir = Path(base_dir)
@@ -174,6 +177,7 @@ class PlottingFramework:
                 "class_name_map": {str(k): str(v) for k, v in class_name_map.items()},
                 "is_b_all": bool(is_b_all),
                 "curve_variant": curve_variant if curve_variant in files else next(iter(files), None),
+                "curve_source": curve_source,
                 "curve_files": curve_files,
                 "curve_model_order": list(curve_files),
             },
@@ -340,6 +344,30 @@ class PlottingFramework:
     def _display_model_name(name: Any) -> str:
         return str(name).replace("_", " ").strip().title()
 
+    def _is_selected_model(self, model: Any) -> bool:
+        return self.selected_model is not None and str(model) == str(self.selected_model)
+
+    @staticmethod
+    def _sort_curve_items(
+        items: list[tuple[Any, np.ndarray, float]],
+    ) -> list[tuple[Any, np.ndarray, float]]:
+        return sorted(items, key=lambda item: item[2], reverse=True)
+
+    def _style_curve_legend(self, ax, items: Sequence[tuple[Any, np.ndarray, float]]):
+        legend = ax.legend(fontsize=8)
+        if legend is None:
+            return None
+        for text, (model, _, _) in zip(legend.get_texts(), items):
+            if self._is_selected_model(model):
+                text.set_fontweight("bold")
+        return legend
+
+    @staticmethod
+    def _read_table(path: str | Path, *, index_col: int | str | None = None) -> pd.DataFrame:
+        path = Path(path)
+        sep = "\t" if path.suffix.lower() in {".tsv", ".txt"} else ","
+        return pd.read_csv(path, sep=sep, index_col=index_col, low_memory=False)
+
     def _curve_arrays_from_file(self, relative: str) -> tuple[np.ndarray, np.ndarray, list[str]]:
         frame = pd.read_csv(self._base_file(relative))
         probability_columns = [c for c in frame.columns if c.startswith("proba__")]
@@ -349,9 +377,285 @@ class PlottingFramework:
             [c.split("proba__", 1)[1] for c in probability_columns],
         )
 
+    def _prediction_model_name(self, model_name: str | None = None) -> str | None:
+        if model_name:
+            return str(model_name)
+
+        pred_dir = self.run_dir / "survival_prediction"
+        htmls = sorted(pred_dir.glob("*_survival_prediction.html"))
+        if htmls:
+            suffix = "_survival_prediction"
+            stem = htmls[0].stem
+            return stem[: -len(suffix)] if stem.endswith(suffix) else stem
+
+        selected = self.manifest.get("classification", {}).get("selected_model")
+        if selected:
+            return str(selected)
+
+        models = sorted((self.run_dir / "train_artifacts").glob("*.joblib"))
+        return models[0].stem if models else None
+
+    def _load_truth_labels(
+        self,
+        true_label_path: str | Path,
+        *,
+        label_col: str | None = None,
+        sample_col: str | None = None,
+    ) -> pd.Series:
+        frame = self._read_table(true_label_path)
+        if sample_col is not None:
+            if sample_col not in frame.columns:
+                raise KeyError(f"sample_col '{sample_col}' was not found in {true_label_path}.")
+            frame = frame.set_index(sample_col)
+        else:
+            sample_candidates = {"sample", "sample_id", "sampleid", "patient", "patient_id", "id"}
+            first_col = str(frame.columns[0]).casefold() if len(frame.columns) else ""
+            if first_col in sample_candidates:
+                frame = frame.set_index(frame.columns[0])
+            else:
+                indexed = self._read_table(true_label_path, index_col=0)
+                if label_col is None or label_col in indexed.columns or indexed.shape[1] == 1:
+                    frame = indexed
+
+        if label_col is None:
+            candidates = ["y_true", "true_label", "label", "class", "cluster", "subtype"]
+            label_col = next((col for col in candidates if col in frame.columns), None)
+            if label_col is None and frame.shape[1] == 1:
+                label_col = str(frame.columns[0])
+        if label_col is None or label_col not in frame.columns:
+            raise KeyError(
+                "Could not determine the true-label column. Pass label_col='...' "
+                f"for {true_label_path}. Available columns: {list(frame.columns)}"
+            )
+
+        labels = frame[label_col].dropna()
+        labels.index = labels.index.map(str)
+        return labels
+
+    def _align_truth_to_probability_labels(
+        self,
+        truth: pd.Series,
+        probability_labels: Sequence[Any],
+    ) -> pd.Series:
+        labels_as_str = {str(label) for label in probability_labels}
+        out = truth.astype("string")
+        if set(out.dropna().astype(str)).intersection(labels_as_str):
+            return out.astype(str)
+
+        class_name_map = self.manifest.get("classification", {}).get("class_name_map", {})
+        reverse = {str(v): str(k) for k, v in class_name_map.items()}
+        mapped = out.astype(str).map(reverse)
+        if mapped.notna().any():
+            return mapped.fillna(out.astype(str))
+        return out.astype(str)
+
+    def _prediction_probability_frame(self, model_name: str | None = None) -> tuple[str, pd.DataFrame]:
+        pred_dir = self.run_dir / "survival_prediction"
+        pred_dir.mkdir(parents=True, exist_ok=True)
+        model_name = self._prediction_model_name(model_name)
+        if not model_name:
+            raise FileNotFoundError("Could not determine the prediction model name.")
+
+        proba_path = pred_dir / "model_probabilities.csv"
+        if proba_path.exists():
+            proba = self._read_table(proba_path, index_col=0)
+            proba.index = proba.index.map(str)
+            return model_name, proba
+
+        model_path = self.run_dir / "train_artifacts" / f"{model_name}.joblib"
+        matrix_path = self.run_dir / "limma_re-correction" / "limma_corrected_expression.csv"
+        prediction_path = pred_dir / "model_predictions.csv"
+        missing = [str(path) for path in (model_path, matrix_path) if not path.exists()]
+        if missing:
+            raise FileNotFoundError(
+                "Could not rebuild prediction probabilities from this run; missing "
+                + ", ".join(missing)
+            )
+
+        import joblib
+        from omiclass.utils.io import load_matrix
+
+        model = joblib.load(model_path)
+        expr = load_matrix(matrix_path)
+        X = expr.T
+        X.index = X.index.map(str)
+        if prediction_path.exists():
+            pred_index = self._read_table(prediction_path, index_col=0).index.map(str)
+            X = X.loc[[sample for sample in pred_index if sample in X.index]]
+        expected_features = getattr(model, "feature_names_in_", None)
+        if expected_features is None:
+            expected_features = getattr(model, "_feature_names_in", None)
+        if expected_features is not None:
+            X = X.reindex(columns=expected_features)
+        X = X.fillna(0.0)
+
+        if not hasattr(model, "predict_proba"):
+            raise AttributeError(f"Model '{model_name}' does not expose predict_proba().")
+        probabilities = model.predict_proba(X)
+        columns = list(getattr(model, "classes_", range(probabilities.shape[1])))
+        proba = pd.DataFrame(probabilities, index=X.index, columns=columns)
+        proba.to_csv(proba_path)
+        return model_name, proba
+
+    def _prediction_model_arrays(
+        self,
+        true_label_path: str | Path,
+        *,
+        label_col: str | None = None,
+        sample_col: str | None = None,
+        model_name: str | None = None,
+    ) -> list[tuple[str, np.ndarray, np.ndarray, list[str]]]:
+        model_name, proba = self._prediction_probability_frame(model_name)
+        truth = self._load_truth_labels(
+            true_label_path,
+            label_col=label_col,
+            sample_col=sample_col,
+        )
+        common = proba.index.intersection(truth.index)
+        if common.empty:
+            raise ValueError(
+                "No overlapping sample IDs between prediction probabilities and true labels."
+            )
+
+        proba = proba.loc[common]
+        truth = self._align_truth_to_probability_labels(truth.loc[common], proba.columns)
+
+        pred_dir = self.base_dir / "prediction" / "curves"
+        pred_dir.mkdir(parents=True, exist_ok=True)
+        frame = pd.DataFrame({"sample_id": common, "y_true": truth.to_numpy()})
+        labels = [str(col) for col in proba.columns]
+        for col in proba.columns:
+            frame[f"proba__{col}"] = proba[col].to_numpy(dtype=float)
+        filename = f"{self._safe_name(model_name)}.csv"
+        frame.to_csv(pred_dir / filename, index=False)
+
+        prediction = dict(self.manifest.get("prediction", {}))
+        prediction.update(
+            {
+                "curve_files": {model_name: f"prediction/curves/{filename}"},
+                "curve_model_order": [model_name],
+                "curve_source": "clean_and_predict",
+                "truth_label_path": str(true_label_path),
+            }
+        )
+        self._update_manifest(self.base_dir, prediction=prediction)
+        self.manifest = self._read_manifest(self.base_dir)
+
+        return [(model_name, truth.to_numpy(), proba.to_numpy(dtype=float), labels)]
+
+    def _recover_holdout_curve_files(self) -> bool:
+        """Backfill all-model holdout curve CSVs from existing training-run artifacts."""
+        try:
+            cfg_path = self.run_dir / "config.freeze.yaml"
+            split_path = self.run_dir / "split.json"
+            matrix_path = self.run_dir / "limma_correction" / "limma_corrected_expression.csv"
+            model_dir = self.run_dir / "train_artifacts"
+            missing = [
+                str(path)
+                for path in (cfg_path, split_path, matrix_path, model_dir)
+                if not path.exists()
+            ]
+            if missing:
+                print(
+                    "[PlottingFramework] Could not recover all-model holdout PR/ROC "
+                    f"base files; missing: {', '.join(missing)}"
+                )
+                return False
+
+            import joblib
+            import yaml
+            from omiclass.config.schema import Config
+            from omiclass.eval.holdout import evaluate_holdout
+            from omiclass.utils.io import load_labels, load_matrix
+
+            cfg = Config.model_validate(yaml.safe_load(cfg_path.read_text(encoding="utf-8")) or {})
+            split = json.loads(split_path.read_text(encoding="utf-8"))
+            test_index = [str(sample) for sample in split.get("test_index", [])]
+            if not test_index:
+                print("[PlottingFramework] Could not recover holdout curves; split.json has no test_index.")
+                return False
+
+            expr = load_matrix(matrix_path)
+            X_all = expr.T
+            X_all.index = X_all.index.map(str)
+            y_all, common_index = load_labels(
+                cfg.project.meta_path,
+                cfg.project.cluster_column,
+                X_all.index,
+                cfg=cfg,
+            )
+            common_index = common_index.map(str)
+            X_all = X_all.loc[common_index]
+            y_all.index = y_all.index.map(str)
+            y_all = y_all.loc[common_index]
+
+            available_test = [sample for sample in test_index if sample in X_all.index]
+            if not available_test:
+                print("[PlottingFramework] Could not recover holdout curves; no test samples match the saved matrix.")
+                return False
+
+            X_test = X_all.loc[available_test]
+            y_test = y_all.loc[available_test]
+            model_paths = sorted(model_dir.glob("*.joblib"))
+            if not model_paths:
+                print(f"[PlottingFramework] Could not recover holdout curves; no .joblib models in {model_dir}.")
+                return False
+
+            curve_dir = self.base_dir / "classification" / "curves"
+            curve_dir.mkdir(parents=True, exist_ok=True)
+            curve_files: dict[str, str] = {}
+
+            for model_path in model_paths:
+                model_name = model_path.stem
+                report = evaluate_holdout(joblib.load(model_path), X_test, y_test)
+                payload = report["plot_payload"]
+                y_true = np.asarray(y_test).reshape(-1)
+                probabilities = np.asarray(payload["y_proba"])
+                labels = list(payload.get("labels") or sorted(np.unique(y_true.astype(int))))
+                if probabilities.ndim == 1:
+                    probabilities = np.column_stack([1.0 - probabilities, probabilities])
+                if probabilities.shape[1] != len(labels):
+                    labels = [str(i) for i in range(probabilities.shape[1])]
+
+                frame = pd.DataFrame({"y_true": y_true})
+                for col, label in enumerate(labels):
+                    frame[f"proba__{label}"] = probabilities[:, col]
+                filename = f"{self._safe_name(model_name)}.csv"
+                frame.to_csv(curve_dir / filename, index=False)
+                curve_files[model_name] = f"classification/curves/{filename}"
+
+            classification = dict(self.manifest.get("classification", {}))
+            classification.update(
+                {
+                    "curve_files": curve_files,
+                    "curve_model_order": list(curve_files),
+                    "curve_source": "holdout_test_recovered",
+                }
+            )
+            self._update_manifest(self.base_dir, classification=classification)
+            self.manifest = self._read_manifest(self.base_dir)
+            print(
+                "[PlottingFramework] Recovered all-model holdout PR/ROC base files "
+                f"for {len(curve_files)} models."
+            )
+            return True
+        except Exception as exc:
+            print(
+                "[PlottingFramework] Could not recover all-model holdout PR/ROC "
+                f"base files from existing run artifacts: {exc}"
+            )
+            return False
+
     def _curve_model_arrays(self) -> list[tuple[str, np.ndarray, np.ndarray, list[str]]]:
         config = self.manifest["classification"]
         curve_files = config.get("curve_files") or {}
+        curve_source = str(config.get("curve_source") or "")
+        needs_holdout_recovery = not curve_files or (
+            bool(curve_files) and not curve_source.startswith("holdout_test")
+        )
+        if needs_holdout_recovery and self._recover_holdout_curve_files():
+            config = self.manifest["classification"]
+            curve_files = config.get("curve_files") or {}
         if curve_files:
             model_order = config.get("curve_model_order") or list(curve_files)
             return [
@@ -384,6 +688,7 @@ class PlottingFramework:
                 items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
         if not items:
             raise ValueError("PR curve requires at least one class with positive and negative samples.")
+        items = self._sort_curve_items(items)
         fig, ax = plt.subplots(figsize=(6.5, 5))
         for model, curve, score in items:
             display_name = self._display_model_name(model)
@@ -393,7 +698,7 @@ class PlottingFramework:
                 label=f"{display_name} (AUPRC={score:.3f})",
             )
         ax.set(xlabel="Recall", ylabel="Precision")
-        ax.legend(fontsize=8)
+        self._style_curve_legend(ax, items)
         fig.tight_layout()
         return self._save(fig, "precision_recall_curve.pdf", show=show)
 
@@ -413,6 +718,7 @@ class PlottingFramework:
                 items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
         if not items:
             raise ValueError("ROC curve requires at least one class with positive and negative samples.")
+        items = self._sort_curve_items(items)
         fig, ax = plt.subplots(figsize=(6.5, 5))
         ax.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="0.5")
         for model, curve, score in items:
@@ -423,11 +729,123 @@ class PlottingFramework:
                 label=f"{display_name} (AUROC={score:.3f})",
             )
         ax.set(xlabel="False Positive Rate", ylabel="True Positive Rate")
-        ax.legend(fontsize=8)
+        self._style_curve_legend(ax, items)
         fig.tight_layout()
         return self._save(fig, "roc_curve.pdf", show=show)
 
-    def plot_pc_metadata_heatmaps(self, show: bool = False) -> list[Path]:
+    def plot_prediction_pr_curve(
+        self,
+        true_label_path: str | Path,
+        *,
+        label_col: str | None = None,
+        sample_col: str | None = None,
+        model_name: str | None = None,
+        show: bool = False,
+    ) -> Path:
+        recall_grid = np.linspace(0, 1, 500)
+        items = []
+        for model, y_true, probabilities, labels in self._prediction_model_arrays(
+            true_label_path,
+            label_col=label_col,
+            sample_col=sample_col,
+            model_name=model_name,
+        ):
+            curves, scores = [], []
+            for col, label in enumerate(labels):
+                binary = (y_true.astype(str) == str(label)).astype(int)
+                if np.unique(binary).size < 2:
+                    continue
+                precision, recall, _ = precision_recall_curve(binary, probabilities[:, col])
+                order = np.argsort(recall)
+                curves.append(np.interp(recall_grid, recall[order], precision[order]))
+                scores.append(average_precision_score(binary, probabilities[:, col]))
+            if curves:
+                items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
+        if not items:
+            raise ValueError("Prediction PR curve requires at least one class with positive and negative samples.")
+
+        items = self._sort_curve_items(items)
+        fig, ax = plt.subplots(figsize=(6.5, 5))
+        for model, curve, score in items:
+            display_name = self._display_model_name(model)
+            ax.plot(recall_grid, curve, label=f"{display_name} (AUPRC={score:.3f})")
+        ax.set(xlabel="Recall", ylabel="Precision", title="Prediction set precision-recall")
+        self._style_curve_legend(ax, items)
+        fig.tight_layout()
+        return self._save(fig, "prediction_precision_recall_curve.pdf", show=show)
+
+    def plot_prediction_roc_curve(
+        self,
+        true_label_path: str | Path,
+        *,
+        label_col: str | None = None,
+        sample_col: str | None = None,
+        model_name: str | None = None,
+        show: bool = False,
+    ) -> Path:
+        fpr_grid = np.linspace(0, 1, 500)
+        items = []
+        for model, y_true, probabilities, labels in self._prediction_model_arrays(
+            true_label_path,
+            label_col=label_col,
+            sample_col=sample_col,
+            model_name=model_name,
+        ):
+            curves, scores = [], []
+            for col, label in enumerate(labels):
+                binary = (y_true.astype(str) == str(label)).astype(int)
+                if np.unique(binary).size < 2:
+                    continue
+                fpr, tpr, _ = roc_curve(binary, probabilities[:, col])
+                curves.append(np.interp(fpr_grid, fpr, tpr, left=0, right=1))
+                scores.append(auc(fpr, tpr))
+            if curves:
+                items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
+        if not items:
+            raise ValueError("Prediction ROC curve requires at least one class with positive and negative samples.")
+
+        items = self._sort_curve_items(items)
+        fig, ax = plt.subplots(figsize=(6.5, 5))
+        ax.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="0.5")
+        for model, curve, score in items:
+            display_name = self._display_model_name(model)
+            ax.plot(fpr_grid, curve, label=f"{display_name} (AUROC={score:.3f})")
+        ax.set(xlabel="False Positive Rate", ylabel="True Positive Rate", title="Prediction set ROC")
+        self._style_curve_legend(ax, items)
+        fig.tight_layout()
+        return self._save(fig, "prediction_roc_curve.pdf", show=show)
+
+    def plot_prediction_curves(
+        self,
+        true_label_path: str | Path,
+        *,
+        label_col: str | None = None,
+        sample_col: str | None = None,
+        model_name: str | None = None,
+        show: bool = False,
+    ) -> list[Path]:
+        return [
+            self.plot_prediction_pr_curve(
+                true_label_path,
+                label_col=label_col,
+                sample_col=sample_col,
+                model_name=model_name,
+                show=show,
+            ),
+            self.plot_prediction_roc_curve(
+                true_label_path,
+                label_col=label_col,
+                sample_col=sample_col,
+                model_name=model_name,
+                show=show,
+            ),
+        ]
+
+    def plot_pc_metadata_heatmaps(
+        self,
+        show: bool = False,
+        filename_prefix: str = "",
+    ) -> list[Path]:
         config = self.manifest.get("pca", {})
         frames = {
             "before": pd.read_csv(self._base_file(config["before_associations"]), index_col=0),
@@ -447,10 +865,15 @@ class PlottingFramework:
             sns.heatmap(frame, annot=True, cmap="viridis", vmin=0, vmax=vmax, ax=ax)
             ax.set(xlabel="Metadata variables", ylabel="Principal components", title=f"PC associations — {state} correction")
             fig.tight_layout()
-            paths.append(self._save(fig, f"pc_metadata_associations_{state}.pdf", show=show))
+            paths.append(self._save(fig, f"{filename_prefix}pc_metadata_associations_{state}.pdf", show=show))
         return paths
 
-    def plot_pca_scatter(self, state: str, show: bool = False) -> Path:
+    def plot_pca_scatter(
+        self,
+        state: str,
+        show: bool = False,
+        filename_prefix: str = "",
+    ) -> Path:
         if state not in {"before", "after"}:
             raise ValueError("state must be 'before' or 'after'")
         config = self.manifest["pca"]
@@ -468,10 +891,45 @@ class PlottingFramework:
         sns.scatterplot(data=frame, x="PC1", y="PC2", hue=cohort, s=45, ax=ax)
         ax.set(xlabel=x_label, ylabel=y_label, title=f"PCA by {cohort} — {state} correction")
         fig.tight_layout()
-        return self._save(fig, f"pca_pc1_pc2_{state}.pdf", show=show)
+        return self._save(fig, f"{filename_prefix}pca_pc1_pc2_{state}.pdf", show=show)
 
-    def plot_pca_scatters(self, show: bool = False) -> list[Path]:
-        return [self.plot_pca_scatter("before", show=show), self.plot_pca_scatter("after", show=show)]
+    def plot_pca_scatters(
+        self,
+        show: bool = False,
+        filename_prefix: str = "",
+    ) -> list[Path]:
+        return [
+            self.plot_pca_scatter("before", show=show, filename_prefix=filename_prefix),
+            self.plot_pca_scatter("after", show=show, filename_prefix=filename_prefix),
+        ]
+
+    def plot_prediction_pca_scatters(self, show: bool = False) -> list[Path]:
+        return self.plot_pca_scatters(show=show, filename_prefix="prediction_")
+
+    def plot_prediction_pc_metadata_heatmaps(self, show: bool = False) -> list[Path]:
+        return self.plot_pc_metadata_heatmaps(show=show, filename_prefix="prediction_")
+
+    def generate_prediction_plots(
+        self,
+        true_label_path: str | Path,
+        *,
+        label_col: str | None = None,
+        sample_col: str | None = None,
+        model_name: str | None = None,
+        show: bool = False,
+    ) -> list[Path]:
+        paths = self.plot_prediction_curves(
+            true_label_path,
+            label_col=label_col,
+            sample_col=sample_col,
+            model_name=model_name,
+            show=show,
+        )
+        if self.manifest.get("pca"):
+            paths.extend(self.plot_prediction_pc_metadata_heatmaps(show=show))
+            if self.manifest["pca"].get("cohort_column"):
+                paths.extend(self.plot_prediction_pca_scatters(show=show))
+        return paths
 
     def generate_all(self, show: bool = False) -> list[Path]:
         paths: list[Path] = []
