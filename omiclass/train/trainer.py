@@ -725,25 +725,55 @@ class Trainer:
         lgbm_cw_file_name = self.cfg.models.light_gbm.weighted_filename
         xgb_cw_file_name = self.cfg.models.xgboost.weighted_filename
 
+        model_keys_by_severity = {
+            Severity.BALANCED: (
+                "plain_random_forest",
+                "light_gbm",
+                "xgboost",
+                "stacked_ensemble",
+            ),
+            Severity.MILD: (
+                "plain_random_forest",
+                "weighted_random_forest",
+                "light_gbm",
+                "weighted_light_gbm",
+                "xgboost",
+                "weighted_xgboost",
+                "stacked_ensemble",
+            ),
+            Severity.SEVERE: (
+                "plain_random_forest",
+                "weighted_random_forest",
+                "smote_random_forest",
+                "adasyn_random_forest",
+                "svm_smote_random_forest",
+                "bl_smote_random_forest",
+                "light_gbm",
+                "weighted_light_gbm",
+                "xgboost",
+                "weighted_xgboost",
+                "stacked_ensemble",
+            ),
+        }
+        selected_model_keys = model_keys_by_severity[sev]
+
         if self.cfg.surface_markers.enabled:
             sm_genes = apply_surface_marker_filter_with_min(X.columns.tolist(), min_features=self.cfg.runtime.min_features)
             X = X.loc[:, sm_genes]
 
-        if sev == Severity.BALANCED:
-            # Skip resampling models entirely
-            variants = [
-                ("plain_random_forest",    rf_var.plain_random_forest.filename),
-                ("weighted_random_forest", rf_var.weighted_random_forest.filename),
-            ]
-        else:  # Severity.SEVERE or Severity.MILD
-            variants = [
-                ("plain_random_forest",       rf_var.plain_random_forest.filename),
-                ("weighted_random_forest",    rf_var.weighted_random_forest.filename),
-                ("smote_random_forest",       rf_var.smote_random_forest.filename),
-                ("adasyn_random_forest",      rf_var.adasyn_random_forest.filename),
-                ("svm_smote_random_forest",   rf_var.svm_smote_random_forest.filename),
-                ("bl_smote_random_forest",    rf_var.bl_smote_random_forest.filename),
-            ]
+        rf_filenames = {
+            "plain_random_forest": rf_var.plain_random_forest.filename,
+            "weighted_random_forest": rf_var.weighted_random_forest.filename,
+            "smote_random_forest": rf_var.smote_random_forest.filename,
+            "adasyn_random_forest": rf_var.adasyn_random_forest.filename,
+            "svm_smote_random_forest": rf_var.svm_smote_random_forest.filename,
+            "bl_smote_random_forest": rf_var.bl_smote_random_forest.filename,
+        }
+        variants = [
+            (key, rf_filenames[key])
+            for key in selected_model_keys
+            if key in rf_filenames
+        ]
         rows: list[dict] = []
         paths: dict[str, Path] = {}
         i = 1
@@ -759,57 +789,61 @@ class Trainer:
                 rows.append(_failed_row(key, e))
 
         #--- LightGBM ---
-        try:
-            row, p = self.run_boosting("light_gbm", X, y, filename_for_artifact=lgbm_file_name, model_conf=self.cfg.models.light_gbm)
-            row["status"] = "ok"
-            row["error"] = ""
-            rows.append(row)
-            paths["light_gbm"] = p
-        except Exception as e:
-            print(traceback.format_exc())
-            rows.append(_failed_row("light_gbm", e))
-        try:
-            row, p = self.run_boosting(
-                "weighted_light_gbm",
-                X,
-                y,
-                filename_for_artifact=lgbm_cw_file_name,
-                model_conf=self.cfg.models.light_gbm,
-            )
-            row["status"] = "ok"
-            row["error"] = ""
-            rows.append(row)
-            paths["weighted_light_gbm"] = p
-        except Exception as e:
-            print(traceback.format_exc())
-            rows.append(_failed_row("weighted_light_gbm", e))
+        if "light_gbm" in selected_model_keys:
+            try:
+                row, p = self.run_boosting("light_gbm", X, y, filename_for_artifact=lgbm_file_name, model_conf=self.cfg.models.light_gbm)
+                row["status"] = "ok"
+                row["error"] = ""
+                rows.append(row)
+                paths["light_gbm"] = p
+            except Exception as e:
+                print(traceback.format_exc())
+                rows.append(_failed_row("light_gbm", e))
+        if "weighted_light_gbm" in selected_model_keys:
+            try:
+                row, p = self.run_boosting(
+                    "weighted_light_gbm",
+                    X,
+                    y,
+                    filename_for_artifact=lgbm_cw_file_name,
+                    model_conf=self.cfg.models.light_gbm,
+                )
+                row["status"] = "ok"
+                row["error"] = ""
+                rows.append(row)
+                paths["weighted_light_gbm"] = p
+            except Exception as e:
+                print(traceback.format_exc())
+                rows.append(_failed_row("weighted_light_gbm", e))
 
         # --- XGBoost ---
-        try:
-            row, p = self.run_boosting("xgboost", X, y, filename_for_artifact=xgboost_file_name, model_conf=self.cfg.models.xgboost)
-            row["status"] = "ok"
-            row["error"] = ""
-            rows.append(row)
-            paths["xgboost"] = p
-        except Exception as e:
-            print(traceback.format_exc())
-            rows.append(_failed_row("xgboost", e))
+        if "xgboost" in selected_model_keys:
+            try:
+                row, p = self.run_boosting("xgboost", X, y, filename_for_artifact=xgboost_file_name, model_conf=self.cfg.models.xgboost)
+                row["status"] = "ok"
+                row["error"] = ""
+                rows.append(row)
+                paths["xgboost"] = p
+            except Exception as e:
+                print(traceback.format_exc())
+                rows.append(_failed_row("xgboost", e))
 
-        try:
-            row, p = self.run_boosting(
-                "weighted_xgboost",
-                X,
-                y,
-                filename_for_artifact=xgb_cw_file_name,
-                model_conf=self.cfg.models.xgboost,
-            )
-            row["status"] = "ok"
-            row["error"] = ""
-            rows.append(row)
-            paths["weighted_xgboost"] = p
-        except Exception as e:
-            print(traceback.format_exc())
-            rows.append(_failed_row("weighted_xgboost", e))
+        if "weighted_xgboost" in selected_model_keys:
+            try:
+                row, p = self.run_boosting(
+                    "weighted_xgboost",
+                    X,
+                    y,
+                    filename_for_artifact=xgb_cw_file_name,
+                    model_conf=self.cfg.models.xgboost,
+                )
+                row["status"] = "ok"
+                row["error"] = ""
+                rows.append(row)
+                paths["weighted_xgboost"] = p
+            except Exception as e:
+                print(traceback.format_exc())
+                rows.append(_failed_row("weighted_xgboost", e))
 
         # --- Stacked ensemble (only if prerequisites exist) ---
         have_rf = any(k.endswith("random_forest") and (k in self.final_models) for k, _ in variants)
@@ -817,7 +851,7 @@ class Trainer:
         have_lgbm = any(k in self.final_models for k in ["light_gbm", "weighted_light_gbm"])
 
 
-        if have_rf and have_xgb and have_lgbm:
+        if "stacked_ensemble" in selected_model_keys and have_rf and have_xgb and have_lgbm:
             try:
                 row, p = self.run_stacked("stacked_ensemble", X, y, filename_for_artifact=stacked_file_name, model_conf=self.cfg.models.stacked_ensemble)
                 row["status"] = "ok"
@@ -826,7 +860,7 @@ class Trainer:
                 paths["stacked_ensemble"] = p
             except Exception as e:
                 rows.append(_failed_row("stacked_ensemble", e))
-        else:
+        elif "stacked_ensemble" in selected_model_keys:
             missing = []
             if not have_rf: missing.append("rf")
             if not have_lgbm: missing.append("light_gbm")
