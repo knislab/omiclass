@@ -395,6 +395,26 @@ class PlottingFramework:
         models = sorted((self.run_dir / "train_artifacts").glob("*.joblib"))
         return models[0].stem if models else None
 
+    def _prediction_model_paths(self, model_name: str | None = None) -> list[Path]:
+        model_dir = self.run_dir / "train_artifacts"
+        if model_name is not None:
+            path = model_dir / f"{model_name}.joblib"
+            if not path.exists():
+                raise FileNotFoundError(f"Prediction model artifact not found: {path}")
+            return [path]
+
+        paths = sorted(model_dir.glob("*.joblib"))
+        if paths:
+            return paths
+
+        selected = self._prediction_model_name()
+        if selected is None:
+            raise FileNotFoundError(f"No .joblib model artifacts found in {model_dir}.")
+        path = model_dir / f"{selected}.joblib"
+        if not path.exists():
+            raise FileNotFoundError(f"Prediction model artifact not found: {path}")
+        return [path]
+
     def _load_truth_labels(
         self,
         true_label_path: str | Path,
@@ -449,53 +469,72 @@ class PlottingFramework:
             return mapped.fillna(out.astype(str))
         return out.astype(str)
 
-    def _prediction_probability_frame(self, model_name: str | None = None) -> tuple[str, pd.DataFrame]:
+    def _prediction_matrix_for_models(self) -> pd.DataFrame:
         pred_dir = self.run_dir / "survival_prediction"
         pred_dir.mkdir(parents=True, exist_ok=True)
-        model_name = self._prediction_model_name(model_name)
-        if not model_name:
-            raise FileNotFoundError("Could not determine the prediction model name.")
-
-        proba_path = pred_dir / "model_probabilities.csv"
-        if proba_path.exists():
-            proba = self._read_table(proba_path, index_col=0)
-            proba.index = proba.index.map(str)
-            return model_name, proba
-
-        model_path = self.run_dir / "train_artifacts" / f"{model_name}.joblib"
         matrix_path = self.run_dir / "limma_re-correction" / "limma_corrected_expression.csv"
         prediction_path = pred_dir / "model_predictions.csv"
-        missing = [str(path) for path in (model_path, matrix_path) if not path.exists()]
-        if missing:
+        if not matrix_path.exists():
             raise FileNotFoundError(
                 "Could not rebuild prediction probabilities from this run; missing "
-                + ", ".join(missing)
+                f"{matrix_path}"
             )
 
-        import joblib
         from omiclass.utils.io import load_matrix
 
-        model = joblib.load(model_path)
         expr = load_matrix(matrix_path)
         X = expr.T
         X.index = X.index.map(str)
         if prediction_path.exists():
             pred_index = self._read_table(prediction_path, index_col=0).index.map(str)
             X = X.loc[[sample for sample in pred_index if sample in X.index]]
-        expected_features = getattr(model, "feature_names_in_", None)
-        if expected_features is None:
-            expected_features = getattr(model, "_feature_names_in", None)
-        if expected_features is not None:
-            X = X.reindex(columns=expected_features)
-        X = X.fillna(0.0)
+        return X
 
-        if not hasattr(model, "predict_proba"):
-            raise AttributeError(f"Model '{model_name}' does not expose predict_proba().")
-        probabilities = model.predict_proba(X)
-        columns = list(getattr(model, "classes_", range(probabilities.shape[1])))
-        proba = pd.DataFrame(probabilities, index=X.index, columns=columns)
-        proba.to_csv(proba_path)
-        return model_name, proba
+    def _prediction_probability_frames(
+        self,
+        model_name: str | None = None,
+    ) -> list[tuple[str, pd.DataFrame]]:
+        pred_dir = self.run_dir / "survival_prediction"
+        pred_dir.mkdir(parents=True, exist_ok=True)
+        proba_dir = pred_dir / "model_probabilities"
+        proba_dir.mkdir(parents=True, exist_ok=True)
+
+        import joblib
+
+        X_base = self._prediction_matrix_for_models()
+        frames: list[tuple[str, pd.DataFrame]] = []
+        for model_path in self._prediction_model_paths(model_name):
+            current_model_name = model_path.stem
+            proba_path = proba_dir / f"{self._safe_name(current_model_name)}.csv"
+            if proba_path.exists():
+                proba = self._read_table(proba_path, index_col=0)
+                proba.index = proba.index.map(str)
+                frames.append((current_model_name, proba))
+                continue
+
+            model = joblib.load(model_path)
+            X = X_base.copy()
+            expected_features = getattr(model, "feature_names_in_", None)
+            if expected_features is None:
+                expected_features = getattr(model, "_feature_names_in", None)
+            if expected_features is not None:
+                X = X.reindex(columns=expected_features)
+            X = X.fillna(0.0)
+
+            if not hasattr(model, "predict_proba"):
+                raise AttributeError(f"Model '{current_model_name}' does not expose predict_proba().")
+            probabilities = model.predict_proba(X)
+            columns = list(getattr(model, "classes_", range(probabilities.shape[1])))
+            proba = pd.DataFrame(probabilities, index=X.index, columns=columns)
+            proba.to_csv(proba_path)
+            frames.append((current_model_name, proba))
+        return frames
+
+    def _prediction_probability_frame(self, model_name: str | None = None) -> tuple[str, pd.DataFrame]:
+        frames = self._prediction_probability_frames(model_name)
+        if not frames:
+            raise FileNotFoundError("Could not build prediction probability frames.")
+        return frames[0]
 
     def _prediction_model_arrays(
         self,
@@ -505,35 +544,53 @@ class PlottingFramework:
         sample_col: str | None = None,
         model_name: str | None = None,
     ) -> list[tuple[str, np.ndarray, np.ndarray, list[str]]]:
-        model_name, proba = self._prediction_probability_frame(model_name)
         truth = self._load_truth_labels(
             true_label_path,
             label_col=label_col,
             sample_col=sample_col,
         )
-        common = proba.index.intersection(truth.index)
-        if common.empty:
+        pred_dir = self.base_dir / "prediction" / "curves"
+        pred_dir.mkdir(parents=True, exist_ok=True)
+        curve_files: dict[str, str] = {}
+        arrays: list[tuple[str, np.ndarray, np.ndarray, list[str]]] = []
+
+        for current_model_name, proba in self._prediction_probability_frames(model_name):
+            common = proba.index.intersection(truth.index)
+            if common.empty:
+                continue
+
+            aligned_proba = proba.loc[common]
+            aligned_truth = self._align_truth_to_probability_labels(
+                truth.loc[common],
+                aligned_proba.columns,
+            )
+
+            frame = pd.DataFrame({"sample_id": common, "y_true": aligned_truth.to_numpy()})
+            labels = [str(col) for col in aligned_proba.columns]
+            for col in aligned_proba.columns:
+                frame[f"proba__{col}"] = aligned_proba[col].to_numpy(dtype=float)
+            filename = f"{self._safe_name(current_model_name)}.csv"
+            frame.to_csv(pred_dir / filename, index=False)
+            curve_files[current_model_name] = f"prediction/curves/{filename}"
+            arrays.append(
+                (
+                    current_model_name,
+                    aligned_truth.to_numpy(),
+                    aligned_proba.to_numpy(dtype=float),
+                    labels,
+                )
+            )
+
+        if not arrays:
             raise ValueError(
                 "No overlapping sample IDs between prediction probabilities and true labels."
             )
 
-        proba = proba.loc[common]
-        truth = self._align_truth_to_probability_labels(truth.loc[common], proba.columns)
-
-        pred_dir = self.base_dir / "prediction" / "curves"
-        pred_dir.mkdir(parents=True, exist_ok=True)
-        frame = pd.DataFrame({"sample_id": common, "y_true": truth.to_numpy()})
-        labels = [str(col) for col in proba.columns]
-        for col in proba.columns:
-            frame[f"proba__{col}"] = proba[col].to_numpy(dtype=float)
-        filename = f"{self._safe_name(model_name)}.csv"
-        frame.to_csv(pred_dir / filename, index=False)
-
         prediction = dict(self.manifest.get("prediction", {}))
         prediction.update(
             {
-                "curve_files": {model_name: f"prediction/curves/{filename}"},
-                "curve_model_order": [model_name],
+                "curve_files": curve_files,
+                "curve_model_order": list(curve_files),
                 "curve_source": "clean_and_predict",
                 "truth_label_path": str(true_label_path),
             }
@@ -541,7 +598,7 @@ class PlottingFramework:
         self._update_manifest(self.base_dir, prediction=prediction)
         self.manifest = self._read_manifest(self.base_dir)
 
-        return [(model_name, truth.to_numpy(), proba.to_numpy(dtype=float), labels)]
+        return arrays
 
     def _recover_holdout_curve_files(self) -> bool:
         """Backfill all-model holdout curve CSVs from existing training-run artifacts."""
@@ -845,12 +902,26 @@ class PlottingFramework:
         self,
         show: bool = False,
         filename_prefix: str = "",
+        column_order: Sequence[str] | None = None,
+
     ) -> list[Path]:
         config = self.manifest.get("pca", {})
         frames = {
             "before": pd.read_csv(self._base_file(config["before_associations"]), index_col=0),
             "after": pd.read_csv(self._base_file(config["after_associations"]), index_col=0),
         }
+        if column_order is not None:
+            requested = [col for col in column_order if col in next(iter(frames.values())).columns]
+
+            if not requested:
+                raise ValueError(
+                    "None of the requested column_order columns were found in the PC association heatmap."
+                )
+
+            frames = {
+                state: frame[[col for col in column_order if col in frame.columns]]
+                for state, frame in frames.items()
+            }
         vmax = config.get("heatmap_vmax")
         if vmax is None:
             finite = [df.to_numpy(dtype=float) for df in frames.values()]
