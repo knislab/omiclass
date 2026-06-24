@@ -347,11 +347,21 @@ class PlottingFramework:
     def _is_selected_model(self, model: Any) -> bool:
         return self.selected_model is not None and str(model) == str(self.selected_model)
 
-    @staticmethod
     def _sort_curve_items(
+        self,
         items: list[tuple[Any, np.ndarray, float]],
     ) -> list[tuple[Any, np.ndarray, float]]:
-        return sorted(items, key=lambda item: item[2], reverse=True)
+        return [
+            item
+            for _, item in sorted(
+                enumerate(items),
+                key=lambda indexed: (
+                    -indexed[1][2],
+                    0 if self._is_selected_model(indexed[1][0]) else 1,
+                    indexed[0],
+                ),
+            )
+        ]
 
     def _style_curve_legend(self, ax, items: Sequence[tuple[Any, np.ndarray, float]]):
         legend = ax.legend(fontsize=8)
