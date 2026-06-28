@@ -42,7 +42,12 @@ class PlottingFramework:
         self.base_dir = self.pdf_dir / "base_files"
         self.output_dir = Path(output_dir) if output_dir else self.pdf_dir / "publication"
         self.uncorrected_run_dir = Path(uncorrected_run_dir) if uncorrected_run_dir else None
-        self.manifest = self._read_manifest(self.base_dir)
+        try:
+            self.manifest = self._read_manifest(self.base_dir)
+        except FileNotFoundError:
+            if not ((self.run_dir / "train_artifacts" / "tables").exists() or (self.run_dir / "leaderboard.csv").exists()):
+                raise
+            self.manifest = {}
         self.selected_model = self.manifest.get("classification", {}).get("selected_model")
 
     @staticmethod
@@ -377,6 +382,151 @@ class PlottingFramework:
         path = Path(path)
         sep = "\t" if path.suffix.lower() in {".tsv", ".txt"} else ","
         return pd.read_csv(path, sep=sep, index_col=index_col, low_memory=False)
+
+    def _selected_model_from_outputs(self, model_name: str | None = None) -> str:
+        if model_name:
+            return str(model_name)
+        if self.selected_model:
+            return str(self.selected_model)
+
+        leaderboard_path = self.run_dir / "leaderboard.csv"
+        if leaderboard_path.exists():
+            leaderboard = self._read_table(leaderboard_path)
+            if "model" in leaderboard.columns:
+                candidates = leaderboard
+                if "status" in candidates.columns:
+                    ok = candidates["status"].astype(str).str.casefold().eq("ok")
+                    if ok.any():
+                        candidates = candidates.loc[ok]
+                if not candidates.empty:
+                    return str(candidates.iloc[0]["model"])
+
+        tables_dir = self.run_dir / "train_artifacts" / "tables"
+        metric_paths = sorted(tables_dir.glob("*_test_metrics.csv"))
+        metric_paths = [
+            path
+            for path in metric_paths
+            if not path.name.endswith("_threshold_optimized_test_metrics.csv")
+        ]
+        if len(metric_paths) == 1:
+            return metric_paths[0].name[: -len("_test_metrics.csv")]
+
+        raise FileNotFoundError(
+            "Could not determine the selected model from the PDF manifest, "
+            f"{leaderboard_path}, or {tables_dir}."
+        )
+
+    def _holdout_table_path(
+        self,
+        model_name: str,
+        table: str,
+        *,
+        threshold_optimized: bool = False,
+    ) -> Path:
+        if table not in {"test_metrics", "per_class"}:
+            raise ValueError("table must be 'test_metrics' or 'per_class'")
+
+        tables_dir = self.run_dir / "train_artifacts" / "tables"
+        suffix = (
+            f"_threshold_optimized_{table}.csv"
+            if threshold_optimized
+            else f"_{table}.csv"
+        )
+        path = tables_dir / f"{model_name}{suffix}"
+        if path.exists():
+            return path
+
+        available = sorted(path.name for path in tables_dir.glob(f"*{suffix}"))
+        raise FileNotFoundError(
+            f"Holdout {table.replace('_', ' ')} file not found for model '{model_name}': {path}. "
+            f"Available matching files: {available}"
+        )
+
+    @staticmethod
+    def _mean_metric(frame: pd.DataFrame, column: str) -> float:
+        if column not in frame.columns:
+            return float("nan")
+        values = pd.to_numeric(frame[column], errors="coerce")
+        return float(values.mean()) if values.notna().any() else float("nan")
+
+    def selected_model_holdout_test_scores(
+        self,
+        model_name: str | None = None,
+        *,
+        threshold_optimized: bool = False,
+    ) -> pd.DataFrame:
+        """Return selected-model holdout accuracy, macro precision, recall and F1.
+
+        Values are read from the existing ``train_artifacts/tables`` output
+        files. Precision, recall and F1 are macro averages over the saved
+        per-class table; F1 prefers the saved ``f1_macro`` value when present.
+        """
+        selected = self._selected_model_from_outputs(model_name)
+        metrics_path = self._holdout_table_path(
+            selected,
+            "test_metrics",
+            threshold_optimized=threshold_optimized,
+        )
+        per_class_path = self._holdout_table_path(
+            selected,
+            "per_class",
+            threshold_optimized=threshold_optimized,
+        )
+
+        metrics = self._read_table(metrics_path)
+        if metrics.empty:
+            raise ValueError(f"Holdout test metrics file is empty: {metrics_path}")
+        row = metrics.iloc[0]
+        per_class = self._read_table(per_class_path)
+
+        f1 = pd.to_numeric(pd.Series([row.get("f1_macro")]), errors="coerce").iloc[0]
+        if pd.isna(f1):
+            f1 = self._mean_metric(per_class, "f1")
+
+        scores = pd.DataFrame(
+            [
+                {
+                    "model": selected,
+                    "n_test": row.get("n_test", np.nan),
+                    "accuracy": row.get("accuracy", np.nan),
+                    "precision": self._mean_metric(per_class, "precision"),
+                    "recall": self._mean_metric(per_class, "recall"),
+                    "f1": f1,
+                }
+            ]
+        )
+        for column in ["n_test", "accuracy", "precision", "recall", "f1"]:
+            scores[column] = pd.to_numeric(scores[column], errors="coerce")
+        return scores
+
+    def print_selected_model_holdout_test_scores(
+        self,
+        model_name: str | None = None,
+        *,
+        threshold_optimized: bool = False,
+        digits: int = 4,
+    ) -> pd.DataFrame:
+        """Print selected-model holdout test scores and return them as a DataFrame."""
+        scores = self.selected_model_holdout_test_scores(
+            model_name=model_name,
+            threshold_optimized=threshold_optimized,
+        )
+        label = "threshold-optimized holdout" if threshold_optimized else "holdout"
+        print(f"Selected model {label} test scores (macro precision/recall/F1):")
+        float_formatter = lambda value: "" if pd.isna(value) else f"{value:.{digits}f}"
+        print(
+            scores.to_string(
+                index=False,
+                formatters={
+                    "n_test": lambda value: "" if pd.isna(value) else f"{value:.0f}",
+                    "accuracy": float_formatter,
+                    "precision": float_formatter,
+                    "recall": float_formatter,
+                    "f1": float_formatter,
+                },
+            )
+        )
+        return scores
 
     def _curve_arrays_from_file(self, relative: str) -> tuple[np.ndarray, np.ndarray, list[str]]:
         frame = pd.read_csv(self._base_file(relative))
