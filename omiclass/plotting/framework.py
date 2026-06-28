@@ -343,7 +343,7 @@ class PlottingFramework:
                 ),
             ]
 
-        return [self.plot_confusion_matrix(variant) for variant in variants]
+        return [self.plot_confusion_matrix(variant, show=show) for variant in variants]
 
     @staticmethod
     def _display_model_name(name: Any) -> str:
