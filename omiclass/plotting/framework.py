@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Mapping, Optional, Sequence, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -505,7 +505,63 @@ class PlottingFramework:
         *,
         threshold_optimized: bool = False,
         digits: int = 4,
+        uncorr: bool = False,
     ) -> pd.DataFrame:
+        """Print selected-model holdout test scores and return them as a DataFrame.
+
+        If uncorr=True, also print the best/selected model from self.uncorrected_run_dir.
+        """
+        corrected_scores = self.selected_model_holdout_test_scores(
+            model_name=model_name,
+            threshold_optimized=threshold_optimized,
+        )
+        corrected_scores.insert(0, "run", "corrected")
+
+        scores = corrected_scores
+
+        if uncorr:
+            if self.uncorrected_run_dir is None:
+                raise ValueError(
+                    "uncorrected_run_dir is not set; cannot print uncorrected scores."
+                )
+
+            uncorrected_framework = PlottingFramework(
+                run_dir=self.uncorrected_run_dir,
+                output_dir=self.output_dir,
+            )
+
+            uncorrected_scores = uncorrected_framework.selected_model_holdout_test_scores(
+                model_name=None,  # use best/selected model from the uncorrected run
+                threshold_optimized=threshold_optimized,
+            )
+            uncorrected_scores.insert(0, "run", "uncorrected")
+
+            scores = pd.concat(
+                [corrected_scores, uncorrected_scores],
+                ignore_index=True,
+            )
+
+        label = "threshold-optimized holdout" if threshold_optimized else "holdout"
+        print(f"Selected model {label} test scores (macro precision/recall/F1):")
+
+        float_formatter = lambda value: "" if pd.isna(value) else f"{value:.{digits}f}"
+
+        print(
+            scores.to_string(
+                index=False,
+                formatters={
+                    "n_test": lambda value: "" if pd.isna(value) else f"{value:.0f}",
+                    "accuracy": float_formatter,
+                    "precision": float_formatter,
+                    "recall": float_formatter,
+                    "f1": float_formatter,
+                },
+            )
+        )
+
+        return scores
+    
+    def print_model_holdout_test_scores(self, model_name: str | None = None, *, threshold_optimized: bool = False, digits: int = 4) -> pd.DataFrame:
         """Print selected-model holdout test scores and return them as a DataFrame."""
         scores = self.selected_model_holdout_test_scores(
             model_name=model_name,
@@ -1104,6 +1160,7 @@ class PlottingFramework:
         state: str,
         show: bool = False,
         filename_prefix: str = "",
+        colored_by: Union[pd.Series, None] = None
     ) -> Path:
         if state not in {"before", "after"}:
             raise ValueError("state must be 'before' or 'after'")
@@ -1119,8 +1176,13 @@ class PlottingFramework:
         y_label = f"PC2 ({variance[1] * 100:.1f}%)" if len(variance) > 1 else "PC2"
         frame[cohort] = frame[cohort].astype("string").fillna("NA")
         fig, ax = plt.subplots(figsize=(7, 5))
-        sns.scatterplot(data=frame, x="PC1", y="PC2", hue=cohort, s=45, ax=ax)
-        ax.set(xlabel=x_label, ylabel=y_label, title=f"PCA by {cohort} — {state} correction")
+        if colored_by is not None:
+            sns.scatterplot(data=frame, x="PC1", y="PC2", hue=colored_by, s=45, ax=ax)
+            title = f"PCA by {colored_by.name or 'IGHV'} — {state} correction"
+        else:
+            sns.scatterplot(data=frame, x="PC1", y="PC2", hue=cohort, s=45, ax=ax)
+            title = f"PCA by {cohort} — {state} correction"
+        ax.set(xlabel=x_label, ylabel=y_label, title=title)
         fig.tight_layout()
         return self._save(fig, f"{filename_prefix}pca_pc1_pc2_{state}.pdf", show=show)
 
@@ -1128,7 +1190,15 @@ class PlottingFramework:
         self,
         show: bool = False,
         filename_prefix: str = "",
+        colored_by: Union[pd.Series, None] = None
     ) -> list[Path]:
+        if colored_by is not None:
+            return [
+                self.plot_pca_scatter("before", show=show, filename_prefix=filename_prefix),
+                self.plot_pca_scatter("after", show=show, filename_prefix=filename_prefix),
+                self.plot_pca_scatter("before", show=show, filename_prefix=filename_prefix, colored_by=colored_by),
+                self.plot_pca_scatter("after", show=show, filename_prefix=filename_prefix, colored_by=colored_by),
+            ]
         return [
             self.plot_pca_scatter("before", show=show, filename_prefix=filename_prefix),
             self.plot_pca_scatter("after", show=show, filename_prefix=filename_prefix),
