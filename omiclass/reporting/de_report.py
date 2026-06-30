@@ -85,24 +85,18 @@ def write_de_geneset_report_html(
     selection_summary = (geneset_summary or {}).get("selection_summary", []) or []
     n_filtered_contrasts = sum(1 for row in selection_summary if str(row.get("selection_pool", "")) == "filtered")
     n_fallback_contrasts = sum(1 for row in selection_summary if str(row.get("selection_pool", "")) == "fallback")
-    close_pair_pca_gene_count = int((geneset_summary or {}).get("close_pair_pca_gene_count", 0) or 0)
-    close_pair_mad_filter_applied = bool((geneset_summary or {}).get("close_pair_mad_filter_applied", False))
     n_final = len(combined_genes)
-    summary_metrics = [
-        (f"DE {feature_label_plural}", f"{len(df):,}"),
-        ("One-vs-rest markers", f"{n_one_vs_rest:,}"),
-        ("Close-pair markers", f"{n_pairwise:,}"),
-        ("Filtered contrasts", f"{n_filtered_contrasts:,}"),
-        ("Fallback contrasts", f"{n_fallback_contrasts:,}"),
-        (f"Final {feature_label_singular}-set", f"{n_final:,}"),
-        ("Volcano plots", f"{len(volcano_svgs):,}"),
-    ]
-    if close_pair_pca_gene_count > 0:
-        label = "Close-pair PCA genes"
-        if close_pair_mad_filter_applied:
-            label = "Close-pair PCA genes (MAD)"
-        summary_metrics.append((label, f"{close_pair_pca_gene_count:,}"))
-    summary_html = vertical_metric_grid(summary_metrics)
+    summary_html = vertical_metric_grid(
+        [
+            (f"DE {feature_label_plural}", f"{len(df):,}"),
+            ("One-vs-rest markers", f"{n_one_vs_rest:,}"),
+            ("Close-pair markers", f"{n_pairwise:,}"),
+            ("Filtered contrasts", f"{n_filtered_contrasts:,}"),
+            ("Fallback contrasts", f"{n_fallback_contrasts:,}"),
+            (f"Final {feature_label_singular}-set", f"{n_final:,}"),
+            ("Volcano plots", f"{len(volcano_svgs):,}"),
+        ]
+    )
 
     # Gene panels
     genes_html_parts: List[str] = []

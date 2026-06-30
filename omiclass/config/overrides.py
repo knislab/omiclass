@@ -91,8 +91,8 @@ SPEC = OverrideSpec(
         "de_gene_selection_one_vs_rest_fraction": "de_gene_selection.one_vs_rest_fraction",
         "de_gene_selection_close_pair_fraction": "de_gene_selection.close_pair_fraction",
         "de_gene_selection_close_pair_count": "de_gene_selection.close_pair_count",
-        "de_gene_selection_close_pair_use_mad_filter": "de_gene_selection.close_pair_use_mad_filter",
-        "de_gene_selection_close_pair_top_mad_genes": "de_gene_selection.close_pair_top_mad_genes",
+        "de_gene_selection_close_pair_distance_method": "de_gene_selection.close_pair_distance_method",
+        "de_gene_selection_close_pair_knn_k": "de_gene_selection.close_pair_knn_k",
         "de_gene_selection_pca_components": "de_gene_selection.pca_components",
 
         # Normalization & Surface Markers

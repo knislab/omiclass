@@ -6,7 +6,7 @@ import rpy2.robjects as ro
 from typing import Optional, Sequence, Union, Tuple
 from pathlib import Path
 import tempfile, shutil
-from scipy.stats import median_abs_deviation
+from sklearn.neighbors import NearestNeighbors
 from omiclass.utils.batch import _assert_unique, _align_samples, _write_csv 
 from omiclass.plotting.volcano_plot import plot_volcano_from_limma
 from omiclass.utils.io import load_matrix
@@ -71,37 +71,27 @@ class LimmaVoomRunner:
             *,
             pca_components: int,
             pair_count: Optional[int],
-            close_pair_use_mad_filter: bool = False,
-            close_pair_top_mad_genes: int = 2000,
-    ) -> tuple[pd.DataFrame, list[dict], list[tuple[str, str, float]], int, bool]:
+            distance_method: str = "centroid",
+            knn_k: int = 5,
+    ) -> tuple[pd.DataFrame, list[dict], list[tuple[str, str, float]]]:
         if expr_df.empty or design_col not in meta_df.columns:
-            return pd.DataFrame(), [], [], 0, False
+            return pd.DataFrame(), [], []
 
         y = meta_df[design_col].astype(str)
         classes = sorted(y.dropna().unique().tolist())
         if len(classes) < 2:
-            return pd.DataFrame(), [], [], int(expr_df.shape[0]), False
+            return pd.DataFrame(), [], []
 
-        if close_pair_top_mad_genes <= 0:
-            raise ValueError("close_pair_top_mad_genes must be positive.")
-
-        mad_filter_applied = False
-        if close_pair_use_mad_filter and expr_df.shape[0] > close_pair_top_mad_genes:
-            gene_mad = pd.Series(
-                median_abs_deviation(expr_df, axis=1, nan_policy="omit"),
-                index=expr_df.index,
-                name="MAD",
-            )
-            top_genes = gene_mad.sort_values(ascending=False).head(close_pair_top_mad_genes).index
-            expr_df = expr_df.loc[top_genes, :]
-            mad_filter_applied = True
-        close_pair_pca_gene_count = int(expr_df.shape[0])
+        if distance_method not in {"centroid", "knn"}:
+            raise ValueError("distance_method must be either 'centroid' or 'knn'.")
+        if knn_k <= 0:
+            raise ValueError("knn_k must be positive.")
 
         X = expr_df.T.loc[meta_df.index]
         X = X.apply(pd.to_numeric, errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(0.0)
         values = X.to_numpy(dtype=float)
         if values.size == 0:
-            return pd.DataFrame(), [], [], close_pair_pca_gene_count, mad_filter_applied
+            return pd.DataFrame(), [], []
 
         if np.nanmin(values) >= 0:
             values = np.log1p(values)
@@ -126,7 +116,28 @@ class LimmaVoomRunner:
             for class_b in classes[i + 1:]:
                 if class_a not in centroids.index or class_b not in centroids.index:
                     continue
-                dist = float(np.linalg.norm(centroids.loc[class_a].to_numpy() - centroids.loc[class_b].to_numpy()))
+                if distance_method == "knn":
+                    a_scores = score_df.loc[y == class_a]
+                    b_scores = score_df.loc[y == class_b]
+                    k_ab = min(int(knn_k), len(b_scores))
+                    k_ba = min(int(knn_k), len(a_scores))
+                    if k_ab <= 0 or k_ba <= 0:
+                        continue
+                    a_to_b = (
+                        NearestNeighbors(n_neighbors=k_ab)
+                        .fit(b_scores)
+                        .kneighbors(a_scores)[0]
+                        .mean()
+                    )
+                    b_to_a = (
+                        NearestNeighbors(n_neighbors=k_ba)
+                        .fit(a_scores)
+                        .kneighbors(b_scores)[0]
+                        .mean()
+                    )
+                    dist = float((a_to_b + b_to_a) / 2.0)
+                else:
+                    dist = float(np.linalg.norm(centroids.loc[class_a].to_numpy() - centroids.loc[class_b].to_numpy()))
                 distances.loc[class_a, class_b] = dist
                 distances.loc[class_b, class_a] = dist
                 pairs.append((class_a, class_b, dist))
@@ -138,7 +149,7 @@ class LimmaVoomRunner:
             {"class_a": class_a, "class_b": class_b}
             for class_a, class_b, _ in selected
         ]
-        return distances, pair_dicts, selected, close_pair_pca_gene_count, mad_filter_applied
+        return distances, pair_dicts, selected
 
 
     def run_limma_voom(self, 
@@ -331,20 +342,14 @@ class LimmaVoomRunner:
                 train_artifacts_dir = base_output_dir / "train_artifacts"
                 train_artifacts_dir.mkdir(parents=True, exist_ok=True)
 
-                (
-                    distance_matrix,
-                    pair_dicts,
-                    close_pairs,
-                    close_pair_pca_gene_count,
-                    close_pair_mad_filter_applied,
-                ) = self._compute_close_class_pairs(
+                distance_matrix, pair_dicts, close_pairs = self._compute_close_class_pairs(
                     X,
                     M,
                     design_col,
                     pca_components=gs_cfg.pca_components,
                     pair_count=gs_cfg.close_pair_count,
-                    close_pair_use_mad_filter=gs_cfg.close_pair_use_mad_filter,
-                    close_pair_top_mad_genes=gs_cfg.close_pair_top_mad_genes,
+                    distance_method=gs_cfg.close_pair_distance_method,
+                    knn_k=gs_cfg.close_pair_knn_k,
                 )
                 if distance_matrix.empty:
                     pd.DataFrame().to_csv(train_artifacts_dir / "class_distance_matrix.csv")
@@ -359,16 +364,6 @@ class LimmaVoomRunner:
                     columns=["class_a", "class_b", "distance", "rank"],
                 )
                 pairs_df.to_csv(train_artifacts_dir / "selected_close_class_pairs.csv", index=False)
-                pd.DataFrame(
-                    [
-                        {
-                            "close_pair_pca_gene_count": close_pair_pca_gene_count,
-                            "close_pair_use_mad_filter": bool(gs_cfg.close_pair_use_mad_filter),
-                            "close_pair_mad_filter_applied": close_pair_mad_filter_applied,
-                            "close_pair_top_mad_genes": int(gs_cfg.close_pair_top_mad_genes),
-                        }
-                    ]
-                ).to_csv(train_artifacts_dir / "close_pair_pca_summary.csv", index=False)
 
                 if close_pair_budget > 0 and pair_dicts:
                     pairwise_output_filepath = output_dir / out_csv.replace(".csv", "_pairwise_close_class.csv")
@@ -412,8 +407,6 @@ class LimmaVoomRunner:
                     max_genes_per_class=gs_cfg.max_genes_per_class,
                     artifacts_dir=train_artifacts_dir,
                     close_pairs=close_pairs,
-                    close_pair_pca_gene_count=close_pair_pca_gene_count,
-                    close_pair_mad_filter_applied=close_pair_mad_filter_applied,
                 )
                 gene_list = summary.combined
                 feature_list_path = output_dir / "limma_selected_features.txt"

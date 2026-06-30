@@ -54,8 +54,8 @@ class DEGeneSelectionCfg(BaseModel):
     one_vs_rest_fraction: float = 0.5
     close_pair_fraction: float = 0.5
     close_pair_count: Optional[int] = None
-    close_pair_use_mad_filter: bool = False
-    close_pair_top_mad_genes: int = 2000
+    close_pair_distance_method: str = "centroid"
+    close_pair_knn_k: int = 5
     pca_components: int = 10
 
     @model_validator(mode="after")
@@ -82,8 +82,10 @@ class DEGeneSelectionCfg(BaseModel):
             raise ValueError("At least one DE gene-selection fraction must be positive.")
         if self.close_pair_count is not None and self.close_pair_count <= 0:
             raise ValueError("de_gene_selection.close_pair_count must be positive when set.")
-        if self.close_pair_top_mad_genes <= 0:
-            raise ValueError("de_gene_selection.close_pair_top_mad_genes must be positive.")
+        if self.close_pair_distance_method not in {"centroid", "knn"}:
+            raise ValueError("de_gene_selection.close_pair_distance_method must be either 'centroid' or 'knn'.")
+        if self.close_pair_knn_k <= 0:
+            raise ValueError("de_gene_selection.close_pair_knn_k must be positive.")
         if self.pca_components <= 0:
             raise ValueError("de_gene_selection.pca_components must be positive.")
         return self
