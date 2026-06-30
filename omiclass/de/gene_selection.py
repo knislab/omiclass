@@ -28,6 +28,8 @@ class GeneSetSelectionSummary:
     pairwise_by_contrast: Dict[str, List[str]] = field(default_factory=dict)
     pairwise_contrast_order: List[str] = field(default_factory=list)
     close_pairs: List[Tuple[str, str, float]] = field(default_factory=list)
+    close_pair_pca_gene_count: int = 0
+    close_pair_mad_filter_applied: bool = False
     selection_summary: List[Dict[str, object]] = field(default_factory=list)
 
 
@@ -347,6 +349,8 @@ def select_marker_genes(
     max_genes_per_class: int = 75,
     artifacts_dir: Optional[Path] = None,
     close_pairs: Optional[Sequence[Tuple[str, str, float]]] = None,
+    close_pair_pca_gene_count: int = 0,
+    close_pair_mad_filter_applied: bool = False,
 ) -> GeneSetSelectionSummary:
     if K <= 0:
         _write_selection_artifacts(
@@ -495,5 +499,7 @@ def select_marker_genes(
         pairwise_by_contrast=pairwise_by_contrast,
         pairwise_contrast_order=pairwise_contrast_order,
         close_pairs=list(close_pairs or []),
+        close_pair_pca_gene_count=int(close_pair_pca_gene_count),
+        close_pair_mad_filter_applied=bool(close_pair_mad_filter_applied),
         selection_summary=selection_summary,
     )
