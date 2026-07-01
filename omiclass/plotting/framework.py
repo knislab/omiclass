@@ -378,6 +378,18 @@ class PlottingFramework:
         return legend
 
     @staticmethod
+    def _interpolate_pr_curve(
+        recall_grid: np.ndarray,
+        recall: np.ndarray,
+        precision: np.ndarray,
+    ) -> np.ndarray:
+        order = np.argsort(recall)
+        recall_s = recall[order]
+        precision_s = precision[order]
+        unique_recall, first_idx = np.unique(recall_s, return_index=True)
+        return np.interp(recall_grid, unique_recall, precision_s[first_idx])
+
+    @staticmethod
     def _read_table(path: str | Path, *, index_col: int | str | None = None) -> pd.DataFrame:
         path = Path(path)
         sep = "\t" if path.suffix.lower() in {".tsv", ".txt"} else ","
@@ -544,7 +556,7 @@ class PlottingFramework:
         label = "threshold-optimized holdout" if threshold_optimized else "holdout"
         print(f"Selected model {label} test scores (macro precision/recall/F1):")
 
-        float_formatter = lambda value: "" if pd.isna(value) else f"{value:.{digits}f}"
+        float_formatter = lambda value: "" if pd.isna(value) else f"{value:.{digits}3f}"
 
         print(
             scores.to_string(
@@ -948,29 +960,46 @@ class PlottingFramework:
         recall_grid = np.linspace(0, 1, 500)
         items = []
         for model, y_true, probabilities, labels in self._curve_model_arrays():
-            curves, scores = [], []
-            for col, label in enumerate(labels):
-                binary = (y_true.astype(str) == str(label)).astype(int)
+            if len(labels) == 2:
+                positive_col = 1
+                positive_label = labels[positive_col]
+                binary = (y_true.astype(str) == str(positive_label)).astype(int)
                 if np.unique(binary).size < 2:
                     continue
-                precision, recall, _ = precision_recall_curve(binary, probabilities[:, col])
-                order = np.argsort(recall)
-                curves.append(np.interp(recall_grid, recall[order], precision[order]))
-                scores.append(average_precision_score(binary, probabilities[:, col]))
-            if curves:
-                items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
+                precision, recall, _ = precision_recall_curve(binary, probabilities[:, positive_col])
+                curve = self._interpolate_pr_curve(recall_grid, recall, precision)
+                score = average_precision_score(binary, probabilities[:, positive_col])
+                items.append((model, curve, float(score)))
+            else:
+                curves, scores = [], []
+                for col, label in enumerate(labels):
+                    binary = (y_true.astype(str) == str(label)).astype(int)
+                    if np.unique(binary).size < 2:
+                        continue
+                    precision, recall, _ = precision_recall_curve(binary, probabilities[:, col])
+                    curves.append(self._interpolate_pr_curve(recall_grid, recall, precision))
+                    scores.append(average_precision_score(binary, probabilities[:, col]))
+                if curves:
+                    items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
         if not items:
             raise ValueError("PR curve requires at least one class with positive and negative samples.")
         items = self._sort_curve_items(items)
+        is_binary = all(len(labels) == 2 for _, _, _, labels in self._curve_model_arrays())
+        metric_label = "AP" if is_binary else "macro AP"
+        title = "Precision–Recall Curve" if is_binary else "Macro Precision–Recall Curve"
         fig, ax = plt.subplots(figsize=(6.5, 5))
         for model, curve, score in items:
             display_name = self._display_model_name(model)
             ax.plot(
                 recall_grid,
                 curve,
-                label=f"{display_name} (AUPRC={score:.3f})",
+                label=f"{display_name} ({metric_label}={score:.3f})",
             )
-        ax.set(xlabel="Recall", ylabel="Precision")
+        ax.set(
+            xlabel="Recall",
+            ylabel="Precision",
+            title=title,
+        )
         self._style_curve_legend(ax, items)
         fig.tight_layout()
         return self._save(fig, "precision_recall_curve.pdf", show=show)
@@ -979,19 +1008,33 @@ class PlottingFramework:
         fpr_grid = np.linspace(0, 1, 500)
         items = []
         for model, y_true, probabilities, labels in self._curve_model_arrays():
-            curves, scores = [], []
-            for col, label in enumerate(labels):
-                binary = (y_true.astype(str) == str(label)).astype(int)
+            if len(labels) == 2:
+                positive_col = 1
+                positive_label = labels[positive_col]
+                binary = (y_true.astype(str) == str(positive_label)).astype(int)
                 if np.unique(binary).size < 2:
                     continue
-                fpr, tpr, _ = roc_curve(binary, probabilities[:, col])
-                curves.append(np.interp(fpr_grid, fpr, tpr, left=0, right=1))
-                scores.append(auc(fpr, tpr))
-            if curves:
-                items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
+                fpr, tpr, _ = roc_curve(binary, probabilities[:, positive_col])
+                curve = np.interp(fpr_grid, fpr, tpr, left=0, right=1)
+                score = auc(fpr, tpr)
+                items.append((model, curve, float(score)))
+            else:
+                curves, scores = [], []
+                for col, label in enumerate(labels):
+                    binary = (y_true.astype(str) == str(label)).astype(int)
+                    if np.unique(binary).size < 2:
+                        continue
+                    fpr, tpr, _ = roc_curve(binary, probabilities[:, col])
+                    curves.append(np.interp(fpr_grid, fpr, tpr, left=0, right=1))
+                    scores.append(auc(fpr, tpr))
+                if curves:
+                    items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
         if not items:
             raise ValueError("ROC curve requires at least one class with positive and negative samples.")
         items = self._sort_curve_items(items)
+        is_binary = all(len(labels) == 2 for _, _, _, labels in self._curve_model_arrays())
+        metric_label = "AUROC" if is_binary else "macro AUROC"
+        title = "ROC Curve" if is_binary else "Macro ROC Curve"
         fig, ax = plt.subplots(figsize=(6.5, 5))
         ax.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="0.5")
         for model, curve, score in items:
@@ -999,9 +1042,13 @@ class PlottingFramework:
             ax.plot(
                 fpr_grid,
                 curve,
-                label=f"{display_name} (AUROC={score:.3f})",
+                label=f"{display_name} ({metric_label}={score:.3f})",
             )
-        ax.set(xlabel="False Positive Rate", ylabel="True Positive Rate")
+        ax.set(
+            xlabel="False Positive Rate",
+            ylabel="True Positive Rate",
+            title=title,
+        )
         self._style_curve_legend(ax, items)
         fig.tight_layout()
         return self._save(fig, "roc_curve.pdf", show=show)
@@ -1023,26 +1070,51 @@ class PlottingFramework:
             sample_col=sample_col,
             model_name=model_name,
         ):
-            curves, scores = [], []
-            for col, label in enumerate(labels):
-                binary = (y_true.astype(str) == str(label)).astype(int)
+            if len(labels) == 2:
+                positive_col = 1
+                positive_label = labels[positive_col]
+                binary = (y_true.astype(str) == str(positive_label)).astype(int)
                 if np.unique(binary).size < 2:
                     continue
-                precision, recall, _ = precision_recall_curve(binary, probabilities[:, col])
-                order = np.argsort(recall)
-                curves.append(np.interp(recall_grid, recall[order], precision[order]))
-                scores.append(average_precision_score(binary, probabilities[:, col]))
-            if curves:
-                items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
+                precision, recall, _ = precision_recall_curve(binary, probabilities[:, positive_col])
+                curve = self._interpolate_pr_curve(recall_grid, recall, precision)
+                score = average_precision_score(binary, probabilities[:, positive_col])
+                items.append((model, curve, float(score)))
+            else:
+                curves, scores = [], []
+                for col, label in enumerate(labels):
+                    binary = (y_true.astype(str) == str(label)).astype(int)
+                    if np.unique(binary).size < 2:
+                        continue
+                    precision, recall, _ = precision_recall_curve(binary, probabilities[:, col])
+                    curves.append(self._interpolate_pr_curve(recall_grid, recall, precision))
+                    scores.append(average_precision_score(binary, probabilities[:, col]))
+                if curves:
+                    items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
         if not items:
             raise ValueError("Prediction PR curve requires at least one class with positive and negative samples.")
 
         items = self._sort_curve_items(items)
+        is_binary = all(
+            len(labels) == 2
+            for _, _, _, labels in self._prediction_model_arrays(
+                true_label_path,
+                label_col=label_col,
+                sample_col=sample_col,
+                model_name=model_name,
+            )
+        )
+        metric_label = "AP" if is_binary else "macro AP"
+        title = "Precision–Recall Curve" if is_binary else "Macro Precision–Recall Curve"
         fig, ax = plt.subplots(figsize=(6.5, 5))
         for model, curve, score in items:
             display_name = self._display_model_name(model)
-            ax.plot(recall_grid, curve, label=f"{display_name} (AUPRC={score:.3f})")
-        ax.set(xlabel="Recall", ylabel="Precision", title="Prediction set precision-recall")
+            ax.plot(recall_grid, curve, label=f"{display_name} ({metric_label}={score:.3f})")
+        ax.set(
+            xlabel="Recall",
+            ylabel="Precision",
+            title=title,
+        )
         self._style_curve_legend(ax, items)
         fig.tight_layout()
         return self._save(fig, "prediction_precision_recall_curve.pdf", show=show)
@@ -1064,26 +1136,52 @@ class PlottingFramework:
             sample_col=sample_col,
             model_name=model_name,
         ):
-            curves, scores = [], []
-            for col, label in enumerate(labels):
-                binary = (y_true.astype(str) == str(label)).astype(int)
+            if len(labels) == 2:
+                positive_col = 1
+                positive_label = labels[positive_col]
+                binary = (y_true.astype(str) == str(positive_label)).astype(int)
                 if np.unique(binary).size < 2:
                     continue
-                fpr, tpr, _ = roc_curve(binary, probabilities[:, col])
-                curves.append(np.interp(fpr_grid, fpr, tpr, left=0, right=1))
-                scores.append(auc(fpr, tpr))
-            if curves:
-                items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
+                fpr, tpr, _ = roc_curve(binary, probabilities[:, positive_col])
+                curve = np.interp(fpr_grid, fpr, tpr, left=0, right=1)
+                score = auc(fpr, tpr)
+                items.append((model, curve, float(score)))
+            else:
+                curves, scores = [], []
+                for col, label in enumerate(labels):
+                    binary = (y_true.astype(str) == str(label)).astype(int)
+                    if np.unique(binary).size < 2:
+                        continue
+                    fpr, tpr, _ = roc_curve(binary, probabilities[:, col])
+                    curves.append(np.interp(fpr_grid, fpr, tpr, left=0, right=1))
+                    scores.append(auc(fpr, tpr))
+                if curves:
+                    items.append((model, np.mean(curves, axis=0), float(np.mean(scores))))
         if not items:
             raise ValueError("Prediction ROC curve requires at least one class with positive and negative samples.")
 
         items = self._sort_curve_items(items)
+        is_binary = all(
+            len(labels) == 2
+            for _, _, _, labels in self._prediction_model_arrays(
+                true_label_path,
+                label_col=label_col,
+                sample_col=sample_col,
+                model_name=model_name,
+            )
+        )
+        metric_label = "AUROC" if is_binary else "macro AUROC"
+        title = "ROC Curve" if is_binary else "Macro ROC Curve"
         fig, ax = plt.subplots(figsize=(6.5, 5))
         ax.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="0.5")
         for model, curve, score in items:
             display_name = self._display_model_name(model)
-            ax.plot(fpr_grid, curve, label=f"{display_name} (AUROC={score:.3f})")
-        ax.set(xlabel="False Positive Rate", ylabel="True Positive Rate", title="Prediction set ROC")
+            ax.plot(fpr_grid, curve, label=f"{display_name} ({metric_label}={score:.3f})")
+        ax.set(
+            xlabel="False Positive Rate",
+            ylabel="True Positive Rate",
+            title=title,
+        )
         self._style_curve_legend(ax, items)
         fig.tight_layout()
         return self._save(fig, "prediction_roc_curve.pdf", show=show)

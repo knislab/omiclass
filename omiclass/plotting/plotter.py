@@ -39,6 +39,14 @@ class FinalSummaryPlotter:
             cleaned[clean_name] = res
         return cleaned
 
+    @staticmethod
+    def _interpolate_pr_curve(grid: np.ndarray, recall: np.ndarray, precision: np.ndarray) -> np.ndarray:
+        order = np.argsort(recall)
+        recall_s = recall[order]
+        precision_s = precision[order]
+        unique_recall, first_idx = np.unique(recall_s, return_index=True)
+        return np.interp(grid, unique_recall, precision_s[first_idx])
+
     def plot_leaderboard_bar(self) -> Path:
         rows = []
         for name, res in self.per_model.items():
@@ -148,6 +156,7 @@ class FinalSummaryPlotter:
         grid_pr = np.linspace(0, 1, 500)
         grid_fpr = np.linspace(0, 1, 500)
         selected_model_key = self._normalize_model_key(bold_model_key)
+        is_binary = K == 2
 
         def _is_selected(name: str) -> bool:
             return bool(
@@ -175,38 +184,37 @@ class FinalSummaryPlotter:
             P = np.asarray(res["y_proba"])
             P = self._ensure_proba_shape(P, K)
 
-            prs = []
-            for k in range(K):
-                precision, recall, _ = precision_recall_curve(Y[:, k], P[:, k])
-                order = np.argsort(recall)
-                recall_s = recall[order]
-                precision_s = precision[order]
-                prs.append(
-                    np.interp(
-                        grid_pr,
-                        recall_s,
-                        precision_s,
-                        left=precision_s[0],
-                        right=precision_s[-1],
+            if is_binary:
+                precision, recall, _ = precision_recall_curve(Y[:, 1], P[:, 1])
+                pr_curve = self._interpolate_pr_curve(grid_pr, recall, precision)
+                ap_score = average_precision_score(Y[:, 1], P[:, 1])
+            else:
+                prs = []
+                for k in range(K):
+                    precision, recall, _ = precision_recall_curve(Y[:, k], P[:, k])
+                    prs.append(
+                        self._interpolate_pr_curve(grid_pr, recall, precision)
                     )
-                )
 
-            macro_precision = np.mean(np.vstack(prs), axis=0)
-            ap_macro = average_precision_score(Y, P[:, :K], average="macro")
+                pr_curve = np.mean(np.vstack(prs), axis=0)
+                ap_score = average_precision_score(Y, P[:, :K], average="macro")
 
-            pr_items.append((name, macro_precision, ap_macro))
+            pr_items.append((name, pr_curve, ap_score))
 
         pr_items.sort(key=lambda x: x[2], reverse=True)
 
-        for name, macro_precision, ap_macro in pr_items:
+        pr_metric_label = "AP" if is_binary else "macro AP"
+        pr_title = "Precision–Recall Curve" if is_binary else "Macro Precision–Recall Curve"
+        for name, pr_curve, ap_score in pr_items:
             selected = _is_selected(name)
             ax_pr.plot(
                 grid_pr,
-                macro_precision,
-                label=f"{name} (AUPRC={ap_macro:.3f})",
+                pr_curve,
+                label=f"{name} ({pr_metric_label}={ap_score:.3f})",
                 linewidth=3.0 if selected else 1.5,
                 zorder=10 if selected else 2,
             )
+        ax_pr.set_title(pr_title)
         ax_pr.legend(fontsize=8)
         _bold_legend_model(ax_pr)
         fig_pr.tight_layout()
@@ -222,29 +230,37 @@ class FinalSummaryPlotter:
             P = np.asarray(res["y_proba"])
             P = self._ensure_proba_shape(P, K)
 
-            tprs, aucs = [], []
-            for k in range(K):
-                fpr, tpr, _ = roc_curve(Y[:, k], P[:, k])
-                tprs.append(np.interp(grid_fpr, fpr, tpr, left=0, right=1))
-                aucs.append(auc(fpr, tpr))
+            if is_binary:
+                fpr, tpr, _ = roc_curve(Y[:, 1], P[:, 1])
+                roc_curve_values = np.interp(grid_fpr, fpr, tpr, left=0, right=1)
+                auc_score = auc(fpr, tpr)
+            else:
+                tprs, aucs = [], []
+                for k in range(K):
+                    fpr, tpr, _ = roc_curve(Y[:, k], P[:, k])
+                    tprs.append(np.interp(grid_fpr, fpr, tpr, left=0, right=1))
+                    aucs.append(auc(fpr, tpr))
 
-            macro_tpr = np.mean(np.vstack(tprs), axis=0)
-            macro_auc = float(np.mean(aucs))
+                roc_curve_values = np.mean(np.vstack(tprs), axis=0)
+                auc_score = float(np.mean(aucs))
 
-            roc_items.append((name, macro_tpr, macro_auc))
+            roc_items.append((name, roc_curve_values, auc_score))
 
         roc_items.sort(key=lambda x: x[2], reverse=True)
 
-        for name, macro_tpr, macro_auc in roc_items:
+        roc_metric_label = "AUROC" if is_binary else "macro AUROC"
+        roc_title = "ROC Curve" if is_binary else "Macro ROC Curve"
+        for name, roc_curve_values, auc_score in roc_items:
             selected = _is_selected(name)
             ax_roc.plot(
                 grid_fpr,
-                macro_tpr,
-                label=f"{name} (AUROC={macro_auc:.3f})",
+                roc_curve_values,
+                label=f"{name} ({roc_metric_label}={auc_score:.3f})",
                 linewidth=3.0 if selected else 1.5,
                 zorder=10 if selected else 2,
             )
         ax_roc.set_xlabel("False Positive Rate"); ax_roc.set_ylabel("True Positive Rate")
+        ax_roc.set_title(roc_title)
         ax_roc.legend(fontsize=8)
         _bold_legend_model(ax_roc)
         fig_roc.tight_layout()

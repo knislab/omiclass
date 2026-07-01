@@ -216,26 +216,34 @@ def render_final_summary_html(
         )
     )
 
-    # Macro PR & ROC side-by-side
+    is_binary = getattr(plotter, "K", 0) == 2
+    pr_title = "PR" if is_binary else "Macro PR"
+    roc_title = "ROC" if is_binary else "Macro ROC"
+    curve_title = "PR & ROC" if is_binary else "Macro PR & Macro ROC"
+    curve_subtitle = "Overlay curves across models" if is_binary else "Overlay curves across models (macro averaging)"
+    pr_download = "pr.svg" if is_binary else "macro_pr.svg"
+    roc_download = "roc.svg" if is_binary else "macro_roc.svg"
+
+    # PR & ROC side-by-side
     parts.append(
         split_card_1_1(
-            title="Macro PR & Macro ROC",
-            subtitle="Overlay curves across models (macro averaging)",
-            left_title="Macro PR",
-            right_title="Macro ROC",
+            title=curve_title,
+            subtitle=curve_subtitle,
+            left_title=pr_title,
+            right_title=roc_title,
             left_html=svg_panel(
-                title="Macro PR",
+                title=pr_title,
                 svg=pr_svg,
                 collapsible=True,
                 open_by_default=False,
-                download_name="macro_pr.svg",
+                download_name=pr_download,
             ),
             right_html=svg_panel(
-                title="Macro ROC",
+                title=roc_title,
                 svg=roc_svg,
                 collapsible=True,
                 open_by_default=False,
-                download_name="macro_roc.svg",
+                download_name=roc_download,
             ),
         )
     )
