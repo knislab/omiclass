@@ -9,6 +9,8 @@ class RawCountNormalizationStep:
     name = "raw_count_normalization"
 
     def should_run(self, ctx: RunContext) -> bool:
+        if bool(getattr(getattr(ctx.cfg, "bulkformer", None), "enabled", False)):
+            return False
         if str(getattr(ctx.cfg.project, "modality", "rnaseq")) == "cptac_ms":
             return False
         # Only normalize when starting from raw counts

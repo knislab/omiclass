@@ -29,6 +29,8 @@ create_toy_dataset.py
 
 # ignore all files in the tests directory
 tests/
+!tests/
+!tests/*.py
 results/
 final_results_runs/
 examples/results/Docker_results/de_results/limma_voom_selected_genes.txt

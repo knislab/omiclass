@@ -34,6 +34,20 @@ SPEC = OverrideSpec(
         "test_holdout_path": "project.hold_out_path",
         "markers_path": "project.geneset_path",
 
+        # BulkFormer feature extraction
+        "bulkformer_enabled": "bulkformer.enabled",
+        "bulkformer_root_dir": "bulkformer.root_dir",
+        "bulkformer_device": "bulkformer.device",
+        "bulkformer_batch_size": "bulkformer.batch_size",
+        "bulkformer_aggregate_type": "bulkformer.aggregate_type",
+        "bulkformer_graph_path": "bulkformer.graph_path",
+        "bulkformer_graph_weights_path": "bulkformer.graph_weights_path",
+        "bulkformer_gene_embedding_path": "bulkformer.gene_embedding_path",
+        "bulkformer_checkpoint_path": "bulkformer.checkpoint_path",
+        "bulkformer_gene_info_path": "bulkformer.gene_info_path",
+        "bulkformer_gene_lengths_path": "bulkformer.gene_lengths_path",
+        "bulkformer_interested_gene_path": "bulkformer.interested_gene_path",
+
         # batch_correction
         "batch_column": "batch_correction.batch_column",
         "design_columns": "batch_correction.design_columns",

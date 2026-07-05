@@ -9,6 +9,8 @@ class DefineGeneCodeStep:
     name = "define_genecode"
 
     def should_run(self, ctx: RunContext) -> bool:
+        if bool(getattr(getattr(ctx.cfg, "bulkformer", None), "enabled", False)):
+            return False
         return ctx.opts.input_mode == "raw_counts"
 
     def run(self, ctx: RunContext) -> None:
@@ -26,5 +28,4 @@ class DefineGeneCodeStep:
             return Path(__file__).resolve().parents[2] / "data" / "gencode_v34_GRCh38_hg38.csv"
         else:
             return Path(__file__).resolve().parents[2] / "data" / "gencode_GRCh37_hg19.csv"
-
 

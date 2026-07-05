@@ -11,6 +11,8 @@ class SurfaceMarkerStep:
     def should_run(self, ctx: RunContext) -> bool:
         if ctx.opts.mode == "clean_and_predict":
             return False
+        if bool(getattr(getattr(ctx.cfg, "bulkformer", None), "enabled", False)):
+            return False
         return ctx.opts.surface_markers
 
     def run(self, ctx: RunContext) -> None:

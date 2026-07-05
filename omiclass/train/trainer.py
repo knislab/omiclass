@@ -757,7 +757,7 @@ class Trainer:
         }
         selected_model_keys = model_keys_by_severity[sev]
 
-        if self.cfg.surface_markers.enabled:
+        if self.cfg.surface_markers.enabled and not bool(getattr(getattr(self.cfg, "bulkformer", None), "enabled", False)):
             sm_genes = apply_surface_marker_filter_with_min(X.columns.tolist(), min_features=self.cfg.runtime.min_features)
             X = X.loc[:, sm_genes]
 

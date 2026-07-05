@@ -7,6 +7,56 @@ from pydantic import BaseModel, Field, model_validator, field_validator, ConfigD
 BatchMethod = Literal["batch", "design", "covariates", "pcs"]
 Modality = Literal["rnaseq", "cptac_ms"]
 
+# ---------- BulkFormer feature extraction ----------
+class BulkFormerCfg(BaseModel):
+    enabled: bool = False
+    root_dir: Path = Path("BulkFormer")
+    device: str = "auto"
+    batch_size: int = 4
+    aggregate_type: Literal["max", "mean", "median", "all"] = "mean"
+    graph_path: Optional[Path] = None
+    graph_weights_path: Optional[Path] = None
+    gene_embedding_path: Optional[Path] = None
+    checkpoint_path: Optional[Path] = None
+    gene_info_path: Optional[Path] = None
+    gene_lengths_path: Optional[Path] = None
+    interested_gene_path: Optional[Path] = None
+
+    @field_validator("device")
+    @classmethod
+    def _validate_device(cls, v):
+        if v is None:
+            return "auto"
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("bulkformer.device must be a non-empty string.")
+        return v.strip()
+
+    @field_validator("batch_size")
+    @classmethod
+    def _validate_batch_size(cls, v):
+        if int(v) <= 0:
+            raise ValueError("bulkformer.batch_size must be a positive integer.")
+        return int(v)
+
+    @model_validator(mode="after")
+    def _set_default_paths(self):
+        root = Path(self.root_dir)
+        if self.graph_path is None:
+            self.graph_path = root / "data" / "G_tcga.pt"
+        if self.graph_weights_path is None:
+            self.graph_weights_path = root / "data" / "G_tcga_weight.pt"
+        if self.gene_embedding_path is None:
+            self.gene_embedding_path = root / "data" / "esm2_feature_concat.pt"
+        if self.checkpoint_path is None:
+            self.checkpoint_path = root / "model" / "bulkformer_147M.pt"
+        if self.gene_info_path is None:
+            self.gene_info_path = root / "data" / "bulkformer_gene_info.csv"
+        if self.gene_lengths_path is None:
+            self.gene_lengths_path = root / "data" / "gene_length_df.csv"
+        if self.interested_gene_path is None:
+            self.interested_gene_path = root / "data" / "interested_gene_list.pt"
+        return self
+
 # ---------- feature selection ----------
 class FeatureSelectionCfg(BaseModel):
     enabled: bool = True
@@ -462,6 +512,7 @@ class ModelsCfg(BaseModel):
 class Config(BaseModel):
     PDF: bool = False
     project: ProjectCfg = Field(default_factory=ProjectCfg)
+    bulkformer: BulkFormerCfg = Field(default_factory=BulkFormerCfg)
     batch_correction: BatchCorrectionCfg = Field(default_factory=BatchCorrectionCfg)
     runtime: RuntimeCfg = Field(default_factory=RuntimeCfg)
     models: ModelsCfg = Field(default_factory=ModelsCfg)
@@ -474,6 +525,8 @@ class Config(BaseModel):
 
     @model_validator(mode="after")
     def _final_checks(self):
+        if bool(getattr(self.bulkformer, "enabled", False)) and self.project.modality != "rnaseq":
+            raise ValueError("bulkformer.enabled requires project.modality='rnaseq'.")
         if (
             self.de_gene_selection.close_pair_count is None
             and self.project.classes_names is not None
