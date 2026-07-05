@@ -40,6 +40,7 @@ examples/results/Python_results/train_artifacts/genesets/**
 examples/results/Bash_results/de_results/limma_voom_selected_genes.txt
 examples/results/Bash_results/config.freeze.yaml
 examples/results/Bash_results/train_artifacts/genesets/**
+BulkFormer/**
 
 
 

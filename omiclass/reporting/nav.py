@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import List, Optional, Tuple
 
+from omiclass.plotting.display_names import display_model_name
+
 
 @dataclass(frozen=True)
 class NavItem:
@@ -62,8 +64,7 @@ def render_sidebar_html(*, tree: List[NavItem], current_page: str) -> str:
 
 
 def _pretty_model_name(stem: str) -> str:
-    # "light_gbm" -> "Light Gbm" (keep simple; adjust if you want smarter)
-    return stem.replace("_", " ").title()
+    return display_model_name(stem)
 
 
 def build_sidebar_from_run_dir(run_dir: Path,     current_page: Optional[str] = None) -> Tuple[List[NavItem], dict]:

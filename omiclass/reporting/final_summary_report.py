@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 from sklearn.metrics import accuracy_score, f1_score
 
+from ..plotting.display_names import display_model_name
 from ..plotting.plotter import FinalSummaryPlotter
 from .assets import wrap_report_html, get_inline_assets
 from .components import card, svg_panel, json_kv, split_card_1_1, vcard, esc
@@ -17,12 +18,12 @@ def _normalize_model_name(name: Optional[str]) -> str:
         return ""
     # Normalize cosmetic differences so selected model highlighting is robust:
     # underscores vs spaces, case differences, and accidental extra whitespace.
-    return " ".join(str(name).replace("_", " ").strip().lower().split())
+    return " ".join(display_model_name(name).replace("_", " ").strip().lower().split())
 
 def _pretty_model_name(name: Optional[str]) -> str:
     if not name:
         return ""
-    return str(name).replace("_", " ").strip().title()
+    return display_model_name(name)
 
 def _format_table_value(col: str, val: Any) -> Any:
     if col == "model":
@@ -97,7 +98,7 @@ def _best_model_holdout_score_html(plotter: FinalSummaryPlotter, selected_model:
     if not selected_model:
         return "<div class='muted'>No selected model found.</div>"
 
-    selected_clean = selected_model.replace("_", " ").title()
+    selected_clean = display_model_name(selected_model)
     selected_norm = _normalize_model_name(selected_model)
     res = None
     for key, payload in plotter.per_model.items():

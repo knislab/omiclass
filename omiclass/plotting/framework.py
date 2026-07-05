@@ -7,6 +7,7 @@ from typing import Any, Mapping, Optional, Sequence, Union
 
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.ticker import PercentFormatter
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -17,6 +18,29 @@ from sklearn.metrics import (
     precision_recall_curve,
     roc_curve,
 )
+
+from omiclass.plotting.display_names import display_model_name
+
+CLASS_DISPLAY_NAMES = {
+    "Her2": "HER2",
+    "her2": "HER2",
+    "Ph": "Ph-like",
+    "ph": "Ph-like",
+    "ph-like": "Ph-like",
+    "PAX5alt": "PAX5alt",
+    "iAMP21": "iAMP21",
+    "TCF3-PBX1": "TCF3-PBX1",
+    "ETV6-RUNX1": "ETV6-RUNX1",
+    "mutated": "M-CLL",
+    "unmutated": "U-CLL",
+}
+
+def display_class_label(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    return CLASS_DISPLAY_NAMES.get(text) or CLASS_DISPLAY_NAMES.get(text.casefold(), text)
+
 
 
 class PlottingFramework:
@@ -112,6 +136,12 @@ class PlottingFramework:
     def _safe_name(value: str) -> str:
         name = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value).strip()).strip("._-")
         return name or "plot"
+
+    @staticmethod
+    def _class_label_key(value: Any) -> str:
+        if isinstance(value, float) and value.is_integer():
+            return str(int(value))
+        return str(value)
 
     @staticmethod
     def save_classification_data(
@@ -252,6 +282,10 @@ class PlottingFramework:
         return path
 
     @staticmethod
+    def _plot_title(default: str, title: str | None = None) -> str:
+        return default if title is None else title
+
+    @staticmethod
     def _preferred_classification_variant(
         config: Mapping[str, Any],
         preferred: Sequence[str] = (),
@@ -288,6 +322,7 @@ class PlottingFramework:
         run_dir: str | Path | None = None,
         label: str | None = None,
         preferred_variants: Sequence[str] = (),
+        title: str | None = None,
     ) -> Path:
         if run_dir is None:
             manifest = self.manifest
@@ -304,14 +339,18 @@ class PlottingFramework:
         row_sums = cm.sum(axis=1, keepdims=True)
         normalized = np.divide(cm, row_sums, out=np.zeros_like(cm, dtype=float), where=row_sums != 0) * 100
         names = config.get("class_name_map", {})
-        display = [names.get(str(int(x)) if float(x).is_integer() else str(x), str(x)) for x in labels]
+        display = [
+            display_class_label(names.get(self._class_label_key(x), self._class_label_key(x)))
+            for x in labels
+        ]
         plot_label = label or variant
 
         fig, ax = plt.subplots(figsize=(6 + 0.35 * len(labels), 4.8 + 0.35 * len(labels)))
         sns.heatmap(normalized, annot=True, fmt=".0f", cmap="Blues", vmin=0, vmax=100,
                     xticklabels=display, yticklabels=display, cbar_kws={"label": "Row-normalized (%)"}, ax=ax)
-        ax.set(xlabel="Predicted", ylabel="True", title=f"{config['selected_model']} — {plot_label}")
-        ax.tick_params(axis="x", rotation=45)
+        default_title = f"{self._display_model_name(config['selected_model'])} — {plot_label}"
+        ax.set(xlabel="Predicted", ylabel="True", title=self._plot_title(default_title, title))
+        ax.tick_params(axis="x", rotation=45 if config.get("is_b_all") else 0)
         fig.tight_layout()
         return self._save(fig, f"confusion_matrix_{self._safe_name(plot_label)}.pdf", show=show)
 
@@ -319,13 +358,16 @@ class PlottingFramework:
         self,
         uncorrected_run_dir: str | Path | None = None,
         show: bool = False,
+        title: str | None = None,
+        corrected_title: str | None = None,
+        uncorrected_title: str | None = None,
     ) -> list[Path]:
         config = self.manifest.get("classification", {})
         variants = list(config.get("files", {}))
         if config.get("is_b_all"):
             preferred = config.get("curve_variant")
             variants = [preferred] if preferred in variants else variants[:1]
-            return [self.plot_confusion_matrix(variant, show=show) for variant in variants]
+            return [self.plot_confusion_matrix(variant, show=show, title=title) for variant in variants]
 
         uncorrected_run_dir = uncorrected_run_dir or self.uncorrected_run_dir
         if uncorrected_run_dir is not None:
@@ -334,20 +376,42 @@ class PlottingFramework:
                 preferred=("corrected", "holdout_test"),
             )
             return [
-                self.plot_confusion_matrix(corrected_variant, label="corrected", show=show),
+                self.plot_confusion_matrix(
+                    corrected_variant,
+                    label="corrected",
+                    show=show,
+                    title=corrected_title or title,
+                ),
                 self.plot_confusion_matrix(
                     run_dir=uncorrected_run_dir,
                     label="uncorrected",
                     preferred_variants=("uncorrected", "corrected", "holdout_test"),
                     show=show,
+                    title=uncorrected_title or title,
                 ),
             ]
 
-        return [self.plot_confusion_matrix(variant, show=show) for variant in variants]
+        def variant_title(variant: str) -> str | None:
+            if len(variants) <= 1:
+                return title
+            if variant == "uncorrected":
+                return uncorrected_title or title
+            if variant in {"corrected", "holdout_test"}:
+                return corrected_title or title
+            return title
+
+        return [
+            self.plot_confusion_matrix(
+                variant,
+                show=show,
+                title=variant_title(str(variant)),
+            )
+            for variant in variants
+        ]
 
     @staticmethod
     def _display_model_name(name: Any) -> str:
-        return str(name).replace("_", " ").strip().title()
+        return display_model_name(name)
 
     def _is_selected_model(self, model: Any) -> bool:
         return self.selected_model is not None and str(model) == str(self.selected_model)
@@ -376,6 +440,17 @@ class PlottingFramework:
             if self._is_selected_model(model):
                 text.set_fontweight("bold")
         return legend
+
+    @staticmethod
+    def _model_color_map(models: Sequence[Any]) -> dict[str, Any]:
+        colors = plt.rcParams["axes.prop_cycle"].by_key().get("color", [])
+        if not colors:
+            colors = list(plt.get_cmap("tab10").colors)
+        ordered_models = sorted({str(model) for model in models})
+        return {
+            model: colors[idx % len(colors)]
+            for idx, model in enumerate(ordered_models)
+        }
 
     @staticmethod
     def _interpolate_pr_curve(
@@ -434,11 +509,13 @@ class PlottingFramework:
         table: str,
         *,
         threshold_optimized: bool = False,
+        run_dir: str | Path | None = None,
     ) -> Path:
         if table not in {"test_metrics", "per_class"}:
             raise ValueError("table must be 'test_metrics' or 'per_class'")
 
-        tables_dir = self.run_dir / "train_artifacts" / "tables"
+        root = Path(run_dir) if run_dir is not None else self.run_dir
+        tables_dir = root / "train_artifacts" / "tables"
         suffix = (
             f"_threshold_optimized_{table}.csv"
             if threshold_optimized
@@ -511,12 +588,380 @@ class PlottingFramework:
             scores[column] = pd.to_numeric(scores[column], errors="coerce")
         return scores
 
+    def _paired_uncorrected_framework(self) -> "PlottingFramework":
+        if self.uncorrected_run_dir is None:
+            raise ValueError(
+                "uncorrected_run_dir is not set; cannot compare corrected and uncorrected results."
+            )
+        return PlottingFramework(
+            run_dir=self.uncorrected_run_dir,
+            output_dir=self.output_dir,
+        )
+
+    def _classification_variant_frame_for_comparison(
+        self,
+        *,
+        preferred_variants: Sequence[str],
+        label: str,
+    ) -> pd.DataFrame:
+        config = self.manifest.get("classification", {})
+        variant = self._preferred_classification_variant(config, preferred_variants)
+        frame = self._classification_frame(variant)
+        missing = {"y_true", "y_pred"} - set(frame.columns)
+        if missing:
+            raise KeyError(
+                f"Saved {label} classification data is missing required columns: {sorted(missing)}"
+            )
+        return frame
+
+    @staticmethod
+    def _format_model_summary(scores: pd.DataFrame) -> str:
+        if scores.empty:
+            return "model unavailable, n_test unavailable"
+        row = scores.iloc[0]
+        model = row.get("model", "")
+        n_test = pd.to_numeric(pd.Series([row.get("n_test")]), errors="coerce").iloc[0]
+        n_label = "NA" if pd.isna(n_test) else f"{n_test:.0f}"
+        return f"{PlottingFramework._display_model_name(model)} (n_test={n_label})"
+
+    @staticmethod
+    def _stable_label_order(
+        labels: Sequence[Any],
+        class_order: Sequence[Any] | None = None,
+        class_name_map: Mapping[str, str] | None = None,
+    ) -> list[Any]:
+        labels_list = list(labels)
+        if class_order is not None:
+            class_name_map = class_name_map or {}
+            labels_by_key: dict[str, Any] = {}
+            for label in labels_list:
+                label_key = PlottingFramework._class_label_key(label)
+                labels_by_key.setdefault(label_key, label)
+                display_name = class_name_map.get(label_key)
+                if display_name:
+                    labels_by_key.setdefault(str(display_name), label)
+                    labels_by_key.setdefault(display_class_label(display_name), label)
+
+            requested = []
+            for requested_label in class_order:
+                matched = labels_by_key.get(str(requested_label))
+                if matched is None:
+                    matched = labels_by_key.get(display_class_label(requested_label))
+                if matched in labels_list and matched not in requested:
+                    requested.append(matched)
+            remaining = [label for label in labels_list if label not in requested]
+            return requested + sorted(remaining, key=lambda value: str(value))
+
+        def key(value: Any) -> tuple[int, float, str]:
+            try:
+                return (0, float(value), str(value))
+            except (TypeError, ValueError):
+                return (1, 0.0, str(value))
+
+        return sorted(labels_list, key=key)
+
+    @staticmethod
+    def _class_display_name(label: Any, class_name_map: Mapping[str, str]) -> str:
+        key = PlottingFramework._class_label_key(label)
+        return display_class_label(class_name_map.get(key, key))
+
+    def _per_class_recall_from_predictions(
+        self,
+        frame: pd.DataFrame,
+        *,
+        labels: Sequence[Any],
+    ) -> dict[Any, float]:
+        y_true = frame["y_true"]
+        y_pred = frame["y_pred"]
+        recalls: dict[Any, float] = {}
+        for label in labels:
+            true_mask = y_true.astype(str).eq(str(label))
+            support = int(true_mask.sum())
+            if support == 0:
+                recalls[label] = float("nan")
+            else:
+                correct = y_pred.loc[true_mask].astype(str).eq(str(label)).sum()
+                recalls[label] = float(correct / support)
+        return recalls
+
+    def plot_corrected_vs_uncorrected_classification_results(
+        self,
+        model_name: str | None = None,
+        *,
+        class_order: Sequence[Any] | None = None,
+        threshold_optimized: bool = False,
+        show: bool = False,
+        title: str | None = None,
+    ) -> list[Path]:
+        """Compare corrected and uncorrected selected-model classification results.
+
+        The macro-performance plot uses the saved holdout metric tables. The
+        per-class recall plot recomputes recall directly from saved
+        ``y_true``/``y_pred`` rows in ``pdf_plots/base_files/classification``.
+        """
+        uncorrected_framework = self._paired_uncorrected_framework()
+
+        corrected_scores = self.selected_model_holdout_test_scores(
+            model_name=model_name,
+            threshold_optimized=threshold_optimized,
+        )
+        uncorrected_scores = uncorrected_framework.selected_model_holdout_test_scores(
+            model_name=None,
+            threshold_optimized=threshold_optimized,
+        )
+
+        corrected_frame = self._classification_variant_frame_for_comparison(
+            preferred_variants=("corrected", "holdout_test"),
+            label="corrected",
+        )
+        saved_corrected_model = self.manifest.get("classification", {}).get("selected_model")
+        if (
+            model_name is not None
+            and saved_corrected_model is not None
+            and str(model_name) != str(saved_corrected_model)
+        ):
+            raise ValueError(
+                "Per-class recall requires saved y_true/y_pred rows for the requested corrected model. "
+                f"The saved classification predictions are for '{saved_corrected_model}', not '{model_name}'."
+            )
+        uncorrected_frame = uncorrected_framework._classification_variant_frame_for_comparison(
+            preferred_variants=("uncorrected", "holdout_test", "corrected"),
+            label="uncorrected",
+        )
+
+        paths: list[Path] = []
+        metrics = ["accuracy", "precision", "recall", "f1"]
+        metric_labels = ["Accuracy", "Precision", "Recall", "F1"]
+        corrected_values = corrected_scores.iloc[0][metrics].astype(float).to_numpy() * 100.0
+        uncorrected_values = uncorrected_scores.iloc[0][metrics].astype(float).to_numpy() * 100.0
+
+        x = np.arange(len(metrics))
+        width = 0.34
+        fig, ax = plt.subplots(figsize=(8.4, 5.8), constrained_layout=True)
+        bars_uncorrected = ax.bar(
+            x - width / 2,
+            uncorrected_values,
+            width,
+            label="Uncorrected",
+            color="#8c8c8c",
+        )
+        bars_corrected = ax.bar(
+            x + width / 2,
+            corrected_values,
+            width,
+            label="Corrected",
+            color="#2f6f9f",
+        )
+
+        finite_values = np.concatenate(
+            [
+                corrected_values[np.isfinite(corrected_values)],
+                uncorrected_values[np.isfinite(uncorrected_values)],
+            ]
+        )
+        ax.set_ylim(75, 103)
+        value_offset = 0.6
+        delta_offset = 1.5
+        for bars, values in (
+            (bars_uncorrected, uncorrected_values),
+            (bars_corrected, corrected_values),
+        ):
+            for bar, value in zip(bars, values):
+                if not np.isfinite(value):
+                    continue
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    value + value_offset,
+                    f"{value:.1f}%",
+                    ha="center",
+                    va="bottom",
+                    fontsize=8,
+                )
+
+        for bar, corrected, uncorrected in zip(
+            bars_corrected,
+            corrected_values,
+            uncorrected_values,
+        ):
+            if not (np.isfinite(corrected) and np.isfinite(uncorrected)):
+                continue
+            delta = corrected - uncorrected
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                corrected + delta_offset,
+                f"{delta:+.1f} pp",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+                fontweight="bold",
+                color="#1f4e73" if delta >= 0 else "#9b2d2d",
+            )
+
+        corrected_summary = self._format_model_summary(corrected_scores)
+        uncorrected_summary = self._format_model_summary(uncorrected_scores)
+        ax.set(
+            xticks=x,
+            xticklabels=metric_labels,
+            ylabel="Score (%)",
+        )
+        ax.yaxis.set_major_formatter(PercentFormatter(xmax=100))
+        ax.set_title(
+            self._plot_title("Corrected vs Uncorrected Performance", title),
+            fontsize=13,
+            pad=16,
+        )
+        ax.legend(frameon=False, loc="upper right")
+        ax.grid(axis="y", color="0.9", linewidth=0.8)
+        ax.set_axisbelow(True)
+        paths.append(
+            self._save(
+                fig,
+                "corrected_vs_uncorrected_macro_performance.pdf",
+                show=show,
+            )
+        )
+
+        raw_labels = list(
+            pd.unique(
+                pd.concat(
+                    [
+                        corrected_frame["y_true"],
+                        corrected_frame["y_pred"],
+                        uncorrected_frame["y_true"],
+                        uncorrected_frame["y_pred"],
+                    ],
+                    ignore_index=True,
+                )
+            )
+        )
+        class_name_map = {
+            **uncorrected_framework.manifest.get("classification", {}).get("class_name_map", {}),
+            **self.manifest.get("classification", {}).get("class_name_map", {}),
+        }
+        labels = self._stable_label_order(
+            raw_labels,
+            class_order=class_order,
+            class_name_map=class_name_map,
+        )
+        if not labels:
+            raise ValueError("No class labels were found in the saved classification predictions.")
+
+        uncorrected_recalls = uncorrected_framework._per_class_recall_from_predictions(
+            uncorrected_frame,
+            labels=labels,
+        )
+        corrected_recalls = self._per_class_recall_from_predictions(
+            corrected_frame,
+            labels=labels,
+        )
+        labels = sorted(
+            labels,
+            key=lambda label: (
+                -(
+                    corrected_recalls[label] - uncorrected_recalls[label]
+                    if np.isfinite(corrected_recalls[label])
+                    and np.isfinite(uncorrected_recalls[label])
+                    else float("-inf")
+                ),
+                str(label),
+            ),
+        )
+
+        def spread_positions(values: Sequence[float]) -> list[float]:
+            finite_values = [float(value) for value in values if np.isfinite(value)]
+            if not finite_values:
+                return [float(value) for value in values]
+            min_gap = min(6.0, 90.0 / max(len(finite_values), 1))
+            indexed = sorted(
+                [(idx, float(value)) for idx, value in enumerate(values)],
+                key=lambda item: item[1],
+            )
+            adjusted = [float(value) for value in values]
+            last = -np.inf
+            for idx, value in indexed:
+                if not np.isfinite(value):
+                    continue
+                adjusted[idx] = min(102.0, max(value, last + min_gap))
+                last = adjusted[idx]
+            overflow = adjusted[indexed[-1][0]] - 102.0 if indexed else 0.0
+            if overflow > 0:
+                for idx, _ in indexed:
+                    adjusted[idx] = max(-2.0, adjusted[idx] - overflow)
+            return adjusted
+
+        left_values = [uncorrected_recalls[label] for label in labels]
+        right_values = [corrected_recalls[label] for label in labels]
+        left_label_y = spread_positions([value * 100.0 for value in left_values])
+        right_label_y = spread_positions([value * 100.0 for value in right_values])
+        recall_ylim = (70, 106)
+        label_ymax = recall_ylim[1] - 2.5
+
+        fig, ax = plt.subplots(
+            figsize=(9.4, max(5.8, 0.58 * len(labels) + 3.2)),
+            constrained_layout=True,
+        )
+        color_cycle = plt.rcParams["axes.prop_cycle"].by_key().get("color", [])
+        for idx, label in enumerate(labels):
+            left = uncorrected_recalls[label]
+            right = corrected_recalls[label]
+            delta = right - left if np.isfinite(left) and np.isfinite(right) else np.nan
+            left_pct = left * 100.0 if np.isfinite(left) else left
+            right_pct = right * 100.0 if np.isfinite(right) else right
+            delta_pct = delta * 100.0 if np.isfinite(delta) else delta
+            display = self._class_display_name(label, class_name_map)
+            color = color_cycle[idx % len(color_cycle)] if color_cycle else None
+            ax.plot([0, 1], [left_pct, right_pct], marker="o", linewidth=1.7, color=color)
+            left_x = -0.045 - 0.012 * (idx % 2)
+            right_x = 1.045 + 0.018 * (idx % 3)
+            if np.isfinite(left_pct):
+                ax.text(
+                    left_x,
+                    min(left_label_y[idx], label_ymax),
+                    f"{left_pct:.1f}%",
+                    ha="right",
+                    va="center",
+                    fontsize=8,
+                    color=color,
+                )
+            if np.isfinite(right_pct):
+                ax.text(
+                    right_x,
+                    min(right_label_y[idx], label_ymax),
+                    f"{display} {right_pct:.1f}% ({delta_pct:+.1f} pp)",
+                    ha="left",
+                    va="center",
+                    fontsize=8,
+                    color=color,
+                )
+
+        ax.set(
+            xlim=(-0.24, 1.52),
+            ylim=recall_ylim,
+            xticks=[0, 1],
+            xticklabels=["Uncorrected", "Corrected"],
+            ylabel="Recall (%)",
+        )
+        ax.yaxis.set_major_formatter(PercentFormatter(xmax=100))
+        ax.set_title("Per-Class Recall: Corrected vs Uncorrected", fontsize=13, pad=16)
+        ax.grid(axis="y", color="0.9", linewidth=0.8)
+        ax.grid(axis="x", color="0.94", linewidth=0.8)
+        ax.set_axisbelow(True)
+        paths.append(
+            self._save(
+                fig,
+                "corrected_vs_uncorrected_per_class_recall.pdf",
+                show=show,
+            )
+        )
+
+        return paths
+
     def print_selected_model_holdout_test_scores(
         self,
         model_name: str | None = None,
         *,
         threshold_optimized: bool = False,
-        digits: int = 4,
+        digits: int = 3,
         uncorr: bool = False,
     ) -> pd.DataFrame:
         """Print selected-model holdout test scores and return them as a DataFrame.
@@ -556,12 +1001,13 @@ class PlottingFramework:
         label = "threshold-optimized holdout" if threshold_optimized else "holdout"
         print(f"Selected model {label} test scores (macro precision/recall/F1):")
 
-        float_formatter = lambda value: "" if pd.isna(value) else f"{value:.{digits}3f}"
+        float_formatter = lambda value: "" if pd.isna(value) else f"{value:.{digits}f}"
 
         print(
             scores.to_string(
                 index=False,
                 formatters={
+                    "model": self._display_model_name,
                     "n_test": lambda value: "" if pd.isna(value) else f"{value:.0f}",
                     "accuracy": float_formatter,
                     "precision": float_formatter,
@@ -586,6 +1032,7 @@ class PlottingFramework:
             scores.to_string(
                 index=False,
                 formatters={
+                    "model": self._display_model_name,
                     "n_test": lambda value: "" if pd.isna(value) else f"{value:.0f}",
                     "accuracy": float_formatter,
                     "precision": float_formatter,
@@ -691,7 +1138,10 @@ class PlottingFramework:
             return out.astype(str)
 
         class_name_map = self.manifest.get("classification", {}).get("class_name_map", {})
-        reverse = {str(v): str(k) for k, v in class_name_map.items()}
+        reverse: dict[str, str] = {}
+        for key, value in class_name_map.items():
+            reverse.setdefault(str(value), str(key))
+            reverse.setdefault(display_class_label(value), str(key))
         mapped = out.astype(str).map(reverse)
         if mapped.notna().any():
             return mapped.fillna(out.astype(str))
@@ -956,7 +1406,7 @@ class PlottingFramework:
             raise KeyError("No saved classification curve data was found.")
         return [(config["selected_model"], *self._curve_arrays_from_file(relative))]
 
-    def plot_pr_curve(self, show: bool = False) -> Path:
+    def plot_pr_curve(self, show: bool = False, title: str | None = None) -> Path:
         recall_grid = np.linspace(0, 1, 500)
         items = []
         for model, y_true, probabilities, labels in self._curve_model_arrays():
@@ -986,25 +1436,27 @@ class PlottingFramework:
         items = self._sort_curve_items(items)
         is_binary = all(len(labels) == 2 for _, _, _, labels in self._curve_model_arrays())
         metric_label = "AP" if is_binary else "macro AP"
-        title = "Precision–Recall Curve" if is_binary else "Macro Precision–Recall Curve"
+        default_title = "Precision–Recall Curve" if is_binary else "Macro Precision–Recall Curve"
         fig, ax = plt.subplots(figsize=(6.5, 5))
+        color_map = self._model_color_map([model for model, _, _ in items])
         for model, curve, score in items:
             display_name = self._display_model_name(model)
             ax.plot(
                 recall_grid,
                 curve,
+                color=color_map[str(model)],
                 label=f"{display_name} ({metric_label}={score:.3f})",
             )
         ax.set(
             xlabel="Recall",
             ylabel="Precision",
-            title=title,
+            title=self._plot_title(default_title, title),
         )
         self._style_curve_legend(ax, items)
         fig.tight_layout()
         return self._save(fig, "precision_recall_curve.pdf", show=show)
 
-    def plot_roc_curve(self, show: bool = False) -> Path:
+    def plot_roc_curve(self, show: bool = False, title: str | None = None) -> Path:
         fpr_grid = np.linspace(0, 1, 500)
         items = []
         for model, y_true, probabilities, labels in self._curve_model_arrays():
@@ -1034,20 +1486,22 @@ class PlottingFramework:
         items = self._sort_curve_items(items)
         is_binary = all(len(labels) == 2 for _, _, _, labels in self._curve_model_arrays())
         metric_label = "AUROC" if is_binary else "macro AUROC"
-        title = "ROC Curve" if is_binary else "Macro ROC Curve"
+        default_title = "ROC Curve" if is_binary else "Macro ROC Curve"
         fig, ax = plt.subplots(figsize=(6.5, 5))
         ax.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="0.5")
+        color_map = self._model_color_map([model for model, _, _ in items])
         for model, curve, score in items:
             display_name = self._display_model_name(model)
             ax.plot(
                 fpr_grid,
                 curve,
+                color=color_map[str(model)],
                 label=f"{display_name} ({metric_label}={score:.3f})",
             )
         ax.set(
             xlabel="False Positive Rate",
             ylabel="True Positive Rate",
-            title=title,
+            title=self._plot_title(default_title, title),
         )
         self._style_curve_legend(ax, items)
         fig.tight_layout()
@@ -1061,6 +1515,7 @@ class PlottingFramework:
         sample_col: str | None = None,
         model_name: str | None = None,
         show: bool = False,
+        title: str | None = None,
     ) -> Path:
         recall_grid = np.linspace(0, 1, 500)
         items = []
@@ -1105,15 +1560,21 @@ class PlottingFramework:
             )
         )
         metric_label = "AP" if is_binary else "macro AP"
-        title = "Precision–Recall Curve" if is_binary else "Macro Precision–Recall Curve"
+        default_title = "Precision–Recall Curve" if is_binary else "Macro Precision–Recall Curve"
         fig, ax = plt.subplots(figsize=(6.5, 5))
+        color_map = self._model_color_map([model for model, _, _ in items])
         for model, curve, score in items:
             display_name = self._display_model_name(model)
-            ax.plot(recall_grid, curve, label=f"{display_name} ({metric_label}={score:.3f})")
+            ax.plot(
+                recall_grid,
+                curve,
+                color=color_map[str(model)],
+                label=f"{display_name} ({metric_label}={score:.3f})",
+            )
         ax.set(
             xlabel="Recall",
             ylabel="Precision",
-            title=title,
+            title=self._plot_title(default_title, title),
         )
         self._style_curve_legend(ax, items)
         fig.tight_layout()
@@ -1127,6 +1588,7 @@ class PlottingFramework:
         sample_col: str | None = None,
         model_name: str | None = None,
         show: bool = False,
+        title: str | None = None,
     ) -> Path:
         fpr_grid = np.linspace(0, 1, 500)
         items = []
@@ -1171,16 +1633,22 @@ class PlottingFramework:
             )
         )
         metric_label = "AUROC" if is_binary else "macro AUROC"
-        title = "ROC Curve" if is_binary else "Macro ROC Curve"
+        default_title = "ROC Curve" if is_binary else "Macro ROC Curve"
         fig, ax = plt.subplots(figsize=(6.5, 5))
         ax.plot([0, 1], [0, 1], linestyle="--", linewidth=1, color="0.5")
+        color_map = self._model_color_map([model for model, _, _ in items])
         for model, curve, score in items:
             display_name = self._display_model_name(model)
-            ax.plot(fpr_grid, curve, label=f"{display_name} ({metric_label}={score:.3f})")
+            ax.plot(
+                fpr_grid,
+                curve,
+                color=color_map[str(model)],
+                label=f"{display_name} ({metric_label}={score:.3f})",
+            )
         ax.set(
             xlabel="False Positive Rate",
             ylabel="True Positive Rate",
-            title=title,
+            title=self._plot_title(default_title, title),
         )
         self._style_curve_legend(ax, items)
         fig.tight_layout()
@@ -1194,6 +1662,7 @@ class PlottingFramework:
         sample_col: str | None = None,
         model_name: str | None = None,
         show: bool = False,
+        title: str | None = None,
     ) -> list[Path]:
         return [
             self.plot_prediction_pr_curve(
@@ -1202,6 +1671,7 @@ class PlottingFramework:
                 sample_col=sample_col,
                 model_name=model_name,
                 show=show,
+                title=title,
             ),
             self.plot_prediction_roc_curve(
                 true_label_path,
@@ -1209,6 +1679,7 @@ class PlottingFramework:
                 sample_col=sample_col,
                 model_name=model_name,
                 show=show,
+                title=title,
             ),
         ]
 
@@ -1217,6 +1688,9 @@ class PlottingFramework:
         show: bool = False,
         filename_prefix: str = "",
         column_order: Sequence[str] | None = None,
+        title: str | None = None,
+        corrected_title: str | None = None,
+        uncorrected_title: str | None = None,
 
     ) -> list[Path]:
         config = self.manifest.get("pca", {})
@@ -1248,7 +1722,19 @@ class PlottingFramework:
                 continue
             fig, ax = plt.subplots(figsize=(max(6, 1.8 * frame.shape[1]), 0.5 * frame.shape[0] + 2))
             sns.heatmap(frame, annot=True, cmap="viridis", vmin=0, vmax=vmax, ax=ax)
-            ax.set(xlabel="Metadata variables", ylabel="Principal components", title=f"PC associations — {state} correction")
+            default_title = f"PC associations — {state} correction"
+            state_title = (
+                uncorrected_title
+                if state == "before"
+                else corrected_title
+                if state == "after"
+                else None
+            )
+            ax.set(
+                xlabel="Metadata variables",
+                ylabel="Principal components",
+                title=self._plot_title(default_title, state_title or title),
+            )
             fig.tight_layout()
             paths.append(self._save(fig, f"{filename_prefix}pc_metadata_associations_{state}.pdf", show=show))
         return paths
@@ -1258,7 +1744,8 @@ class PlottingFramework:
         state: str,
         show: bool = False,
         filename_prefix: str = "",
-        colored_by: Union[pd.Series, None] = None
+        colored_by: Union[pd.Series, None] = None,
+        title: str | None = None,
     ) -> Path:
         if state not in {"before", "after"}:
             raise ValueError("state must be 'before' or 'after'")
@@ -1276,11 +1763,11 @@ class PlottingFramework:
         fig, ax = plt.subplots(figsize=(7, 5))
         if colored_by is not None:
             sns.scatterplot(data=frame, x="PC1", y="PC2", hue=colored_by, s=45, ax=ax)
-            title = f"PCA by {colored_by.name or 'IGHV'} — {state} correction"
+            default_title = f"PC1 vs PC2 colored by {colored_by.name or 'metadata'} — {state} correction"
         else:
             sns.scatterplot(data=frame, x="PC1", y="PC2", hue=cohort, s=45, ax=ax)
-            title = f"PCA by {cohort} — {state} correction"
-        ax.set(xlabel=x_label, ylabel=y_label, title=title)
+            default_title = f"PC1 vs PC2 colored by {cohort} — {state} correction"
+        ax.set(xlabel=x_label, ylabel=y_label, title=self._plot_title(default_title, title))
         fig.tight_layout()
         return self._save(fig, f"{filename_prefix}pca_pc1_pc2_{state}.pdf", show=show)
 
@@ -1288,25 +1775,28 @@ class PlottingFramework:
         self,
         show: bool = False,
         filename_prefix: str = "",
-        colored_by: Union[pd.Series, None] = None
+        colored_by: Union[pd.Series, None] = None,
+        title: str | None = None,
+        corrected_title: str | None = None,
+        uncorrected_title: str | None = None,
     ) -> list[Path]:
         if colored_by is not None:
             return [
-                self.plot_pca_scatter("before", show=show, filename_prefix=filename_prefix),
-                self.plot_pca_scatter("after", show=show, filename_prefix=filename_prefix),
-                self.plot_pca_scatter("before", show=show, filename_prefix=filename_prefix, colored_by=colored_by),
-                self.plot_pca_scatter("after", show=show, filename_prefix=filename_prefix, colored_by=colored_by),
+                self.plot_pca_scatter("before", show=show, filename_prefix=filename_prefix, title=uncorrected_title or title),
+                self.plot_pca_scatter("after", show=show, filename_prefix=filename_prefix, title=corrected_title or title),
+                self.plot_pca_scatter("before", show=show, filename_prefix=filename_prefix, colored_by=colored_by, title=uncorrected_title or title),
+                self.plot_pca_scatter("after", show=show, filename_prefix=filename_prefix, colored_by=colored_by, title=corrected_title or title),
             ]
         return [
-            self.plot_pca_scatter("before", show=show, filename_prefix=filename_prefix),
-            self.plot_pca_scatter("after", show=show, filename_prefix=filename_prefix),
+            self.plot_pca_scatter("before", show=show, filename_prefix=filename_prefix, title=uncorrected_title or title),
+            self.plot_pca_scatter("after", show=show, filename_prefix=filename_prefix, title=corrected_title or title),
         ]
 
-    def plot_prediction_pca_scatters(self, show: bool = False) -> list[Path]:
-        return self.plot_pca_scatters(show=show, filename_prefix="prediction_")
+    def plot_prediction_pca_scatters(self, show: bool = False, title: str | None = None) -> list[Path]:
+        return self.plot_pca_scatters(show=show, filename_prefix="prediction_", title=title)
 
-    def plot_prediction_pc_metadata_heatmaps(self, show: bool = False) -> list[Path]:
-        return self.plot_pc_metadata_heatmaps(show=show, filename_prefix="prediction_")
+    def plot_prediction_pc_metadata_heatmaps(self, show: bool = False, title: str | None = None) -> list[Path]:
+        return self.plot_pc_metadata_heatmaps(show=show, filename_prefix="prediction_", title=title)
 
     def generate_prediction_plots(
         self,

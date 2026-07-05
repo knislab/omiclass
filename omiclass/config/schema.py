@@ -474,5 +474,9 @@ class Config(BaseModel):
 
     @model_validator(mode="after")
     def _final_checks(self):
-        # Add any cross-field validations here if needed
+        if (
+            self.de_gene_selection.close_pair_count is None
+            and self.project.classes_names is not None
+        ):
+            self.de_gene_selection.close_pair_count = max(1, len(self.project.classes_names) - 1)
         return self

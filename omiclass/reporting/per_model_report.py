@@ -15,6 +15,7 @@ import pandas as pd
 from omiclass.reporting.assets import wrap_report_html
 from omiclass.reporting.components import card, kv_table, metric_grid, panel, chips_panel, esc, svg_panel
 
+from omiclass.plotting.display_names import display_model_name
 from omiclass.plotting.geneset_plotter import plot_geneset_top_frequency_bar
 from omiclass.reporting.nav import build_sidebar_from_run_dir, render_sidebar_html
 from omiclass.utils.gene_symbols import get_gene_symbols
@@ -570,7 +571,7 @@ def _render_per_model_html(d: Dict[str, Any], out_html: Path, site_dir: Path, cf
     geneset = d.get("geneset") or None
     downloads = d.get("downloads") or None
 
-    title = str(model.get("name") or "model").replace("_", " ").title()
+    title = display_model_name(model.get("name") or "model")
     subtitle = str(model.get("estimator") or "")
     subtitle = clear_name(subtitle)
 
