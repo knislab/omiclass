@@ -8,6 +8,31 @@ BatchMethod = Literal["batch", "design", "covariates", "pcs"]
 Modality = Literal["rnaseq", "cptac_ms"]
 
 # ---------- BulkFormer feature extraction ----------
+class BulkFormerReductionCfg(BaseModel):
+    strategy: Literal["full", "supervised", "pca", "supervised_pca"] = "full"
+    supervised_dimensions: int = 200
+    pca_components: int = 50
+    one_vs_rest_fraction: float = 0.5
+    close_pair_fraction: float = 0.5
+    close_pair_count: Optional[int] = None
+    close_pair_pca_components: int = 10
+    random_state: Optional[int] = None
+
+    @model_validator(mode="after")
+    def _validate_reduction(self):
+        if self.supervised_dimensions <= 0:
+            raise ValueError("bulkformer.reduction.supervised_dimensions must be positive.")
+        if self.pca_components <= 0 or self.close_pair_pca_components <= 0:
+            raise ValueError("BulkFormer PCA component counts must be positive.")
+        if self.one_vs_rest_fraction < 0 or self.close_pair_fraction < 0:
+            raise ValueError("BulkFormer reduction budget fractions must be non-negative.")
+        if self.one_vs_rest_fraction + self.close_pair_fraction <= 0:
+            raise ValueError("At least one BulkFormer supervised budget fraction must be positive.")
+        if self.close_pair_count is not None and self.close_pair_count <= 0:
+            raise ValueError("bulkformer.reduction.close_pair_count must be positive when set.")
+        return self
+
+
 class BulkFormerCfg(BaseModel):
     enabled: bool = False
     root_dir: Path = Path("BulkFormer")
@@ -21,6 +46,7 @@ class BulkFormerCfg(BaseModel):
     gene_info_path: Optional[Path] = None
     gene_lengths_path: Optional[Path] = None
     interested_gene_path: Optional[Path] = None
+    reduction: BulkFormerReductionCfg = Field(default_factory=BulkFormerReductionCfg)
 
     @field_validator("device")
     @classmethod
@@ -532,4 +558,13 @@ class Config(BaseModel):
             and self.project.classes_names is not None
         ):
             self.de_gene_selection.close_pair_count = max(1, len(self.project.classes_names) - 1)
+        if (
+            bool(getattr(self.bulkformer, "enabled", False))
+            and self.bulkformer.reduction.strategy != "full"
+            and self.runtime.feature_selection.enabled
+        ):
+            raise ValueError(
+                "runtime.feature_selection.enabled must be false when using a non-full "
+                "BulkFormer reduction strategy."
+            )
         return self

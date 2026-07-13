@@ -20,6 +20,8 @@ class RebatchCorrectionStep:
     name = "rebatch_correction"
 
     def should_run(self, ctx: RunContext) -> bool:
+        if bool(getattr(getattr(ctx.cfg, "bulkformer", None), "enabled", False)):
+            return False
         if ctx.opts.mode == "clean_and_predict":
             return True
         return False

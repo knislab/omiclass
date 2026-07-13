@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
+import json
 import pandas as pd
 import joblib
 from sklearn.model_selection import StratifiedKFold
@@ -26,6 +27,8 @@ from .auto_config import apply_auto_config
 from omiclass.errors.errors import TuningError 
 from omiclass.errors.faild_model import _failed_row
 from sklearn.pipeline import Pipeline as SkPipeline
+from omiclass.features.bulkformer_reduction import build_bulkformer_representation
+from .cv_engine import _bulkformer_representation_from_model
 from omiclass.utils.surface_markers import apply_surface_marker_filter_with_min
 try:
     from imblearn.pipeline import Pipeline as ImbPipeline
@@ -51,6 +54,34 @@ class Trainer:
         self.cv_results: dict[str, CVResult] = {}
         self.builders: dict[str, Any] = {}
 
+    def _bulkformer_reduction_active(self) -> bool:
+        bulkformer = getattr(self.cfg, "bulkformer", None)
+        return bool(bulkformer and bulkformer.enabled)
+
+    def _with_bulkformer_reduction(self, builder):
+        if not self._bulkformer_reduction_active():
+            return builder
+
+        def wrapped_builder():
+            return SkPipeline([
+                ("bulkformer_representation", build_bulkformer_representation(
+                    self.cfg.bulkformer, int(self.cfg.runtime.random_state)
+                )),
+                ("classifier", builder()),
+            ])
+        return wrapped_builder
+
+    def _reduction_space(self, space: dict) -> dict:
+        if not self._bulkformer_reduction_active():
+            return space
+        return {f"classifier__{key}": value for key, value in space.items()}
+
+    def _reduction_fit_kwargs(self, fit_kwargs: dict | None) -> dict:
+        values = dict(fit_kwargs or {})
+        if not self._bulkformer_reduction_active():
+            return values
+        return {f"classifier__{key}": value for key, value in values.items()}
+
     # Internal helpers
     def _safe_inner_cv(self, y: pd.Series, cv: int, seed: int):
         min_count = int(pd.Series(y).value_counts().min())
@@ -73,6 +104,7 @@ class Trainer:
                 boost_cfg = self.cfg.models.light_gbm
                 space = build_lgbm_param_grid(X, boost_cfg.param_grid)
 
+        space = self._reduction_space(space)
         tun = self.cfg.runtime.tuning
         runt = self.cfg.runtime
 
@@ -245,7 +277,9 @@ class Trainer:
         if inner == 0:
             base.fit(X, y)
             return base
-        wrapped = CalibratedClassifierCV(base, method=method, cv=inner)
+        # ensemble=False refits the estimator (including the representation) on
+        # the complete supplied training set after fold-local calibration predictions.
+        wrapped = CalibratedClassifierCV(base, method=method, cv=inner, ensemble=False)
         return self._final_fit_with_kwargs(wrapped, X, y, fit_kwargs=fit_kwargs)
 
     def _save_model(self, model, filename: str) -> Path:
@@ -254,6 +288,56 @@ class Trainer:
         path.parent.mkdir(parents=True, exist_ok=True)
         joblib.dump(export_model, path)
         return path
+
+    def _write_bulkformer_reduction_artifacts(self, model, cvres: CVResult, model_key: str) -> None:
+        representation = _bulkformer_representation_from_model(model)
+        if representation is None:
+            return
+        out = self.artifacts_dir / "bulkformer_reduction"
+        out.mkdir(parents=True, exist_ok=True)
+        summary = {
+            "model": model_key,
+            "strategy": representation.strategy,
+            "requested_supervised_dimensions": representation.supervised_dimensions,
+            "requested_pca_components": representation.pca_components,
+            "input_dimensions": int(representation.n_features_in_),
+            "output_dimensions": int(representation.effective_n_features_),
+            "random_state": representation.random_state,
+            "input_features": list(map(str, representation.feature_names_in_)),
+            "output_features": list(map(str, representation.output_features_)),
+        }
+        (out / "reduction_summary.json").write_text(
+            json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8"
+        )
+        fold_rows = []
+        for metrics in cvres.per_fold_metrics:
+            if "bulkformer_reduction_strategy" in metrics:
+                fold_rows.append({
+                    "fold": metrics.get("fold"),
+                    "strategy": metrics.get("bulkformer_reduction_strategy"),
+                    "input_dimensions": metrics.get("bulkformer_input_dimensions"),
+                    "output_dimensions": metrics.get("bulkformer_output_dimensions"),
+                    "selected_dimensions": ";".join(metrics.get("bulkformer_selected_dimensions", [])),
+                    "selected_close_pairs": json.dumps(
+                        metrics.get("bulkformer_close_pairs", []), default=str
+                    ),
+                })
+        pd.DataFrame(fold_rows).to_csv(out / "fold_reduction_summary.csv", index=False)
+        selector = getattr(representation, "selector_", None)
+        if selector is not None:
+            selector.selection_report_.to_csv(out / "selected_embedding_dimensions.csv", index=False)
+            selector.class_centroid_distances_.to_csv(out / "class_centroid_distances.csv")
+            pd.DataFrame(selector.selected_close_pairs_, columns=["class_a", "class_b", "distance"]).to_csv(
+                out / "selected_close_class_pairs.csv", index=False
+            )
+        pca = getattr(representation, "pca_", None)
+        if pca is not None:
+            ratios = np.asarray(pca.explained_variance_ratio_)
+            pd.DataFrame({
+                "component": representation.output_features_,
+                "explained_variance_ratio": ratios,
+                "cumulative_explained_variance_ratio": np.cumsum(ratios),
+            }).to_csv(out / "pca_explained_variance.csv", index=False)
     
 
     # ----- per-variant -----
@@ -274,10 +358,11 @@ class Trainer:
         init_params, fit_kwargs = split_init_and_fit_kwargs(key, raw)
 
         base_builder = get_builder(key, random_state=int(r.random_state), n_jobs=int(r.n_jobs), override_params=init_params,)
+        base_builder = self._with_bulkformer_reduction(base_builder)
         self.builders[key] = base_builder
 
         prefix = "" if key in ("plain_random_forest", "weighted_random_forest") else "rf__"
-        space = build_rf_search_space(X, rf_cfg.defaults.search_space, prefix=prefix)
+        space = self._reduction_space(build_rf_search_space(X, rf_cfg.defaults.search_space, prefix=prefix))
 
 
         fs = getattr(r, "feature_selection", None)
@@ -318,6 +403,18 @@ class Trainer:
             "accuracy_mean": df["accuracy"].mean(),
             "accuracy_std": df["accuracy"].std(),
         }
+        if self._bulkformer_reduction_active():
+            row.update(
+                bulkformer_reduction_strategy=self.cfg.bulkformer.reduction.strategy,
+                bulkformer_requested_supervised_dimensions=(
+                    self.cfg.bulkformer.reduction.supervised_dimensions
+                    if "supervised" in self.cfg.bulkformer.reduction.strategy else np.nan
+                ),
+                bulkformer_requested_pca_components=(
+                    self.cfg.bulkformer.reduction.pca_components
+                    if "pca" in self.cfg.bulkformer.reduction.strategy else np.nan
+                ),
+            )
         # Final production model on ALL data (calibrated if YAML says so)
         best_params = self._tune_full(key, base_builder, X, y) 
 
@@ -355,12 +452,13 @@ class Trainer:
             method=cal.method,
             cv=int(cvs),
             seed=int(r.random_state),
-            fit_kwargs=fit_kwargs,
+            fit_kwargs=self._reduction_fit_kwargs(fit_kwargs),
         )
 
         # Save final model
         saved_path = self._save_model(final_model, filename_for_artifact)
         self.final_models[key] = final_model  # optional in-memory handle
+        self._write_bulkformer_reduction_artifacts(final_model, cvres, key)
 
         return row, saved_path
     
@@ -422,7 +520,7 @@ class Trainer:
             sw = compute_sample_weight("balanced", y)
             fit_kwargs["sample_weight"] = sw
             
-        def base_builder():
+        def unwrapped_builder():
             est_builder = get_builder(
                 key,
                 random_state=int(r.random_state),
@@ -433,11 +531,13 @@ class Trainer:
             if hasattr(est, "get_params") and "n_jobs" in est.get_params(deep=False):
                 est.set_params(n_jobs=1)
             return est
+
+        base_builder = self._with_bulkformer_reduction(unwrapped_builder)
             
         if "xgboost" in key:
-            space = build_xgb_param_grid(X, model_conf.param_grid)
+            space = self._reduction_space(build_xgb_param_grid(X, model_conf.param_grid))
         else:
-            space = build_lgbm_param_grid(X, model_conf.param_grid)
+            space = self._reduction_space(build_lgbm_param_grid(X, model_conf.param_grid))
 
         fs = getattr(r, "feature_selection", None)
         tun = getattr(r, "tuning", None)
@@ -465,7 +565,7 @@ class Trainer:
             eval_calibrated_in_cv=eval_calibrated_in_cv,
             calib_method=cal_method,
             calib_cv=cvs,
-            fit_kwargs=fit_kwargs,
+            fit_kwargs=self._reduction_fit_kwargs(fit_kwargs),
         )
         if fs is not None and bool(getattr(fs, "enabled", False)):
             cvres, consensus_genes, full_info = self._save_genesets_from_cvres(model_key=key, cvres=cvres, feature_selection_cfg=fs)
@@ -481,14 +581,28 @@ class Trainer:
             "accuracy_mean": df["accuracy"].mean(),
             "accuracy_std": df["accuracy"].std(),
         }
+        if self._bulkformer_reduction_active():
+            row.update(
+                bulkformer_reduction_strategy=self.cfg.bulkformer.reduction.strategy,
+                bulkformer_requested_supervised_dimensions=(
+                    self.cfg.bulkformer.reduction.supervised_dimensions
+                    if "supervised" in self.cfg.bulkformer.reduction.strategy else np.nan
+                ),
+                bulkformer_requested_pca_components=(
+                    self.cfg.bulkformer.reduction.pca_components
+                    if "pca" in self.cfg.bulkformer.reduction.strategy else np.nan
+                ),
+            )
         
         # Final production model on ALL data (calibrated if YAML says so)
+        fit_kwargs = self._reduction_fit_kwargs(fit_kwargs)
         best_params = self._tune_full(key, base_builder, X, y, fit_kwargs=fit_kwargs)
 
         per_fold_best = [m.get("best_rounds") for m in cvres.per_fold_metrics]
         cap = None
-        if best_params and "n_estimators" in best_params:
-            cap = int(best_params["n_estimators"])
+        estimator_key = "classifier__n_estimators" if self._bulkformer_reduction_active() else "n_estimators"
+        if best_params and estimator_key in best_params:
+            cap = int(best_params[estimator_key])
         
         elif hasattr(model_conf.param_grid, "n_estimators"):
             try:
@@ -525,8 +639,9 @@ class Trainer:
             if best_params:
                 est.set_params(**best_params)
             if final_n_estimators is not None:
-                if hasattr(est, "get_params") and "n_estimators" in est.get_params(deep=False):
-                    est.set_params(n_estimators=int(final_n_estimators))
+                params = est.get_params(deep=True) if hasattr(est, "get_params") else {}
+                if estimator_key in params:
+                    est.set_params(**{estimator_key: int(final_n_estimators)})
             return est
         
         fit_kwargs_no_es = dict(fit_kwargs or {})
@@ -544,6 +659,7 @@ class Trainer:
         # Save final model
         saved_path = self._save_model(final_model, filename_for_artifact)
         self.final_models[key] = final_model 
+        self._write_bulkformer_reduction_artifacts(final_model, cvres, key)
 
         return row, saved_path
 
@@ -584,9 +700,9 @@ class Trainer:
 
         rf_cfg = self.cfg.models.random_forest
         prefix = "" if rf_key in ("plain_random_forest", "weighted_random_forest") else "rf__"
-        rf_space = build_rf_search_space(X, rf_cfg.defaults.search_space, prefix=prefix)
-        xgb_space = build_xgb_param_grid(X, self.cfg.models.xgboost.param_grid)
-        lgbm_space = build_lgbm_param_grid(X, self.cfg.models.light_gbm.param_grid)
+        rf_space = self._reduction_space(build_rf_search_space(X, rf_cfg.defaults.search_space, prefix=prefix))
+        xgb_space = self._reduction_space(build_xgb_param_grid(X, self.cfg.models.xgboost.param_grid))
+        lgbm_space = self._reduction_space(build_lgbm_param_grid(X, self.cfg.models.light_gbm.param_grid))
 
         fs = getattr(r, "feature_selection", None)
         tun = getattr(r, "tuning", None)
@@ -629,6 +745,8 @@ class Trainer:
             "accuracy_mean": df["accuracy"].mean(),
             "accuracy_std": df["accuracy"].std(),
         }
+        if self._bulkformer_reduction_active():
+            row["bulkformer_reduction_strategy"] = self.cfg.bulkformer.reduction.strategy
         from sklearn.utils.validation import check_is_fitted
         try:
             check_is_fitted(self.final_models[rf_key])

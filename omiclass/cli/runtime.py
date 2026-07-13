@@ -54,7 +54,7 @@ def create_runtime_options_from_path_conf_kwargs(
     bulkformer_enabled = bool(getattr(getattr(cfg, "bulkformer", None), "enabled", False))
 
     if bulkformer_enabled:
-        mode = "train-only"
+        mode = "clean_and_predict" if has_leaderboard(project_out_dir) else "train-only"
         input_mode = "raw_counts"
         run_de = False
         run_batch = False

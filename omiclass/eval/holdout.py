@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Tuple
 import numpy as np
 import pandas as pd
+from omiclass.train.cv_engine import _bulkformer_representation_from_model
 from sklearn.metrics import f1_score, accuracy_score, classification_report, confusion_matrix, roc_auc_score, log_loss
 
 from .thresholds import apply_multiclass_thresholds
@@ -13,6 +14,18 @@ def _match_features_to_model(X: pd.DataFrame, model) -> pd.DataFrame:
     Ensures that X has the features expected by the model,
     reordering columns as needed and adding missing columns with zeros.
     """
+    representation = _bulkformer_representation_from_model(model)
+    if representation is not None:
+        expected = list(representation.feature_names_in_)
+        missing = [feature for feature in expected if feature not in X.columns]
+        extra = [feature for feature in X.columns if feature not in set(expected)]
+        strict_extra = getattr(representation, "strategy", "full") != "full"
+        if missing or (extra and strict_extra):
+            raise ValueError(
+                f"BulkFormer embedding schema mismatch; missing={missing[:5]}, extra={extra[:5]}."
+            )
+        return X.loc[:, expected]
+
     if not hasattr(model, "feature_names_in_"):
         return X
 

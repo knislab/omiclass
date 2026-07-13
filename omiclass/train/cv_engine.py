@@ -15,6 +15,22 @@ from sklearn.metrics import get_scorer
 from skopt import BayesSearchCV
 
 
+def _bulkformer_representation_from_model(model):
+    candidates = [model]
+    candidates.extend(
+        getattr(item, "estimator", None)
+        for item in (getattr(model, "calibrated_classifiers_", None) or [])
+    )
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        named = getattr(candidate, "named_steps", {})
+        representation = named.get("bulkformer_representation")
+        if representation is not None:
+            return representation
+    return None
+
+
 # ---------- data structures ----------
 
 @dataclass
@@ -137,9 +153,16 @@ def _feature_rank_by_importance(
 
         est.fit(Xtr, ytr)
 
-        if not hasattr(est, "feature_importances_"):
+        importance_estimator = est
+        # Walk through sklearn/imblearn pipelines to the fitted classifier.
+        while not hasattr(importance_estimator, "feature_importances_"):
+            named_steps = getattr(importance_estimator, "named_steps", None)
+            if not named_steps:
+                break
+            importance_estimator = list(named_steps.values())[-1]
+        if not hasattr(importance_estimator, "feature_importances_"):
             return None
-        imp = np.asarray(est.feature_importances_, dtype=float)
+        imp = np.asarray(importance_estimator.feature_importances_, dtype=float)
         if imp.shape[0] != X.shape[1]:
             return None
         imps.append(imp)
@@ -326,7 +349,9 @@ def calibrate_within_training(
         cal.fit(Xtr_used, ytr)
         return cal
 
-    cal = CalibratedClassifierCV(fitted_or_builder, method=str(method), cv=inner)
+    cal = CalibratedClassifierCV(
+        fitted_or_builder, method=str(method), cv=inner, ensemble=False
+    )
     cal.fit(Xtr_used, ytr)
     return cal
 
@@ -411,8 +436,8 @@ def nested_oof_cv(
             )
         else:
             fold_fit_kwargs = dict(fit_kwargs or {})
-            if "sample_weight" in fold_fit_kwargs:
-                fold_fit_kwargs["sample_weight"] = np.asarray(fold_fit_kwargs["sample_weight"])[tr_idx]
+            for weight_key in [key for key in fold_fit_kwargs if key.endswith("sample_weight")]:
+                fold_fit_kwargs[weight_key] = np.asarray(fold_fit_kwargs[weight_key])[tr_idx]
 
             model = fit_fold_model(
                 model_builder=model_builder,
@@ -441,6 +466,15 @@ def nested_oof_cv(
             "fs_best_score": fs_best_score,
             "fs_scoring": fs_scoring,
         }
+        representation = _bulkformer_representation_from_model(model)
+        if representation is not None:
+            m["bulkformer_reduction_strategy"] = representation.strategy
+            m["bulkformer_input_dimensions"] = int(representation.n_features_in_)
+            m["bulkformer_output_dimensions"] = int(representation.effective_n_features_)
+            selector = getattr(representation, "selector_", None)
+            if selector is not None:
+                m["bulkformer_selected_dimensions"] = list(selector.selected_features_)
+                m["bulkformer_close_pairs"] = list(selector.selected_close_pairs_)
         m.update(prob_metrics)
         per_fold_metrics.append(m)
 

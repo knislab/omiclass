@@ -14,6 +14,7 @@ from omiclass.utils.io import load_survival_matrix, load_matrix
 from omiclass.survival.plotter import plot_confidence_histogram, plot_confidence_violin, plot_km_and_forest
 from omiclass.survival.report import render_survival_prediction_html
 from omiclass.errors.errors import SurvivalPredictionError
+from omiclass.train.cv_engine import _bulkformer_representation_from_model
 from omiclass.utils.debug import debug_prediction_and_survival_inputs
 
 
@@ -81,11 +82,37 @@ def run_survival_prediction(X: Union[pd.DataFrame, Path, str],
         X_df = X.copy()
 
     X_df = X_df.T
-    expected_features = getattr(model, "feature_names_in_", None)
+    representation = _bulkformer_representation_from_model(model)
+    if representation is not None and ctx is not None:
+        current_signature = {
+            "aggregate_type": str(ctx.cfg.bulkformer.aggregate_type),
+            "checkpoint_path": str(ctx.cfg.bulkformer.checkpoint_path),
+            "gene_info_path": str(ctx.cfg.bulkformer.gene_info_path),
+            "interested_gene_path": str(ctx.cfg.bulkformer.interested_gene_path),
+        }
+        trained_signature = getattr(representation, "extraction_signature_", {})
+        if trained_signature and current_signature != trained_signature:
+            raise SurvivalPredictionError(
+                "BulkFormer extraction configuration differs from the fitted model: "
+                f"trained={trained_signature}, current={current_signature}."
+            )
+    expected_features = (
+        getattr(representation, "feature_names_in_", None)
+        if representation is not None else getattr(model, "feature_names_in_", None)
+    )
     if expected_features is None:
         expected_features = getattr(model, "_feature_names_in", None)
-    X_df = X_df.reindex(columns=expected_features)
-    X_df = X_df.fillna(0.0)
+    if representation is not None:
+        missing = [feature for feature in expected_features if feature not in X_df.columns]
+        extra = [feature for feature in X_df.columns if feature not in set(expected_features)]
+        strict_extra = getattr(representation, "strategy", "full") != "full"
+        if missing or (extra and strict_extra):
+            raise SurvivalPredictionError(
+                f"BulkFormer embedding schema mismatch; missing={missing[:5]}, extra={extra[:5]}."
+            )
+        X_df = X_df.loc[:, expected_features]
+    else:
+        X_df = X_df.reindex(columns=expected_features).fillna(0.0)
     
     # --- predictions ---
     proba_df = _build_proba_df(model, X_df)

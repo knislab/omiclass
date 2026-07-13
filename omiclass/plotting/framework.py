@@ -1192,12 +1192,24 @@ class PlottingFramework:
 
             model = joblib.load(model_path)
             X = X_base.copy()
+            from omiclass.train.cv_engine import _bulkformer_representation_from_model
+            representation = _bulkformer_representation_from_model(model)
+            if representation is not None:
+                expected = list(representation.feature_names_in_)
+                missing = [feature for feature in expected if feature not in X.columns]
+                extra = [feature for feature in X.columns if feature not in set(expected)]
+                strict_extra = getattr(representation, "strategy", "full") != "full"
+                if missing or (extra and strict_extra):
+                    raise ValueError(
+                        f"BulkFormer embedding schema mismatch; missing={missing[:5]}, extra={extra[:5]}."
+                    )
+                X = X.loc[:, expected]
             expected_features = getattr(model, "feature_names_in_", None)
             if expected_features is None:
                 expected_features = getattr(model, "_feature_names_in", None)
-            if expected_features is not None:
+            if expected_features is not None and representation is None:
                 X = X.reindex(columns=expected_features)
-            X = X.fillna(0.0)
+                X = X.fillna(0.0)
 
             if not hasattr(model, "predict_proba"):
                 raise AttributeError(f"Model '{current_model_name}' does not expose predict_proba().")

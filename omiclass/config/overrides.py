@@ -47,6 +47,14 @@ SPEC = OverrideSpec(
         "bulkformer_gene_info_path": "bulkformer.gene_info_path",
         "bulkformer_gene_lengths_path": "bulkformer.gene_lengths_path",
         "bulkformer_interested_gene_path": "bulkformer.interested_gene_path",
+        "bulkformer_reduction_strategy": "bulkformer.reduction.strategy",
+        "bulkformer_supervised_dimensions": "bulkformer.reduction.supervised_dimensions",
+        "bulkformer_pca_components": "bulkformer.reduction.pca_components",
+        "bulkformer_one_vs_rest_fraction": "bulkformer.reduction.one_vs_rest_fraction",
+        "bulkformer_close_pair_fraction": "bulkformer.reduction.close_pair_fraction",
+        "bulkformer_close_pair_count": "bulkformer.reduction.close_pair_count",
+        "bulkformer_close_pair_pca_components": "bulkformer.reduction.close_pair_pca_components",
+        "bulkformer_reduction_random_state": "bulkformer.reduction.random_state",
 
         # batch_correction
         "batch_column": "batch_correction.batch_column",
