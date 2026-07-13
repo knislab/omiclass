@@ -21,6 +21,22 @@ def test_bulkformer_defaults_disabled(tmp_path):
     assert cfg.bulkformer.batch_size == 4
     assert cfg.bulkformer.aggregate_type == "mean"
     assert cfg.bulkformer.checkpoint_path == Path("BulkFormer/model/bulkformer_147M.pt")
+    assert cfg.bulkformer.reduction.strategy == "full"
+
+
+def test_bulkformer_reduction_config_and_aliases(tmp_path):
+    overrides = _base_overrides(tmp_path)
+    overrides.update({
+        "bulkformer_enabled": True,
+        "bulkformer_reduction_strategy": "supervised_pca",
+        "bulkformer_supervised_dimensions": 120,
+        "bulkformer_pca_components": 30,
+        "feature_selection_enabled": False,
+    })
+    cfg = load_config(overrides)
+    assert cfg.bulkformer.reduction.strategy == "supervised_pca"
+    assert cfg.bulkformer.reduction.supervised_dimensions == 120
+    assert cfg.bulkformer.reduction.pca_components == 30
 
 
 def test_bulkformer_aliases_map_and_device_auto_is_valid(tmp_path):
@@ -82,3 +98,17 @@ def test_runtime_with_bulkformer_forces_embedding_training_path(tmp_path):
     assert opts.run_batch is False
     assert opts.run_training is True
     assert opts.surface_markers is False
+
+
+def test_existing_bulkformer_run_uses_external_prediction_path(tmp_path):
+    overrides = _base_overrides(tmp_path)
+    overrides["bulkformer_enabled"] = True
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "leaderboard.csv").write_text("model,f1_macro_mean\nplain_random_forest,1.0\n")
+    cfg = load_config(overrides)
+    opts = create_runtime_options_from_path_conf_kwargs(
+        cfg, expression_path=tmp_path / "external_counts.csv", kwargs=overrides,
+    )
+    assert opts.mode == "clean_and_predict"
+    assert opts.input_mode == "raw_counts"
