@@ -217,3 +217,35 @@ class_col: metadata column used as the classification label
 batch_column: metadata column used for batch correction
 n_jobs: number of CPU jobs to use
 ```
+
+### CellFM embedding backend
+
+CellFM can replace BulkFormer at the sample-embedding stage. It consumes raw,
+non-negative RNA-seq counts with genes in rows and samples in columns. Gene IDs
+are matched exactly to CellFM's `expand_gene_info.csv` vocabulary. The pretrained
+model is frozen and valid gene-token outputs are mean-pooled for each sample.
+
+Enable one embedding backend only. CellFM uses the same downstream representation
+transformer and supports `full`, `supervised`, `pca`, and `supervised_pca`:
+
+```python
+run(
+    "data/raw_counts.csv",
+    output_dir="results/cellfm_run",
+    meta_path="data/patients_meta.csv",
+    class_col="class",
+    cellfm_enabled=True,
+    cellfm_root_dir="CellFM/CellFM-torch",
+    cellfm_checkpoint_path="CellFM/weights/CellFM_80M_weight.ckpt",
+    cellfm_device="auto",
+    cellfm_batch_size=1,
+    cellfm_reduction_strategy="supervised_pca",
+    cellfm_supervised_dimensions=200,
+    cellfm_pca_components=50,
+    feature_selection_enabled=False,
+)
+```
+
+`feature_selection_enabled` must be false for every non-`full` embedding
+strategy. The Python environment running Omiclass must also provide CellFM's
+PyTorch and MindSpore dependencies.

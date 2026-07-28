@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional, Literal, List
 from omiclass.config.schema import Config
 from omiclass.utils.clean_and_pred import has_leaderboard
+from omiclass.features.embedding_backend import embedding_enabled
 
 
 
@@ -51,9 +52,9 @@ def create_runtime_options_from_path_conf_kwargs(
     run_prediction = kwargs.get("run_prediction", False) or (cfg.runtime.survival_prediction.enabled is True)
     is_split = kwargs.get("reuse_split", False) and kwargs.get("split_json", False)
     project_out_dir = Path(cfg.project.out_dir)
-    bulkformer_enabled = bool(getattr(getattr(cfg, "bulkformer", None), "enabled", False))
+    embeddings_enabled = embedding_enabled(cfg)
 
-    if bulkformer_enabled:
+    if embeddings_enabled:
         mode = "clean_and_predict" if has_leaderboard(project_out_dir) else "train-only"
         input_mode = "raw_counts"
         run_de = False
@@ -100,7 +101,7 @@ def create_runtime_options_from_path_conf_kwargs(
         "counts_path" : counts_path,
         "meta_path" : meta_path,
         "gene_path" : gene_path,
-        "surface_markers" : False if bulkformer_enabled else (kwargs.get("surface_markers", False) or cfg.surface_markers.enabled),
+        "surface_markers" : False if embeddings_enabled else (kwargs.get("surface_markers", False) or cfg.surface_markers.enabled),
         "run_batch": run_batch,
         "run_de": run_de,
         "run_geneset_opt": geneset_opt,

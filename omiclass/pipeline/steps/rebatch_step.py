@@ -14,13 +14,14 @@ from omiclass.utils.io import load_matrix
 from omiclass.data.processor import DataProcessor
 from omiclass.utils.splits import load_split
 from omiclass.utils.pipeline import maybe_log1p_expression
+from omiclass.features.embedding_backend import embedding_enabled
 
 
 class RebatchCorrectionStep:
     name = "rebatch_correction"
 
     def should_run(self, ctx: RunContext) -> bool:
-        if bool(getattr(getattr(ctx.cfg, "bulkformer", None), "enabled", False)):
+        if embedding_enabled(ctx.cfg):
             return False
         if ctx.opts.mode == "clean_and_predict":
             return True

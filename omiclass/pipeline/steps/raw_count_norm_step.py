@@ -4,12 +4,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from omiclass.pipeline.orchestrator import RunContext
 from omiclass.data.processor import DataProcessor
+from omiclass.features.embedding_backend import embedding_enabled
 
 class RawCountNormalizationStep:
     name = "raw_count_normalization"
 
     def should_run(self, ctx: RunContext) -> bool:
-        if bool(getattr(getattr(ctx.cfg, "bulkformer", None), "enabled", False)):
+        if embedding_enabled(ctx.cfg):
             return False
         if str(getattr(ctx.cfg.project, "modality", "rnaseq")) == "cptac_ms":
             return False

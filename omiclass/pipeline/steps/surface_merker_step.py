@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from omiclass.pipeline.orchestrator import RunContext
 from omiclass.utils.surface_markers import fillter_surface_markers
+from omiclass.features.embedding_backend import embedding_enabled
 
 class SurfaceMarkerStep:
     name = "surface_marker_filtering"
@@ -11,7 +12,7 @@ class SurfaceMarkerStep:
     def should_run(self, ctx: RunContext) -> bool:
         if ctx.opts.mode == "clean_and_predict":
             return False
-        if bool(getattr(getattr(ctx.cfg, "bulkformer", None), "enabled", False)):
+        if embedding_enabled(ctx.cfg):
             return False
         return ctx.opts.surface_markers
 

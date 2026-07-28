@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field, model_validator, field_validator, ConfigD
 BatchMethod = Literal["batch", "design", "covariates", "pcs"]
 Modality = Literal["rnaseq", "cptac_ms"]
 
-# ---------- BulkFormer feature extraction ----------
-class BulkFormerReductionCfg(BaseModel):
+# ---------- foundation-model feature extraction ----------
+class EmbeddingReductionCfg(BaseModel):
     strategy: Literal["full", "supervised", "pca", "supervised_pca"] = "full"
     supervised_dimensions: int = 200
     pca_components: int = 50
@@ -21,16 +21,20 @@ class BulkFormerReductionCfg(BaseModel):
     @model_validator(mode="after")
     def _validate_reduction(self):
         if self.supervised_dimensions <= 0:
-            raise ValueError("bulkformer.reduction.supervised_dimensions must be positive.")
+            raise ValueError("Embedding supervised_dimensions must be positive.")
         if self.pca_components <= 0 or self.close_pair_pca_components <= 0:
-            raise ValueError("BulkFormer PCA component counts must be positive.")
+            raise ValueError("Embedding PCA component counts must be positive.")
         if self.one_vs_rest_fraction < 0 or self.close_pair_fraction < 0:
-            raise ValueError("BulkFormer reduction budget fractions must be non-negative.")
+            raise ValueError("Embedding reduction budget fractions must be non-negative.")
         if self.one_vs_rest_fraction + self.close_pair_fraction <= 0:
-            raise ValueError("At least one BulkFormer supervised budget fraction must be positive.")
+            raise ValueError("At least one supervised embedding budget fraction must be positive.")
         if self.close_pair_count is not None and self.close_pair_count <= 0:
-            raise ValueError("bulkformer.reduction.close_pair_count must be positive when set.")
+            raise ValueError("Embedding close_pair_count must be positive when set.")
         return self
+
+
+# Public compatibility name for existing configurations and imports.
+BulkFormerReductionCfg = EmbeddingReductionCfg
 
 
 class BulkFormerCfg(BaseModel):
@@ -81,6 +85,48 @@ class BulkFormerCfg(BaseModel):
             self.gene_lengths_path = root / "data" / "gene_length_df.csv"
         if self.interested_gene_path is None:
             self.interested_gene_path = root / "data" / "interested_gene_list.pt"
+        return self
+
+
+class CellFMCfg(BaseModel):
+    """Frozen CellFM extraction settings for sample-level RNA-seq embeddings."""
+
+    enabled: bool = False
+    root_dir: Path = Path("CellFM/CellFM-torch")
+    checkpoint_path: Optional[Path] = None
+    gene_info_path: Optional[Path] = None
+    vendor_dir: Optional[Path] = None
+    device: str = "auto"
+    batch_size: int = 1
+    random_state: int = 0
+    reduction: EmbeddingReductionCfg = Field(default_factory=EmbeddingReductionCfg)
+
+    @field_validator("device")
+    @classmethod
+    def _validate_device(cls, v):
+        if v is None:
+            return "auto"
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("cellfm.device must be a non-empty string.")
+        return v.strip()
+
+    @field_validator("batch_size")
+    @classmethod
+    def _validate_batch_size(cls, v):
+        if int(v) <= 0:
+            raise ValueError("cellfm.batch_size must be a positive integer.")
+        return int(v)
+
+    @model_validator(mode="after")
+    def _set_default_paths(self):
+        root = Path(self.root_dir)
+        if self.checkpoint_path is None:
+            self.checkpoint_path = root.parent / "weights" / "CellFM_80M_weight.ckpt"
+        if self.gene_info_path is None:
+            self.gene_info_path = root / "csv" / "expand_gene_info.csv"
+        if self.vendor_dir is None:
+            # The bundled checkout keeps binary dependencies next to CellFM-torch.
+            self.vendor_dir = root.parent / "vendor"
         return self
 
 # ---------- feature selection ----------
@@ -539,6 +585,7 @@ class Config(BaseModel):
     PDF: bool = False
     project: ProjectCfg = Field(default_factory=ProjectCfg)
     bulkformer: BulkFormerCfg = Field(default_factory=BulkFormerCfg)
+    cellfm: CellFMCfg = Field(default_factory=CellFMCfg)
     batch_correction: BatchCorrectionCfg = Field(default_factory=BatchCorrectionCfg)
     runtime: RuntimeCfg = Field(default_factory=RuntimeCfg)
     models: ModelsCfg = Field(default_factory=ModelsCfg)
@@ -551,20 +598,24 @@ class Config(BaseModel):
 
     @model_validator(mode="after")
     def _final_checks(self):
+        if self.bulkformer.enabled and self.cellfm.enabled:
+            raise ValueError("BulkFormer and CellFM are alternative embedding backends; enable only one.")
         if bool(getattr(self.bulkformer, "enabled", False)) and self.project.modality != "rnaseq":
             raise ValueError("bulkformer.enabled requires project.modality='rnaseq'.")
+        if bool(getattr(self.cellfm, "enabled", False)) and self.project.modality != "rnaseq":
+            raise ValueError("cellfm.enabled requires project.modality='rnaseq'.")
         if (
             self.de_gene_selection.close_pair_count is None
             and self.project.classes_names is not None
         ):
             self.de_gene_selection.close_pair_count = max(1, len(self.project.classes_names) - 1)
         if (
-            bool(getattr(self.bulkformer, "enabled", False))
-            and self.bulkformer.reduction.strategy != "full"
+            (self.bulkformer.enabled or self.cellfm.enabled)
+            and (self.bulkformer if self.bulkformer.enabled else self.cellfm).reduction.strategy != "full"
             and self.runtime.feature_selection.enabled
         ):
             raise ValueError(
                 "runtime.feature_selection.enabled must be false when using a non-full "
-                "BulkFormer reduction strategy."
+                "embedding reduction strategy."
             )
         return self

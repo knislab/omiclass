@@ -56,6 +56,24 @@ SPEC = OverrideSpec(
         "bulkformer_close_pair_pca_components": "bulkformer.reduction.close_pair_pca_components",
         "bulkformer_reduction_random_state": "bulkformer.reduction.random_state",
 
+        # CellFM feature extraction (shares the representation strategies above)
+        "cellfm_enabled": "cellfm.enabled",
+        "cellfm_root_dir": "cellfm.root_dir",
+        "cellfm_checkpoint_path": "cellfm.checkpoint_path",
+        "cellfm_gene_info_path": "cellfm.gene_info_path",
+        "cellfm_vendor_dir": "cellfm.vendor_dir",
+        "cellfm_device": "cellfm.device",
+        "cellfm_batch_size": "cellfm.batch_size",
+        "cellfm_random_state": "cellfm.random_state",
+        "cellfm_reduction_strategy": "cellfm.reduction.strategy",
+        "cellfm_supervised_dimensions": "cellfm.reduction.supervised_dimensions",
+        "cellfm_pca_components": "cellfm.reduction.pca_components",
+        "cellfm_one_vs_rest_fraction": "cellfm.reduction.one_vs_rest_fraction",
+        "cellfm_close_pair_fraction": "cellfm.reduction.close_pair_fraction",
+        "cellfm_close_pair_count": "cellfm.reduction.close_pair_count",
+        "cellfm_close_pair_pca_components": "cellfm.reduction.close_pair_pca_components",
+        "cellfm_reduction_random_state": "cellfm.reduction.random_state",
+
         # batch_correction
         "batch_column": "batch_correction.batch_column",
         "design_columns": "batch_correction.design_columns",

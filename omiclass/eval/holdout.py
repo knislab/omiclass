@@ -22,7 +22,7 @@ def _match_features_to_model(X: pd.DataFrame, model) -> pd.DataFrame:
         strict_extra = getattr(representation, "strategy", "full") != "full"
         if missing or (extra and strict_extra):
             raise ValueError(
-                f"BulkFormer embedding schema mismatch; missing={missing[:5]}, extra={extra[:5]}."
+                f"Embedding schema mismatch; missing={missing[:5]}, extra={extra[:5]}."
             )
         return X.loc[:, expected]
 

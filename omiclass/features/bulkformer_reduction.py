@@ -11,6 +11,8 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils.validation import check_is_fitted
 
+from omiclass.features.embedding_backend import extraction_signature
+
 
 def benjamini_hochberg(pvalues: np.ndarray) -> np.ndarray:
     p = np.asarray(pvalues, dtype=float)
@@ -38,19 +40,19 @@ def _frame(X: Any, expected=None) -> pd.DataFrame:
         columns = list(expected) if expected is not None else [f"x{i}" for i in range(arr.shape[1])]
         result = pd.DataFrame(arr, columns=columns)
     if result.columns.duplicated().any():
-        raise ValueError("BulkFormer embedding columns must be unique.")
+        raise ValueError("Embedding columns must be unique.")
     if expected is not None:
         expected = list(expected)
         missing = [c for c in expected if c not in result.columns]
         extra = [c for c in result.columns if c not in set(expected)]
         if missing or extra:
             raise ValueError(
-                f"BulkFormer embedding schema mismatch; missing={missing[:5]}, extra={extra[:5]}."
+                f"Embedding schema mismatch; missing={missing[:5]}, extra={extra[:5]}."
             )
         result = result.loc[:, expected]
     result = result.apply(pd.to_numeric, errors="coerce")
     if not np.isfinite(result.to_numpy(dtype=float)).all():
-        raise ValueError("BulkFormer embeddings contain non-finite values.")
+        raise ValueError("Embeddings contain non-finite values.")
     return result
 
 
@@ -195,7 +197,7 @@ class SupervisedEmbeddingSelector(BaseEstimator, TransformerMixin):
         return np.asarray(self.selected_features_, dtype=object)
 
 
-class BulkFormerRepresentation(BaseEstimator, TransformerMixin):
+class EmbeddingRepresentation(BaseEstimator, TransformerMixin):
     def __init__(self, strategy="full", supervised_dimensions=200, pca_components=50,
                  one_vs_rest_fraction=0.5, close_pair_fraction=0.5,
                  close_pair_count=None, close_pair_pca_components=10, random_state=None,
@@ -248,17 +250,21 @@ class BulkFormerRepresentation(BaseEstimator, TransformerMixin):
         return np.asarray(self.output_features_, dtype=object)
 
 
-def build_bulkformer_representation(cfg, runtime_seed):
+def build_embedding_representation(cfg, runtime_seed, backend="bulkformer"):
     reduction = cfg.reduction
     seed = runtime_seed if reduction.random_state is None else reduction.random_state
-    signature = {
-        "aggregate_type": str(cfg.aggregate_type),
-        "checkpoint_path": str(cfg.checkpoint_path),
-        "gene_info_path": str(cfg.gene_info_path),
-        "interested_gene_path": str(cfg.interested_gene_path),
-    }
-    return BulkFormerRepresentation(
+    signature = extraction_signature(backend, cfg)
+    return EmbeddingRepresentation(
         reduction.strategy, reduction.supervised_dimensions, reduction.pca_components,
         reduction.one_vs_rest_fraction, reduction.close_pair_fraction,
         reduction.close_pair_count, reduction.close_pair_pca_components, seed, signature,
     )
+
+
+def build_bulkformer_representation(cfg, runtime_seed):
+    """Compatibility wrapper; the transformer itself is backend-independent."""
+    return build_embedding_representation(cfg, runtime_seed, backend="bulkformer")
+
+
+# Compatibility import for existing callers and serialized estimators.
+BulkFormerRepresentation = EmbeddingRepresentation

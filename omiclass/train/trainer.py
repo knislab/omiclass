@@ -27,7 +27,8 @@ from .auto_config import apply_auto_config
 from omiclass.errors.errors import TuningError 
 from omiclass.errors.faild_model import _failed_row
 from sklearn.pipeline import Pipeline as SkPipeline
-from omiclass.features.bulkformer_reduction import build_bulkformer_representation
+from omiclass.features.bulkformer_reduction import build_embedding_representation
+from omiclass.features.embedding_backend import embedding_backend, embedding_config, embedding_enabled
 from .cv_engine import _bulkformer_representation_from_model
 from omiclass.utils.surface_markers import apply_surface_marker_filter_with_min
 try:
@@ -55,17 +56,17 @@ class Trainer:
         self.builders: dict[str, Any] = {}
 
     def _bulkformer_reduction_active(self) -> bool:
-        bulkformer = getattr(self.cfg, "bulkformer", None)
-        return bool(bulkformer and bulkformer.enabled)
+        return embedding_enabled(self.cfg)
 
     def _with_bulkformer_reduction(self, builder):
         if not self._bulkformer_reduction_active():
             return builder
 
         def wrapped_builder():
+            backend = embedding_backend(self.cfg)
             return SkPipeline([
-                ("bulkformer_representation", build_bulkformer_representation(
-                    self.cfg.bulkformer, int(self.cfg.runtime.random_state)
+                ("bulkformer_representation", build_embedding_representation(
+                    embedding_config(self.cfg), int(self.cfg.runtime.random_state), backend
                 )),
                 ("classifier", builder()),
             ])
@@ -404,15 +405,16 @@ class Trainer:
             "accuracy_std": df["accuracy"].std(),
         }
         if self._bulkformer_reduction_active():
+            reduction = embedding_config(self.cfg).reduction
             row.update(
-                bulkformer_reduction_strategy=self.cfg.bulkformer.reduction.strategy,
+                bulkformer_reduction_strategy=reduction.strategy,
                 bulkformer_requested_supervised_dimensions=(
-                    self.cfg.bulkformer.reduction.supervised_dimensions
-                    if "supervised" in self.cfg.bulkformer.reduction.strategy else np.nan
+                    reduction.supervised_dimensions
+                    if "supervised" in reduction.strategy else np.nan
                 ),
                 bulkformer_requested_pca_components=(
-                    self.cfg.bulkformer.reduction.pca_components
-                    if "pca" in self.cfg.bulkformer.reduction.strategy else np.nan
+                    reduction.pca_components
+                    if "pca" in reduction.strategy else np.nan
                 ),
             )
         # Final production model on ALL data (calibrated if YAML says so)
@@ -582,15 +584,16 @@ class Trainer:
             "accuracy_std": df["accuracy"].std(),
         }
         if self._bulkformer_reduction_active():
+            reduction = embedding_config(self.cfg).reduction
             row.update(
-                bulkformer_reduction_strategy=self.cfg.bulkformer.reduction.strategy,
+                bulkformer_reduction_strategy=reduction.strategy,
                 bulkformer_requested_supervised_dimensions=(
-                    self.cfg.bulkformer.reduction.supervised_dimensions
-                    if "supervised" in self.cfg.bulkformer.reduction.strategy else np.nan
+                    reduction.supervised_dimensions
+                    if "supervised" in reduction.strategy else np.nan
                 ),
                 bulkformer_requested_pca_components=(
-                    self.cfg.bulkformer.reduction.pca_components
-                    if "pca" in self.cfg.bulkformer.reduction.strategy else np.nan
+                    reduction.pca_components
+                    if "pca" in reduction.strategy else np.nan
                 ),
             )
         
@@ -746,7 +749,7 @@ class Trainer:
             "accuracy_std": df["accuracy"].std(),
         }
         if self._bulkformer_reduction_active():
-            row["bulkformer_reduction_strategy"] = self.cfg.bulkformer.reduction.strategy
+            row["bulkformer_reduction_strategy"] = embedding_config(self.cfg).reduction.strategy
         from sklearn.utils.validation import check_is_fitted
         try:
             check_is_fitted(self.final_models[rf_key])
@@ -875,7 +878,7 @@ class Trainer:
         }
         selected_model_keys = model_keys_by_severity[sev]
 
-        if self.cfg.surface_markers.enabled and not bool(getattr(getattr(self.cfg, "bulkformer", None), "enabled", False)):
+        if self.cfg.surface_markers.enabled and not embedding_enabled(self.cfg):
             sm_genes = apply_surface_marker_filter_with_min(X.columns.tolist(), min_features=self.cfg.runtime.min_features)
             X = X.loc[:, sm_genes]
 

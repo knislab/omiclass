@@ -57,6 +57,8 @@ class PlottingFramework:
         run_dir: str | Path,
         output_dir: str | Path | None = None,
         uncorrected_run_dir: str | Path | None = None,
+        transparent: bool = False,
+        output_format: str = "pdf",
     ):
         matplotlib.rcParams["pdf.fonttype"] = 42
         matplotlib.rcParams["ps.fonttype"] = 42
@@ -66,6 +68,10 @@ class PlottingFramework:
         self.base_dir = self.pdf_dir / "base_files"
         self.output_dir = Path(output_dir) if output_dir else self.pdf_dir / "publication"
         self.uncorrected_run_dir = Path(uncorrected_run_dir) if uncorrected_run_dir else None
+        self.transparent = bool(transparent)
+        self.output_format = str(output_format).lower().lstrip(".")
+        if self.output_format not in {"pdf", "png"}:
+            raise ValueError("output_format must be 'pdf' or 'png'.")
         try:
             self.manifest = self._read_manifest(self.base_dir)
         except FileNotFoundError:
@@ -274,8 +280,14 @@ class PlottingFramework:
 
     def _save(self, fig, filename: str, show: bool = False) -> Path:
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        path = self.output_dir / filename
-        fig.savefig(path, format="pdf", bbox_inches="tight")
+        path = (self.output_dir / filename).with_suffix(f".{self.output_format}")
+        fig.savefig(
+            path,
+            format=self.output_format,
+            dpi=300,
+            bbox_inches="tight",
+            transparent=self.transparent,
+        )
         if show:
             plt.show()
         plt.close(fig)
@@ -596,6 +608,8 @@ class PlottingFramework:
         return PlottingFramework(
             run_dir=self.uncorrected_run_dir,
             output_dir=self.output_dir,
+            transparent=self.transparent,
+            output_format=self.output_format,
         )
 
     def _classification_variant_frame_for_comparison(
@@ -985,6 +999,8 @@ class PlottingFramework:
             uncorrected_framework = PlottingFramework(
                 run_dir=self.uncorrected_run_dir,
                 output_dir=self.output_dir,
+                transparent=self.transparent,
+                output_format=self.output_format,
             )
 
             uncorrected_scores = uncorrected_framework.selected_model_holdout_test_scores(
@@ -1201,7 +1217,7 @@ class PlottingFramework:
                 strict_extra = getattr(representation, "strategy", "full") != "full"
                 if missing or (extra and strict_extra):
                     raise ValueError(
-                        f"BulkFormer embedding schema mismatch; missing={missing[:5]}, extra={extra[:5]}."
+                        f"Embedding schema mismatch; missing={missing[:5]}, extra={extra[:5]}."
                     )
                 X = X.loc[:, expected]
             expected_features = getattr(model, "feature_names_in_", None)

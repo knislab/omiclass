@@ -44,6 +44,13 @@ examples/results/Bash_results/config.freeze.yaml
 examples/results/Bash_results/train_artifacts/genesets/**
 BulkFormer/**
 
+# Local CellFM runtime assets and generated embeddings
+CellFM/CellFM-torch/
+CellFM/weights/
+CellFM/smoke_outputs/
+CellFM/bulk_smoke_outputs/
+CellFM/vendor/
+
 
 
 !omiclass/data/gencode_GRCh37_hg19.csv

@@ -6,24 +6,33 @@ if TYPE_CHECKING:
     from omiclass.pipeline.orchestrator import RunContext
 
 from omiclass.features.bulkformer import BulkFormerFeatureExtractor, write_bulkformer_artifacts
+from omiclass.features.cellfm import CellFMFeatureExtractor, write_cellfm_artifacts
+from omiclass.features.embedding_backend import embedding_backend
 
 
-class BulkFormerFeatureExtractionStep:
-    name = "bulkformer_feature_extraction"
+class EmbeddingFeatureExtractionStep:
+    name = "embedding_feature_extraction"
 
     def should_run(self, ctx: RunContext) -> bool:
-        cfg = getattr(ctx.cfg, "bulkformer", None)
-        return bool(cfg and cfg.enabled)
+        return embedding_backend(ctx.cfg) is not None
 
     def run(self, ctx: RunContext) -> None:
         counts = ctx.cache["full_expr"]
-        extractor = BulkFormerFeatureExtractor(ctx.cfg.bulkformer)
+        backend = embedding_backend(ctx.cfg)
+        if backend == "bulkformer":
+            extractor = BulkFormerFeatureExtractor(ctx.cfg.bulkformer)
+            writer = write_bulkformer_artifacts
+        elif backend == "cellfm":
+            extractor = CellFMFeatureExtractor(ctx.cfg.cellfm)
+            writer = write_cellfm_artifacts
+        else:  # protected by should_run; useful when invoked directly
+            return
         result = extractor.extract(counts)
 
-        artifact_dir = ctx.out_dir / "bulkformer"
+        artifact_dir = ctx.out_dir / backend
         if ctx.opts.mode == "clean_and_predict":
             artifact_dir = artifact_dir / "external_prediction"
-        feature_path, metadata_path = write_bulkformer_artifacts(
+        feature_path, metadata_path = writer(
             out_dir=artifact_dir,
             features=result.features,
             metadata=result.metadata,
@@ -34,10 +43,15 @@ class BulkFormerFeatureExtractionStep:
         ctx.cache["full_expr_t"] = result.features.T
         ctx.cache["feature_list"] = feature_list
         ctx.cache["gene_list"] = feature_list
-        ctx.cache["feature_source"] = "bulkformer"
-        ctx.cache["bulkformer_metadata"] = result.metadata
+        ctx.cache["feature_source"] = backend
+        ctx.cache["embedding_metadata"] = result.metadata
+        ctx.cache[f"{backend}_metadata"] = result.metadata
         if ctx.opts.mode == "clean_and_predict":
             ctx.cache["X_recorrected"] = result.features
-        ctx.artifacts["bulkformer_features"] = feature_path
-        ctx.artifacts["bulkformer_metadata"] = metadata_path
-        print(f"[BulkFormer] Feature embeddings saved at: {feature_path}")
+        ctx.artifacts[f"{backend}_features"] = feature_path
+        ctx.artifacts[f"{backend}_metadata"] = metadata_path
+        print(f"[{backend}] Feature embeddings saved at: {feature_path}")
+
+
+# Preserve the public class used by existing integrations.
+BulkFormerFeatureExtractionStep = EmbeddingFeatureExtractionStep

@@ -16,6 +16,9 @@ from omiclass.survival.report import render_survival_prediction_html
 from omiclass.errors.errors import SurvivalPredictionError
 from omiclass.train.cv_engine import _bulkformer_representation_from_model
 from omiclass.utils.debug import debug_prediction_and_survival_inputs
+from omiclass.features.embedding_backend import (
+    embedding_backend, embedding_config, extraction_signature,
+)
 
 
 @dataclass
@@ -84,16 +87,12 @@ def run_survival_prediction(X: Union[pd.DataFrame, Path, str],
     X_df = X_df.T
     representation = _bulkformer_representation_from_model(model)
     if representation is not None and ctx is not None:
-        current_signature = {
-            "aggregate_type": str(ctx.cfg.bulkformer.aggregate_type),
-            "checkpoint_path": str(ctx.cfg.bulkformer.checkpoint_path),
-            "gene_info_path": str(ctx.cfg.bulkformer.gene_info_path),
-            "interested_gene_path": str(ctx.cfg.bulkformer.interested_gene_path),
-        }
+        backend = embedding_backend(ctx.cfg)
+        current_signature = extraction_signature(backend, embedding_config(ctx.cfg))
         trained_signature = getattr(representation, "extraction_signature_", {})
         if trained_signature and current_signature != trained_signature:
             raise SurvivalPredictionError(
-                "BulkFormer extraction configuration differs from the fitted model: "
+                "Embedding extraction configuration differs from the fitted model: "
                 f"trained={trained_signature}, current={current_signature}."
             )
     expected_features = (
@@ -108,7 +107,7 @@ def run_survival_prediction(X: Union[pd.DataFrame, Path, str],
         strict_extra = getattr(representation, "strategy", "full") != "full"
         if missing or (extra and strict_extra):
             raise SurvivalPredictionError(
-                f"BulkFormer embedding schema mismatch; missing={missing[:5]}, extra={extra[:5]}."
+                f"Embedding schema mismatch; missing={missing[:5]}, extra={extra[:5]}."
             )
         X_df = X_df.loc[:, expected_features]
     else:
