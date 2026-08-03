@@ -43,6 +43,8 @@ examples/results/Bash_results/de_results/limma_voom_selected_genes.txt
 examples/results/Bash_results/config.freeze.yaml
 examples/results/Bash_results/train_artifacts/genesets/**
 BulkFormer/**
+CellFM/**
+BulkFormer/**
 
 # Local CellFM runtime assets and generated embeddings
 CellFM/CellFM-torch/
