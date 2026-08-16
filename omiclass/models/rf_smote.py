@@ -8,6 +8,9 @@ from ..sampling.svmsmote import SafeSVMSMOTE
 from ..sampling.blsmote import SafeBorderlineSMOTE
 
 def _pipe(sampler, *, random_state: int, n_jobs: int, **rf_cfg):
+    # Keep the sampler and classifier tied to the framework seed. Setting the
+    # sampler here makes that invariant apply to every SMOTE-family builder.
+    sampler.set_params(random_state=int(random_state))
     return Pipeline(steps=[
         ("sampler", sampler),
         ("rf", build_rf_plain(random_state=random_state, n_jobs=n_jobs, **rf_cfg)),

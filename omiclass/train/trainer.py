@@ -278,9 +278,9 @@ class Trainer:
         if inner == 0:
             base.fit(X, y)
             return base
-        # ensemble=False refits the estimator (including the representation) on
-        # the complete supplied training set after fold-local calibration predictions.
-        wrapped = CalibratedClassifierCV(base, method=method, cv=inner, ensemble=False)
+        # Match the calibration behavior used before commit 348201d: retain
+        # one fitted estimator/calibrator pair per calibration fold.
+        wrapped = CalibratedClassifierCV(base, method=method, cv=inner, ensemble=True)
         return self._final_fit_with_kwargs(wrapped, X, y, fit_kwargs=fit_kwargs)
 
     def _save_model(self, model, filename: str) -> Path:

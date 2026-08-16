@@ -145,6 +145,13 @@ def _feature_rank_by_importance(
         ytr = y.iloc[tr_idx]
 
         est = model_builder()
+        named_steps = getattr(est, "named_steps", {})
+        sampler = named_steps.get("sampler")
+        if sampler is not None and hasattr(sampler, "fit_resample"):
+            # Preserve the pre-348201d behavior for SMOTE-family pipelines:
+            # feature_importances_ is not exposed by the pipeline itself, so
+            # feature selection falls back to tuning on the full DE gene set.
+            return None
         if tuned_params:
             try:
                 est.set_params(**tuned_params)
@@ -350,7 +357,7 @@ def calibrate_within_training(
         return cal
 
     cal = CalibratedClassifierCV(
-        fitted_or_builder, method=str(method), cv=inner, ensemble=False
+        fitted_or_builder, method=str(method), cv=inner, ensemble=True
     )
     cal.fit(Xtr_used, ytr)
     return cal

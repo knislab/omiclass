@@ -1,8 +1,13 @@
 from __future__ import annotations
 import argparse
+import os
 from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
 from omiclass.pipeline.runner import run_pipeline
 
