@@ -14,6 +14,7 @@ from omiclass.errors.errors import ConfigError
 class OverrideSpec:
     aliases: Dict[str, str]  
     frozen_prefixes: Tuple[Tuple[str, ...], ...]  
+    allowed_frozen_paths: Tuple[Tuple[str, ...], ...] = ()
 
 
 SPEC = OverrideSpec(
@@ -65,6 +66,7 @@ SPEC = OverrideSpec(
         "cellfm_device": "cellfm.device",
         "cellfm_batch_size": "cellfm.batch_size",
         "cellfm_random_state": "cellfm.random_state",
+        "cellfm_num_views": "cellfm.num_views",
         "cellfm_reduction_strategy": "cellfm.reduction.strategy",
         "cellfm_supervised_dimensions": "cellfm.reduction.supervised_dimensions",
         "cellfm_pca_components": "cellfm.reduction.pca_components",
@@ -85,6 +87,7 @@ SPEC = OverrideSpec(
         "random_state": "runtime.random_state",
         "n_jobs": "runtime.n_jobs",
         "cv_folds": "runtime.cv_folds",
+        "tuning_inner_cv": "runtime.tuning.inner_cv",
         "min_features": "runtime.min_features",
         "bayesian_iterations" : "runtime.bayesian_iterations",
         "log_transform": "runtime.log_transform",
@@ -93,6 +96,7 @@ SPEC = OverrideSpec(
 
         # runtime.feature selection
         "feature_selection_enabled": "runtime.feature_selection.enabled",
+        "feature_selection_reduce_sampler_pipelines": "runtime.feature_selection.reduce_sampler_pipelines",
         "feature_selection_min_features": "runtime.feature_selection.min_features",
         "feature_selection_max_features": "runtime.feature_selection.max_features",
         "feature_selection_subset_fracs" : "runtime.feature_selection.subset_fracs",
@@ -151,6 +155,7 @@ SPEC = OverrideSpec(
         "rf_oob_score": "models.random_forest.defaults.oob_score",
         "rf_calibrate": "models.random_forest.defaults.calibration.calibrate",
         "rf_calibration_method": "models.random_forest.defaults.calibration.method",
+        "rf_calibration_ensemble": "models.random_forest.defaults.calibration.ensemble",
         "rf_search_n_estimators": "models.random_forest.defaults.search_space.n_estimators",
         "rf_search_max_depth": "models.random_forest.defaults.search_space.max_depth",
         "rf_search_max_features": "models.random_forest.defaults.search_space.max_features",
@@ -200,6 +205,9 @@ SPEC = OverrideSpec(
         ("runtime", "per_fold_estimators"),
         ("runtime", "tuning"),
     ),
+    # Historical-reproduction launchers need to state this value explicitly.
+    # Keep every other tuning field protected by the frozen-prefix policy.
+    allowed_frozen_paths=(("runtime", "tuning", "inner_cv"),),
 )
 
 
@@ -310,7 +318,10 @@ def normalize_user_overrides(user_kwargs: Dict[str, Any], *, strict: bool = True
                 continue
 
         # frozen block
-        if _is_under_frozen(path, SPEC.frozen_prefixes):
+        if (
+            _is_under_frozen(path, SPEC.frozen_prefixes)
+            and path not in SPEC.allowed_frozen_paths
+        ):
             errors.append(f"Override blocked (frozen): '{key}' -> {'.'.join(path)}")
             continue
 

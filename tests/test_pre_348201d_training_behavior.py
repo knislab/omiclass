@@ -15,6 +15,9 @@ from omiclass.train.cv_engine import (
     calibrate_within_training,
 )
 from omiclass.train.trainer import Trainer
+from omiclass.config.schema import CalibrateCfg, FeatureSelectionCfg
+from omiclass.config.overrides import normalize_user_overrides
+from omiclass.errors.errors import ConfigError
 
 
 def _classification_data():
@@ -27,7 +30,7 @@ def _classification_data():
     return X, y, splits
 
 
-def test_smote_family_feature_ranking_falls_back_to_all_de_features():
+def test_smote_family_feature_ranking_can_fall_back_to_all_de_features():
     X, y, splits = _classification_data()
     builders = (
         build_rf_smote,
@@ -43,8 +46,21 @@ def test_smote_family_feature_ranking_falls_back_to_all_de_features():
             y,
             {},
             splits,
+            reduce_sampler_pipelines=False,
         )
         assert ranked is None
+
+
+def test_smote_feature_ranking_remains_enabled_by_default():
+    X, y, splits = _classification_data()
+    ranked = _feature_rank_by_importance(
+        lambda: build_rf_smote(random_state=80, n_jobs=1, n_estimators=5),
+        X,
+        y,
+        {},
+        splits,
+    )
+    assert sorted(ranked.tolist()) == list(range(X.shape[1]))
 
 
 def test_non_sampler_pipeline_feature_ranking_remains_available():
@@ -66,7 +82,7 @@ def test_non_sampler_pipeline_feature_ranking_remains_available():
     assert sorted(ranked.tolist()) == list(range(X.shape[1]))
 
 
-def test_cv_and_final_random_forest_calibration_use_ensemble():
+def test_cv_and_final_random_forest_calibration_can_use_historical_ensemble():
     X, y, _ = _classification_data()
     calibrated_cv = calibrate_within_training(
         fitted_or_builder=RandomForestClassifier(n_estimators=5, random_state=80),
@@ -75,6 +91,7 @@ def test_cv_and_final_random_forest_calibration_use_ensemble():
         method="sigmoid",
         cv=3,
         seed=80,
+        ensemble=True,
     )
 
     trainer = Trainer.__new__(Trainer)
@@ -86,6 +103,7 @@ def test_cv_and_final_random_forest_calibration_use_ensemble():
         method="sigmoid",
         cv=3,
         seed=80,
+        ensemble=True,
     )
 
     assert calibrated_cv.ensemble is True
@@ -104,3 +122,20 @@ def test_all_smote_family_builders_propagate_framework_seed():
         pipeline = builder(random_state=80, n_jobs=1)
         assert pipeline.named_steps["sampler"].random_state == 80
         assert pipeline.named_steps["rf"].random_state == 80
+
+
+def test_historical_compatibility_options_are_opt_in():
+    assert FeatureSelectionCfg().reduce_sampler_pipelines is True
+    assert CalibrateCfg().ensemble is False
+
+
+def test_historical_inner_cv_is_the_only_tuning_override_exception():
+    normalized = normalize_user_overrides({"tuning_inner_cv": "3"})
+    assert normalized == {"runtime": {"tuning": {"inner_cv": "3"}}}
+
+    try:
+        normalize_user_overrides({"runtime.tuning.n_iter": "99"})
+    except ConfigError:
+        pass
+    else:
+        raise AssertionError("Other runtime.tuning fields must remain frozen")

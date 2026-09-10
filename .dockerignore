@@ -20,6 +20,9 @@ data/
 *.joblib
 *.pkl
 
+# Required framework reference data; experiment inputs remain bind-mounted.
+!omiclass/data/gencode_GRCh37_hg19.csv
+
 # Python cache files
 __pycache__/
 *.pyc

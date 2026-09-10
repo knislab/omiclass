@@ -270,7 +270,7 @@ class Trainer:
             est.fit(X, y)
         return est
 
-    def _fit_final(self, builder, X: pd.DataFrame, y: pd.Series, *, calibrate: bool, method: str, cv: int, seed: int, fit_kwargs: dict | None = None,):
+    def _fit_final(self, builder, X: pd.DataFrame, y: pd.Series, *, calibrate: bool, method: str, cv: int, seed: int, fit_kwargs: dict | None = None, ensemble: bool = False,):
         base = builder()
         if not calibrate:
             return self._final_fit_with_kwargs(base, X, y, fit_kwargs=fit_kwargs)
@@ -278,9 +278,9 @@ class Trainer:
         if inner == 0:
             base.fit(X, y)
             return base
-        # Match the calibration behavior used before commit 348201d: retain
-        # one fitted estimator/calibrator pair per calibration fold.
-        wrapped = CalibratedClassifierCV(base, method=method, cv=inner, ensemble=True)
+        wrapped = CalibratedClassifierCV(
+            base, method=method, cv=inner, ensemble=bool(ensemble)
+        )
         return self._final_fit_with_kwargs(wrapped, X, y, fit_kwargs=fit_kwargs)
 
     def _save_model(self, model, filename: str) -> Path:
@@ -386,6 +386,7 @@ class Trainer:
             eval_calibrated_in_cv= eval_calibrated_in_cv,
             calib_method="sigmoid",
             calib_cv=cvs,
+            calibration_ensemble=bool(cal.ensemble),
         )
 
         if fs is not None and bool(getattr(fs, "enabled", False)):
@@ -434,6 +435,7 @@ class Trainer:
                 "scoring": str(getattr(getattr(r, "tuning", None), "scoring_override", None) or r.scoring),
                 "calibrate": bool(getattr(cal, "calibrate", False)),
                 "calibration_cv": int(cvs),
+                "calibration_ensemble": bool(cal.ensemble),
                 "tune_inner_cv": int(getattr(getattr(r, "tuning", None), "inner_cv", 3)),
                 "bayes_iter": int(getattr(r, "bayesian_iterations", 0)),
             },
@@ -455,6 +457,7 @@ class Trainer:
             cv=int(cvs),
             seed=int(r.random_state),
             fit_kwargs=self._reduction_fit_kwargs(fit_kwargs),
+            ensemble=bool(cal.ensemble),
         )
 
         # Save final model
@@ -567,6 +570,7 @@ class Trainer:
             eval_calibrated_in_cv=eval_calibrated_in_cv,
             calib_method=cal_method,
             calib_cv=cvs,
+            calibration_ensemble=bool(getattr(cal, "ensemble", False)),
             fit_kwargs=self._reduction_fit_kwargs(fit_kwargs),
         )
         if fs is not None and bool(getattr(fs, "enabled", False)):
@@ -657,6 +661,7 @@ class Trainer:
             cv=cvs,
             seed=int(r.random_state),
             fit_kwargs=fit_kwargs_no_es,
+            ensemble=bool(getattr(cal, "ensemble", False)),
         )
 
         # Save final model

@@ -36,5 +36,6 @@ def extraction_signature(backend: str, cfg: Any) -> dict[str, str]:
             "checkpoint_path": str(cfg.checkpoint_path),
             "gene_info_path": str(cfg.gene_info_path),
             "random_state": str(cfg.random_state),
+            "num_views": str(cfg.num_views),
         }
     raise ValueError(f"Unsupported embedding backend: {backend}")

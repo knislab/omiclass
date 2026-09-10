@@ -137,6 +137,7 @@ def _feature_rank_by_importance(
     y: pd.Series,
     tuned_params: Dict[str, Any],
     inner_splits: List[Tuple[np.ndarray, np.ndarray]],
+    reduce_sampler_pipelines: bool = True,
 ) -> Optional[np.ndarray]:
     # Rank features using mean feature_importances_ across inner folds (fold-train only).
     imps: List[np.ndarray] = []
@@ -147,10 +148,13 @@ def _feature_rank_by_importance(
         est = model_builder()
         named_steps = getattr(est, "named_steps", {})
         sampler = named_steps.get("sampler")
-        if sampler is not None and hasattr(sampler, "fit_resample"):
-            # Preserve the pre-348201d behavior for SMOTE-family pipelines:
-            # feature_importances_ is not exposed by the pipeline itself, so
-            # feature selection falls back to tuning on the full DE gene set.
+        if (
+            not reduce_sampler_pipelines
+            and sampler is not None
+            and hasattr(sampler, "fit_resample")
+        ):
+            # Historical compatibility: the old implementation did not look
+            # through imbalanced-learn pipelines for feature_importances_.
             return None
         if tuned_params:
             try:
@@ -265,7 +269,16 @@ def inner_select_recipe(
     search0.fit(Xtr, ytr)
     tuned_for_rank = dict(search0.best_params_ or {})
 
-    ranked_idx = _feature_rank_by_importance(model_builder, Xtr, ytr, tuned_for_rank, splits)
+    ranked_idx = _feature_rank_by_importance(
+        model_builder,
+        Xtr,
+        ytr,
+        tuned_for_rank,
+        splits,
+        reduce_sampler_pipelines=bool(
+            getattr(feature_cfg, "reduce_sampler_pipelines", True)
+        ),
+    )
     if ranked_idx is None:
         # If no importances exist, fallback: tune on all features
         base = model_builder()
@@ -343,6 +356,7 @@ def calibrate_within_training(
     cv: int,
     seed: int,
     use_prefit: bool = False,
+    ensemble: bool = False,
 ) -> Any:
     inner = _safe_stratified_kfold(ytr, desired_splits=int(cv), seed=int(seed))
     if inner == 0:
@@ -357,7 +371,7 @@ def calibrate_within_training(
         return cal
 
     cal = CalibratedClassifierCV(
-        fitted_or_builder, method=str(method), cv=inner, ensemble=True
+        fitted_or_builder, method=str(method), cv=inner, ensemble=bool(ensemble)
     )
     cal.fit(Xtr_used, ytr)
     return cal
@@ -380,6 +394,7 @@ def nested_oof_cv(
     eval_calibrated_in_cv: bool,
     calib_method: str,
     calib_cv: int,
+    calibration_ensemble: bool = False,
     fit_kwargs: Optional[Dict[str, Any]] = None,
 ) -> CVResult:
     outer = _safe_stratified_kfold(y, desired_splits=int(outer_splits), seed=int(seed))
@@ -440,6 +455,7 @@ def nested_oof_cv(
                 cv=int(calib_cv),
                 seed=int(seed),
                 use_prefit=False,
+                ensemble=bool(calibration_ensemble),
             )
         else:
             fold_fit_kwargs = dict(fit_kwargs or {})

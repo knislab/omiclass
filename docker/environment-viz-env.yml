@@ -1,0 +1,86 @@
+name: omiclass_env
+channels:
+  - defaults
+  - conda-forge
+  - bioconda
+dependencies:
+  # Exact Python/numerical/ML builds observed in viz_env on 2026-08-18.
+  - defaults::python=3.9.19=h955ad1f_1
+  - defaults::numpy=1.26.4=py39heeff2f4_0
+  - defaults::numpy-base=1.26.4=py39h8a23956_0
+  - defaults::scipy=1.13.1=py39heeff2f4_1
+  - defaults::scikit-learn=1.5.2=py39h6a678d5_0
+  - conda-forge::scikit-optimize=0.10.2=pyhd8ed1ab_0
+  - defaults::joblib=1.5.2=py39h06a4308_0
+  - defaults::requests=2.32.5=py39h06a4308_0
+  - conda-forge::imbalanced-learn=0.12.4=pyhd8ed1ab_0
+  - defaults::lightgbm=4.5.0=py39h6a678d5_0
+  - defaults::xgboost=2.1.1=py39h06a4308_0
+  - defaults::py-xgboost=2.1.1=py39h06a4308_0
+  - defaults::libxgboost=2.1.1=h6a678d5_0
+
+  # Match viz_env's OpenBLAS and GNU OpenMP runtime rather than allowing the
+  # solver to select MKL or a newer OpenBLAS implementation.
+  - defaults::blas=1.0=openblas
+  - defaults::libopenblas=0.3.21=h043d6bf_0
+  - conda-forge::libblas=3.9.0=16_linux64_openblas
+  - conda-forge::liblapack=3.9.0=16_linux64_openblas
+  - defaults::_openmp_mutex=5.1=52_gnu
+  - defaults::libgomp=15.2.0=h4751f2c_8
+  - defaults::threadpoolctl=3.5.0=py39h2f386ee_0
+  - defaults::tbb=2021.8.0=hdb19cb5_0
+
+  # Data-frame/config and R bridge versions used by the same viz_env.  These
+  # are pinned because they participate in input loading and protein DE.
+  - defaults::pandas=2.2.2=py39h6a678d5_0
+  - defaults::pyarrow=19.0.0=py39h6a678d5_1
+  - conda-forge::pydantic=2.0.3=py39hd1e30aa_0
+  - conda-forge::pydantic-core=2.3.0=py39h9fdd4d6_0
+  - defaults::r-base=4.3.1=h8399a1e_1
+  - defaults::rpy2=3.5.11=py39r43h356210d_0
+  - bioconda::bioconductor-edger=4.0.16=r43hf17093f_1
+  - bioconda::bioconductor-limma=3.58.1=r43ha9d7317_1
+  - defaults::pip=26.0.1=pyhc872135_1
+
+  # Remaining framework dependencies.  They are solved around the exact
+  # numerical/runtime pins above.
+  - seaborn
+  - matplotlib
+  - openpyxl
+  - biopython
+  - shap
+  - sra-tools
+  - weasyprint
+  - lifelines
+  - networkx
+  - scikit-survival
+  - r-matrix=1.6_1.1
+  - r-reticulate=1.42.0
+  - r-rcpptoml
+  - r-rcpp=1.0.11
+  - r-seurat=4.3.0
+  - r-seuratobject
+  - r-sctransform
+  - r-hgnchelper
+  - r-purrr=1.0.4
+  - r-stringr=1.5.1
+  - r-tidyr=1.3.1
+  - r-patchwork
+  - r-openxlsx
+  - r-readr=2.1.5
+  - r-ggplot2
+  - r-matrixstats=1.5.0
+  - r-glmnet=4.1_8
+  - r-rtsne
+  - bioconductor-summarizedexperiment
+  - bioconductor-biobase
+  - bioconductor-aucell
+  - bioconductor-gseabase
+  - bioconductor-singler
+  - bioconductor-celldex
+  - bioconductor-scuttle
+  - pip:
+      # These are pip-installed in viz_env; pin them identically because
+      # current OmiClass imports statsmodels from its survival module.
+      - statsmodels==0.14.4
+      - patsy==1.0.1

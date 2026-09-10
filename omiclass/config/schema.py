@@ -99,6 +99,7 @@ class CellFMCfg(BaseModel):
     device: str = "auto"
     batch_size: int = 1
     random_state: int = 0
+    num_views: int = 20
     reduction: EmbeddingReductionCfg = Field(default_factory=EmbeddingReductionCfg)
 
     @field_validator("device")
@@ -117,6 +118,20 @@ class CellFMCfg(BaseModel):
             raise ValueError("cellfm.batch_size must be a positive integer.")
         return int(v)
 
+    @field_validator("num_views", mode="before")
+    @classmethod
+    def _validate_num_views(cls, v):
+        if isinstance(v, bool):
+            raise ValueError("cellfm.num_views must be a positive integer.")
+        if isinstance(v, str):
+            stripped = v.strip()
+            if not stripped.isdigit():
+                raise ValueError("cellfm.num_views must be a positive integer.")
+            v = int(stripped)
+        if not isinstance(v, int) or v <= 0:
+            raise ValueError("cellfm.num_views must be a positive integer.")
+        return int(v)
+
     @model_validator(mode="after")
     def _set_default_paths(self):
         root = Path(self.root_dir)
@@ -132,6 +147,7 @@ class CellFMCfg(BaseModel):
 # ---------- feature selection ----------
 class FeatureSelectionCfg(BaseModel):
     enabled: bool = True
+    reduce_sampler_pipelines: bool = True
     subset_fracs: List[float] = Field(default_factory=lambda: [0.05, 0.1, 0.2, 0.3])
     min_features: int = 20
     max_features: Optional[int] = None 
@@ -438,6 +454,7 @@ class RuntimeCfg(BaseModel):
 class CalibrateCfg(BaseModel):
     calibrate: bool = True
     method: Literal["sigmoid","isotonic"] = "sigmoid"
+    ensemble: bool = False
 
 # ---------- rf search space ----------
 class RFSearchSpace(BaseModel):

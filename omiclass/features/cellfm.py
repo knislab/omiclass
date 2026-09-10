@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib
 import json
 import os
@@ -14,6 +15,10 @@ import pandas as pd
 
 from omiclass.config.schema import CellFMCfg
 from omiclass.errors.errors import DataError
+
+
+CELLFM_EMBEDDING_DIMENSION = 1536
+CELLFM_GENES_PER_VIEW = 2048
 
 
 @dataclass
@@ -228,6 +233,171 @@ def _resolve_device(torch, configured: str):
     return torch.device(requested)
 
 
+def _stable_view_seed(sample_id: str, global_seed: int, view_index: int) -> int:
+    """Return the reference implementation's process-stable per-view seed."""
+    payload = f"{sample_id}\0{int(global_seed)}\0{int(view_index)}".encode("utf-8")
+    return int.from_bytes(hashlib.sha256(payload).digest()[:4], "big", signed=False)
+
+
+def _tokenize_sample_view(prep, capped_counts: np.ndarray, gene_ids: np.ndarray,
+                          *, seed: int):
+    """Run CellFM's existing collator operations for one deterministic view."""
+    state = np.random.get_state()
+    np.random.seed(int(seed))
+    try:
+        data = np.asarray(capped_counts, dtype=np.float32)
+        genes = np.asarray(gene_ids, dtype=np.int32)
+        total = np.asarray(data.sum(), dtype=np.float32)
+        raw_data, nonzero, zero = prep.seperate(data)
+        data, nonzero, _cut, _zero_sample, seq_len = prep.sample(
+            raw_data, nonzero, zero
+        )
+        raw_data, raw_nonzero, nonzero = prep.compress(raw_data, nonzero)
+        _genes, selected_gene_ids, _ = prep.compress(genes, nonzero)
+        raw_nonzero, normalized, selected_total, total = prep.bayes(raw_nonzero, total)
+        normalized, selected_total = prep.normalize(normalized, selected_total)
+        _raw_normalized, total = prep.normalize(raw_nonzero, total)
+        st_features = prep.cat_st(selected_total, total)
+        valid = prep.attn_mask(seq_len)
+        normalized, _mask_gene = prep.mask(normalized)
+        normalized = prep.pad_zero(normalized)
+        selected_gene_ids = prep.pad_zero(selected_gene_ids)
+    finally:
+        np.random.set_state(state)
+
+    return (
+        np.asarray(normalized, dtype=np.float32),
+        np.asarray(selected_gene_ids, dtype=np.int32),
+        np.asarray(st_features, dtype=np.float32),
+        np.asarray(valid, dtype=np.float32),
+    )
+
+
+def _pool_cellfm_batch(model, expression, genes, st_features, valid):
+    encoded, _ = model.net.encode(expression, genes, st_features, valid)
+    gene_tokens = encoded[:, 3:, :]
+    mask = valid.unsqueeze(-1).to(gene_tokens.dtype)
+    return (gene_tokens * mask).sum(1) / mask.sum(1).clamp_min(1.0)
+
+
+def _extract_legacy_single_view(*, torch, model, loader, device):
+    """Preserve the original single pseudo-cell extraction implementation."""
+    batches = []
+    retained = []
+    with torch.inference_mode():
+        for batch in loader:
+            expression = batch["dw_nzdata"].to(device)
+            genes = batch["nonz_gene"].to(device)
+            st_features = batch["ST_feat"].to(device)
+            valid = batch["zero_idx"].to(device)
+            pooled = _pool_cellfm_batch(model, expression, genes, st_features, valid)
+            batches.append(pooled.float().cpu().numpy())
+            retained.extend(valid.sum(1).to(dtype=torch.int64).cpu().tolist())
+    if not batches:
+        raise DataError("CellFM extraction produced no embeddings.")
+    return np.concatenate(batches, axis=0), retained
+
+
+def _extract_multiview(*, torch, model, prep, prepared: CellFMPreparedInput,
+                       device, batch_size: int, random_state: int, num_views: int):
+    """Generate deterministic CellFM views and return their float32 mean."""
+    sample_count = len(prepared.sample_ids)
+    embedding_sum = np.zeros(
+        (sample_count, CELLFM_EMBEDDING_DIMENSION), dtype=np.float64
+    )
+    retained = np.zeros((sample_count, num_views), dtype=np.int32)
+
+    for view_index in range(num_views):
+        for batch_start in range(0, sample_count, batch_size):
+            batch_stop = min(batch_start + batch_size, sample_count)
+            expression_batch = []
+            genes_batch = []
+            st_batch = []
+            valid_batch = []
+            for sample_position in range(batch_start, batch_stop):
+                seed = _stable_view_seed(
+                    prepared.sample_ids[sample_position], random_state, view_index
+                )
+                expression, genes, st_features, valid = _tokenize_sample_view(
+                    prep,
+                    prepared.counts[sample_position],
+                    prepared.gene_ids,
+                    seed=seed,
+                )
+                expression_batch.append(expression)
+                genes_batch.append(genes)
+                st_batch.append(st_features)
+                valid_batch.append(valid)
+                retained[sample_position, view_index] = int(np.asarray(valid).sum())
+
+            expression_tensor = torch.from_numpy(np.stack(expression_batch)).to(device)
+            genes_tensor = torch.from_numpy(np.stack(genes_batch)).to(device)
+            st_tensor = torch.from_numpy(np.stack(st_batch)).to(device)
+            valid_tensor = torch.from_numpy(np.stack(valid_batch)).to(device)
+            with torch.inference_mode():
+                pooled = _pool_cellfm_batch(
+                    model, expression_tensor, genes_tensor, st_tensor, valid_tensor
+                )
+            batch_embeddings = pooled.float().cpu().numpy()
+            if batch_embeddings.shape != (
+                batch_stop - batch_start, CELLFM_EMBEDDING_DIMENSION
+            ):
+                raise DataError(
+                    "CellFM returned an unexpected embedding shape: "
+                    f"{batch_embeddings.shape}."
+                )
+            embedding_sum[batch_start:batch_stop] += batch_embeddings
+
+    return (embedding_sum / num_views).astype(np.float32), retained.tolist()
+
+
+def _extract_configured_views(*, cfg: CellFMCfg, utils, torch, model, prep,
+                              prepared: CellFMPreparedInput, device):
+    """Route to the preserved legacy implementation or deterministic multiview."""
+    num_views = int(cfg.num_views)
+    if num_views == 1:
+        loader = utils.build_dataset(
+            _BulkSampleDataset(prepared), prep=prep, batch_size=int(cfg.batch_size),
+            pad_zero=True, drop=False, shuffle=False,
+        )
+        state = np.random.get_state()
+        np.random.seed(int(cfg.random_state))
+        try:
+            embeddings, retained = _extract_legacy_single_view(
+                torch=torch, model=model, loader=loader, device=device
+            )
+        finally:
+            np.random.set_state(state)
+        return (
+            embeddings,
+            retained,
+            "legacy_global_numpy_random_state",
+            "single_view",
+        )
+
+    # Match the reference implementation's canonical token ordering.
+    order = np.argsort(prepared.gene_ids, kind="stable")
+    prepared.counts = prepared.counts[:, order]
+    prepared.gene_ids = prepared.gene_ids[order]
+    prepared.mapped_genes = [prepared.mapped_genes[int(i)] for i in order]
+    embeddings, retained = _extract_multiview(
+        torch=torch,
+        model=model,
+        prep=prep,
+        prepared=prepared,
+        device=device,
+        batch_size=int(cfg.batch_size),
+        random_state=int(cfg.random_state),
+        num_views=num_views,
+    )
+    return (
+        embeddings,
+        retained,
+        "sha256_sample_id_global_seed_zero_based_view_index",
+        "mean",
+    )
+
+
 class CellFMFeatureExtractor:
     """Generate frozen, valid-gene mean-pooled embeddings for bulk RNA-seq samples."""
 
@@ -259,10 +429,16 @@ class CellFMFeatureExtractor:
         prep = utils.Prepare(
             pad_len=model_cfg.nonz_len, pad=0, mask_ratio=0.0, dw=False, random=False
         )
-        loader = utils.build_dataset(
-            _BulkSampleDataset(prepared), prep=prep, batch_size=int(cfg.batch_size),
-            pad_zero=True, drop=False, shuffle=False,
-        )
+        if int(model_cfg.nonz_len) != CELLFM_GENES_PER_VIEW:
+            raise DataError(
+                f"Expected CellFM sequence length {CELLFM_GENES_PER_VIEW}, got "
+                f"{model_cfg.nonz_len}."
+            )
+        if int(model_cfg.enc_dims) != CELLFM_EMBEDDING_DIMENSION:
+            raise DataError(
+                f"Expected CellFM embedding width {CELLFM_EMBEDDING_DIMENSION}, got "
+                f"{model_cfg.enc_dims}."
+            )
         torch_state = torch.random.get_rng_state()
         cuda_states = torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None
         torch.manual_seed(int(cfg.random_state))
@@ -281,29 +457,24 @@ class CellFMFeatureExtractor:
         model.eval()
         model.requires_grad_(False)
 
-        state = np.random.get_state()
-        np.random.seed(int(cfg.random_state))  # CellFM Prepare.sample uses NumPy's global RNG.
-        batches = []
-        retained = []
-        try:
-            with torch.inference_mode():
-                for batch in loader:
-                    expression = batch["dw_nzdata"].to(device)
-                    genes = batch["nonz_gene"].to(device)
-                    st_features = batch["ST_feat"].to(device)
-                    valid = batch["zero_idx"].to(device)
-                    encoded, _ = model.net.encode(expression, genes, st_features, valid)
-                    gene_tokens = encoded[:, 3:, :]
-                    mask = valid.unsqueeze(-1).to(gene_tokens.dtype)
-                    pooled = (gene_tokens * mask).sum(1) / mask.sum(1).clamp_min(1.0)
-                    batches.append(pooled.float().cpu().numpy())
-                    retained.extend(valid.sum(1).to(dtype=torch.int64).cpu().tolist())
-        finally:
-            np.random.set_state(state)
-
-        if not batches:
-            raise DataError("CellFM extraction produced no embeddings.")
-        embeddings = np.concatenate(batches, axis=0)
+        num_views = int(cfg.num_views)
+        embeddings, retained, seed_strategy, aggregation = _extract_configured_views(
+            cfg=cfg,
+            utils=utils,
+            torch=torch,
+            model=model,
+            prep=prep,
+            prepared=prepared,
+            device=device,
+        )
+        retained_by_view = None
+        if num_views == 1:
+            retained_per_sample = list(map(int, retained))
+        else:
+            retained_by_view = [list(map(int, sample_views)) for sample_views in retained]
+            # Preserve the original flat metadata field; selection length is the
+            # same across views, while the full per-view values are recorded below.
+            retained_per_sample = [sample_views[0] for sample_views in retained_by_view]
         features = cellfm_feature_matrix(embeddings, prepared.sample_ids)
         metadata = {
             "backend": "cellfm",
@@ -313,16 +484,21 @@ class CellFMFeatureExtractor:
             "gene_info_path": str(cfg.gene_info_path),
             "pooling": "valid_gene_mean",
             "selection_random_state": int(cfg.random_state),
+            "num_views": num_views,
+            "view_seed_strategy": seed_strategy,
+            "view_aggregation": aggregation,
             "input_shape": list(counts.shape),
             "mapped_genes": len(prepared.mapped_genes),
             "unmapped_genes": len(prepared.unmapped_genes),
             "ensembl_mapped_genes": int(prepared.ensembl_mapped_genes),
             "vocabulary_size": len(vocabulary),
             "sequence_length": int(model_cfg.nonz_len),
-            "retained_genes_per_sample": list(map(int, retained)),
+            "retained_genes_per_sample": retained_per_sample,
             "embedding_shape": list(embeddings.shape),
             "feature_shape": list(features.shape),
         }
+        if retained_by_view is not None:
+            metadata["retained_genes_per_sample_per_view"] = retained_by_view
         return CellFMExtractionResult(features=features, metadata=metadata)
 
 

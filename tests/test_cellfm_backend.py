@@ -4,12 +4,19 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import omiclass.features.cellfm as cellfm_module
 from omiclass.cli.runtime import create_runtime_options_from_path_conf_kwargs
 from omiclass.config.loaders import load_config
+from omiclass.config.schema import CellFMCfg
 from omiclass.errors.errors import SchemaValidationError
 from omiclass.features.bulkformer_reduction import build_embedding_representation
 from omiclass.features.cellfm import (
+    CELLFM_EMBEDDING_DIMENSION,
     CellFMExtractionResult,
+    CellFMPreparedInput,
+    _extract_configured_views,
+    _extract_multiview,
+    _stable_view_seed,
     cellfm_feature_matrix,
     prepare_cellfm_input,
 )
@@ -31,6 +38,7 @@ def test_cellfm_config_aliases_and_runtime_route(tmp_path):
         "cellfm_enabled": True,
         "cellfm_batch_size": 3,
         "cellfm_random_state": 17,
+        "cellfm_num_views": 1,
         "cellfm_reduction_strategy": "supervised_pca",
         "cellfm_supervised_dimensions": 12,
         "cellfm_pca_components": 4,
@@ -43,6 +51,7 @@ def test_cellfm_config_aliases_and_runtime_route(tmp_path):
     assert cfg.bulkformer.enabled is False
     assert cfg.cellfm.batch_size == 3
     assert cfg.cellfm.random_state == 17
+    assert cfg.cellfm.num_views == 1
     assert cfg.cellfm.reduction.strategy == "supervised_pca"
     assert cfg.cellfm.reduction.supervised_dimensions == 12
     assert cfg.cellfm.reduction.pca_components == 4
@@ -63,6 +72,186 @@ def test_cellfm_resource_defaults_follow_root_dir(tmp_path):
     assert cfg.cellfm.gene_info_path == root / "csv" / "expand_gene_info.csv"
     assert cfg.cellfm.checkpoint_path == root.parent / "weights" / "CellFM_80M_weight.ckpt"
     assert cfg.cellfm.vendor_dir == root.parent / "vendor"
+    assert cfg.cellfm.num_views == 20
+    assert CellFMCfg(num_views=1).num_views == 1
+
+
+def test_cellfm_num_views_accepts_cli_integer_string(tmp_path):
+    cfg = load_config({**_base(tmp_path), "cellfm_num_views": "20"})
+    assert cfg.cellfm.num_views == 20
+
+
+@pytest.mark.parametrize("num_views", [0, -1, 1.5, True])
+def test_cellfm_num_views_requires_positive_integer(tmp_path, num_views):
+    with pytest.raises(SchemaValidationError, match="num_views"):
+        load_config({**_base(tmp_path), "cellfm_num_views": num_views})
+
+
+def test_cellfm_view_seeds_are_stable_and_distinct():
+    seeds = [_stable_view_seed("sample_a", 17, view) for view in range(20)]
+    assert seeds == [_stable_view_seed("sample_a", 17, view) for view in range(20)]
+    assert len(set(seeds)) == 20
+    assert _stable_view_seed("sample_b", 17, 0) != seeds[0]
+
+
+def _prepared_for_multiview(sample_ids=("sample_a", "sample_b")):
+    counts_by_id = {"sample_a": [1, 3], "sample_b": [2, 4]}
+    return CellFMPreparedInput(
+        counts=np.asarray([counts_by_id[sample_id] for sample_id in sample_ids]),
+        gene_ids=np.asarray([2, 1], dtype=np.int32),
+        sample_ids=list(sample_ids),
+        mapped_genes=["G2", "G1"],
+        unmapped_genes=[],
+        raw_library_sizes=np.asarray([4, 6], dtype=np.float64),
+    )
+
+
+def test_cellfm_multiview_generates_20_views_and_averages_deterministically(monkeypatch):
+    calls = []
+
+    class FakeTensor:
+        def __init__(self, array):
+            self.array = np.asarray(array)
+
+        def to(self, _device):
+            return self
+
+        def float(self):
+            return self
+
+        def cpu(self):
+            return self
+
+        def numpy(self):
+            return self.array
+
+    class FakeInferenceMode:
+        def __enter__(self):
+            return None
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+    fake_torch = SimpleNamespace(
+        from_numpy=FakeTensor,
+        inference_mode=FakeInferenceMode,
+    )
+
+    def fake_tokenize(_prep, _counts, _gene_ids, *, seed):
+        calls.append(seed)
+        value = np.float32(seed % 997)
+        return (
+            np.full(2048, value, dtype=np.float32),
+            np.ones(2048, dtype=np.int32),
+            np.zeros(2, dtype=np.float32),
+            np.ones(2048, dtype=np.float32),
+        )
+
+    def fake_pool(_model, expression, _genes, _st_features, _valid):
+        return FakeTensor(
+            np.repeat(expression.array[:, :1], CELLFM_EMBEDDING_DIMENSION, axis=1)
+        )
+
+    monkeypatch.setattr(cellfm_module, "_tokenize_sample_view", fake_tokenize)
+    monkeypatch.setattr(cellfm_module, "_pool_cellfm_batch", fake_pool)
+    prepared = _prepared_for_multiview()
+    embeddings, retained = _extract_multiview(
+        torch=fake_torch,
+        model=object(),
+        prep=object(),
+        prepared=prepared,
+        device="cpu",
+        batch_size=1,
+        random_state=17,
+        num_views=20,
+    )
+
+    expected = [
+        np.mean([_stable_view_seed(sample_id, 17, view) % 997 for view in range(20)])
+        for sample_id in prepared.sample_ids
+    ]
+    assert len(calls) == len(prepared.sample_ids) * 20
+    assert embeddings.shape == (2, CELLFM_EMBEDDING_DIMENSION)
+    assert embeddings.dtype == np.float32
+    assert np.allclose(embeddings[:, 0], expected)
+    assert np.all(embeddings == embeddings[:, :1])
+    assert retained == [[2048] * 20, [2048] * 20]
+
+    calls.clear()
+    reordered = _prepared_for_multiview(("sample_b", "sample_a"))
+    reordered_embeddings, _ = _extract_multiview(
+        torch=fake_torch,
+        model=object(),
+        prep=object(),
+        prepared=reordered,
+        device="cpu",
+        batch_size=2,
+        random_state=17,
+        num_views=20,
+    )
+    assert np.allclose(reordered_embeddings[0], embeddings[1])
+    assert np.allclose(reordered_embeddings[1], embeddings[0])
+
+
+def test_cellfm_num_views_one_routes_to_legacy_implementation(monkeypatch):
+    expected = np.ones((2, CELLFM_EMBEDDING_DIMENSION), dtype=np.float32)
+    loader = object()
+    utils = SimpleNamespace(build_dataset=lambda *args, **kwargs: loader)
+    monkeypatch.setattr(
+        cellfm_module,
+        "_extract_legacy_single_view",
+        lambda **kwargs: (expected, [2048, 2048]),
+    )
+    monkeypatch.setattr(
+        cellfm_module,
+        "_extract_multiview",
+        lambda **kwargs: pytest.fail("multiview path used for num_views=1"),
+    )
+
+    embeddings, retained, seed_strategy, aggregation = _extract_configured_views(
+        cfg=SimpleNamespace(num_views=1, batch_size=2, random_state=17),
+        utils=utils,
+        torch=object(),
+        model=object(),
+        prep=object(),
+        prepared=_prepared_for_multiview(),
+        device="cpu",
+    )
+    assert embeddings is expected
+    assert retained == [2048, 2048]
+    assert seed_strategy == "legacy_global_numpy_random_state"
+    assert aggregation == "single_view"
+
+
+def test_cellfm_default_routes_to_20_view_mean(monkeypatch):
+    expected = np.ones((2, CELLFM_EMBEDDING_DIMENSION), dtype=np.float32)
+    captured = {}
+
+    def fake_multiview(**kwargs):
+        captured.update(kwargs)
+        return expected, [[2048] * 20, [2048] * 20]
+
+    monkeypatch.setattr(cellfm_module, "_extract_multiview", fake_multiview)
+    monkeypatch.setattr(
+        cellfm_module,
+        "_extract_legacy_single_view",
+        lambda **kwargs: pytest.fail("legacy path used for default num_views=20"),
+    )
+    prepared = _prepared_for_multiview()
+    embeddings, _retained, seed_strategy, aggregation = _extract_configured_views(
+        cfg=CellFMCfg(),
+        utils=SimpleNamespace(),
+        torch=object(),
+        model=object(),
+        prep=object(),
+        prepared=prepared,
+        device="cpu",
+    )
+    assert embeddings is expected
+    assert captured["num_views"] == 20
+    assert prepared.gene_ids.tolist() == [1, 2]
+    assert seed_strategy == "sha256_sample_id_global_seed_zero_based_view_index"
+    assert aggregation == "mean"
 
 
 def test_embedding_backends_are_mutually_exclusive(tmp_path):
@@ -160,3 +349,4 @@ def test_cellfm_uses_shared_representation_strategies(tmp_path, strategy):
     assert transformed.shape[0] == len(X)
     assert transformer.strategy == strategy
     assert transformer.extraction_signature_["backend"] == "cellfm"
+    assert transformer.extraction_signature_["num_views"] == "20"

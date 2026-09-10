@@ -53,6 +53,7 @@ def train_oof_stacker(
             eval_calibrated_in_cv=False,
             calib_method="",
             calib_cv=0,
+            calibration_ensemble=False,
         )
         base_fold_logs[name] = cvres
         if cvres.oof_proba is None:
