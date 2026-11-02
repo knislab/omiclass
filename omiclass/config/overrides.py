@@ -76,6 +76,26 @@ SPEC = OverrideSpec(
         "cellfm_close_pair_pca_components": "cellfm.reduction.close_pair_pca_components",
         "cellfm_reduction_random_state": "cellfm.reduction.random_state",
 
+        # BulkRNABert isolated feature extraction
+        "bulkrnabert_enabled": "bulkrnabert.enabled",
+        "bulkrnabert_root_dir": "bulkrnabert.root_dir",
+        "bulkrnabert_model_name": "bulkrnabert.model_name",
+        "bulkrnabert_checkpoint_directory": "bulkrnabert.checkpoint_directory",
+        "bulkrnabert_vocabulary_path": "bulkrnabert.vocabulary_path",
+        "bulkrnabert_python_executable": "bulkrnabert.python_executable",
+        "bulkrnabert_tpm_input_path": "bulkrnabert.tpm_input_path",
+        "bulkrnabert_cache_dir": "bulkrnabert.cache_dir",
+        "bulkrnabert_device": "bulkrnabert.device",
+        "bulkrnabert_batch_size": "bulkrnabert.batch_size",
+        "bulkrnabert_reduction_strategy": "bulkrnabert.reduction.strategy",
+        "bulkrnabert_supervised_dimensions": "bulkrnabert.reduction.supervised_dimensions",
+        "bulkrnabert_pca_components": "bulkrnabert.reduction.pca_components",
+        "bulkrnabert_one_vs_rest_fraction": "bulkrnabert.reduction.one_vs_rest_fraction",
+        "bulkrnabert_close_pair_fraction": "bulkrnabert.reduction.close_pair_fraction",
+        "bulkrnabert_close_pair_count": "bulkrnabert.reduction.close_pair_count",
+        "bulkrnabert_close_pair_pca_components": "bulkrnabert.reduction.close_pair_pca_components",
+        "bulkrnabert_reduction_random_state": "bulkrnabert.reduction.random_state",
+
         # batch_correction
         "batch_column": "batch_correction.batch_column",
         "design_columns": "batch_correction.design_columns",

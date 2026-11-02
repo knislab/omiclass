@@ -33,6 +33,11 @@ tests/
 !tests/*.py
 results/
 final_results_runs/
+comparison_tools/
+experiments/
+thesis_plots/
+
+# Version only the additive BulkRNABert launchers; keep all run data ignored.
 examples/results/Docker_results/de_results/limma_voom_selected_genes.txt
 examples/results/Docker_results/train_artifacts/genesets/**
 examples/results/Docker_results/config.freeze.yaml

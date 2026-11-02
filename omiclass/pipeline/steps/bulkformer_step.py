@@ -25,6 +25,11 @@ class EmbeddingFeatureExtractionStep:
         elif backend == "cellfm":
             extractor = CellFMFeatureExtractor(ctx.cfg.cellfm)
             writer = write_cellfm_artifacts
+        elif backend == "bulkrnabert":
+            from omiclass.features.bulkrnabert import BulkRNABertFeatureExtractor, write_bulkrnabert_artifacts
+
+            extractor = BulkRNABertFeatureExtractor(ctx.cfg.bulkrnabert)
+            writer = write_bulkrnabert_artifacts
         else:  # protected by should_run; useful when invoked directly
             return
         result = extractor.extract(counts)

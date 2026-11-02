@@ -2,7 +2,7 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import List, Optional, Union, Literal, Dict
-from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
+from pydantic import BaseModel, Field, model_validator, field_validator, model_serializer, ConfigDict
 
 BatchMethod = Literal["batch", "design", "covariates", "pcs"]
 Modality = Literal["rnaseq", "cptac_ms"]
@@ -143,6 +143,35 @@ class CellFMCfg(BaseModel):
             # The bundled checkout keeps binary dependencies next to CellFM-torch.
             self.vendor_dir = root.parent / "vendor"
         return self
+
+class BulkRNABertCfg(BaseModel):
+    """Isolated, frozen BulkRNABert extraction; input is explicitly unlogged TPM."""
+
+    model_config = ConfigDict(protected_namespaces=())
+    enabled: bool = False
+    root_dir: Path = Path("BulkRNABert")
+    model_name: str = "bulk_rna_bert_gtex_encode"
+    checkpoint_directory: Optional[Path] = None
+    vocabulary_path: Optional[Path] = None
+    python_executable: Path = Field(
+        default_factory=lambda: Path.home() / ".conda/envs/bulkrnabert/bin/python"
+    )
+    tpm_input_path: Optional[Path] = None
+    cache_dir: Path = Path("final_results_runs/test_bulkrnabert/cache")
+    device: Literal["auto", "cpu", "gpu"] = "auto"
+    batch_size: int = Field(default=1, gt=0)
+    reduction: EmbeddingReductionCfg = Field(default_factory=EmbeddingReductionCfg)
+
+    @model_validator(mode="after")
+    def _set_default_paths(self):
+        if not self.model_name or Path(self.model_name).name != self.model_name:
+            raise ValueError("bulkrnabert.model_name must be a checkpoint folder name.")
+        if self.checkpoint_directory is None:
+            self.checkpoint_directory = self.root_dir / "checkpoints"
+        if self.vocabulary_path is None:
+            self.vocabulary_path = self.root_dir / "data/bulkrnabert/common_gene_id.txt"
+        return self
+
 
 # ---------- feature selection ----------
 class FeatureSelectionCfg(BaseModel):
@@ -603,6 +632,7 @@ class Config(BaseModel):
     project: ProjectCfg = Field(default_factory=ProjectCfg)
     bulkformer: BulkFormerCfg = Field(default_factory=BulkFormerCfg)
     cellfm: CellFMCfg = Field(default_factory=CellFMCfg)
+    bulkrnabert: BulkRNABertCfg = Field(default_factory=BulkRNABertCfg)
     batch_correction: BatchCorrectionCfg = Field(default_factory=BatchCorrectionCfg)
     runtime: RuntimeCfg = Field(default_factory=RuntimeCfg)
     models: ModelsCfg = Field(default_factory=ModelsCfg)
@@ -613,8 +643,25 @@ class Config(BaseModel):
     surface_markers: SurfaceMarkerCfg = Field(default_factory=SurfaceMarkerCfg)
     plots: PlotsCfg = Field(default_factory=PlotsCfg)
 
+    @model_serializer(mode="wrap")
+    def _serialize_optional_bulkrnabert(self, handler):
+        # Keep frozen configs/output structure identical for existing runs.
+        data = handler(self)
+        if not self.bulkrnabert.enabled:
+            data.pop("bulkrnabert", None)
+        return data
+
     @model_validator(mode="after")
     def _final_checks(self):
+        if self.bulkrnabert.enabled:
+            if self.bulkformer.enabled or self.cellfm.enabled:
+                raise ValueError("BulkRNABert is an alternative embedding backend; enable only one.")
+            if self.project.modality != "rnaseq":
+                raise ValueError("bulkrnabert.enabled requires project.modality='rnaseq'.")
+            if self.bulkrnabert.tpm_input_path is None:
+                raise ValueError("bulkrnabert.tpm_input_path must identify unlogged TPM input.")
+            if self.bulkrnabert.reduction.strategy != "full" and self.runtime.feature_selection.enabled:
+                raise ValueError("runtime.feature_selection.enabled must be false when using a non-full embedding reduction strategy.")
         if self.bulkformer.enabled and self.cellfm.enabled:
             raise ValueError("BulkFormer and CellFM are alternative embedding backends; enable only one.")
         if bool(getattr(self.bulkformer, "enabled", False)) and self.project.modality != "rnaseq":

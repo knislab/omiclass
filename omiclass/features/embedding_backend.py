@@ -9,6 +9,8 @@ def embedding_backend(cfg: Any) -> str | None:
         return "bulkformer"
     if bool(getattr(getattr(cfg, "cellfm", None), "enabled", False)):
         return "cellfm"
+    if bool(getattr(getattr(cfg, "bulkrnabert", None), "enabled", False)):
+        return "bulkrnabert"
     return None
 
 
@@ -37,5 +39,13 @@ def extraction_signature(backend: str, cfg: Any) -> dict[str, str]:
             "gene_info_path": str(cfg.gene_info_path),
             "random_state": str(cfg.random_state),
             "num_views": str(cfg.num_views),
+        }
+    if backend == "bulkrnabert":
+        return {
+            "backend": backend,
+            "pooling": "embeddings_4_gene_mean",
+            "model_name": str(cfg.model_name),
+            "checkpoint_directory": str(cfg.checkpoint_directory),
+            "vocabulary_path": str(cfg.vocabulary_path),
         }
     raise ValueError(f"Unsupported embedding backend: {backend}")
