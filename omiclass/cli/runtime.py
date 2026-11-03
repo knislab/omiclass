@@ -54,6 +54,22 @@ def create_runtime_options_from_path_conf_kwargs(
     project_out_dir = Path(cfg.project.out_dir)
     embeddings_enabled = embedding_enabled(cfg)
 
+    if cfg.batch_correction.algorithm in {"frozen_quantile", "reference_ruv", "fsva_exact"}:
+        if is_raw_count:
+            raise ValueError("Frozen reference preprocessing requires TPM or log1p(TPM) input")
+        return RuntimeOptions(
+            mode="clean_and_predict" if has_leaderboard(project_out_dir) else "batch-train",
+            input_mode="batch_correction", expression_path=expression_path,
+            meta_path=cfg.project.meta_path, run_batch=True, run_de=False,
+            gene_path=kwargs.get("gene_path") or cfg.project.geneset_path,
+            surface_markers=kwargs.get("surface_markers", False) or cfg.surface_markers.enabled,
+            run_training=True, run_prediction=run_prediction,
+            reuse_split=bool(kwargs.get("reuse_split", False)),
+            split_json=kwargs.get("split_json"),
+        )
+    if cfg.batch_correction.algorithm == "none":
+        run_batch = False
+
     if embeddings_enabled:
         mode = "clean_and_predict" if has_leaderboard(project_out_dir) else "train-only"
         input_mode = "raw_counts"

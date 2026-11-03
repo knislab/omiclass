@@ -74,3 +74,14 @@ CellFM/vendor/
 !examples/results/
 !examples/results/**/
 !examples/results/**/*.html
+
+# Keep the projection experiment implementation; generated inputs/results stay local.
+!experiments/
+experiments/*
+!experiments/reference_preprocessing/
+experiments/reference_preprocessing/*
+!experiments/reference_preprocessing/*.py
+!experiments/reference_preprocessing/*.R
+!experiments/reference_preprocessing/*.sh
+!experiments/reference_preprocessing/*.md
+!experiments/reference_preprocessing/.gitignore

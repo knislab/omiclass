@@ -24,6 +24,18 @@ class LoadInputStep:
         - ctx.cache["gene_list"]: gene list associated with the matrix
         """
         dp = DataProcessor(ctx.cfg)
+        if ctx.cfg.batch_correction.algorithm in {"frozen_quantile", "reference_ruv", "fsva_exact"}:
+            from omiclass.batch.reference_pipeline import read_expression
+            if ctx.opts.input_mode == "raw_counts":
+                raise ValueError("Frozen references require explicit TPM or log1p(TPM) input, not raw counts")
+            X = read_expression(ctx.opts.expression_path)
+            from omiclass.utils.io import load_list
+            genes = load_list(ctx.opts.gene_path) if ctx.opts.gene_path else X.index.tolist()
+            if ctx.opts.surface_markers:
+                from omiclass.utils.surface_markers import fillter_surface_markers
+                genes = fillter_surface_markers(genes)
+            ctx.cache.update(full_expr=X, full_expr_t=X.T, gene_list=genes, input_modality="rnaseq")
+            return
         modality = getattr(ctx.cfg.project, "modality", "rnaseq")
 
         modality_label = (

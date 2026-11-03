@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from omiclass.pipeline.orchestrator import RunContext
-from omiclass.batch.limma_runner import LimmaRunner
 from omiclass.reporting.limma_report import write_limma_report
 from omiclass.utils.io import load_matrix
 from omiclass.data.processor import DataProcessor
@@ -18,6 +17,10 @@ class BatchCorrectionStep:
     def should_run(self, ctx: RunContext) -> bool:
         if ctx.opts.mode == "clean_and_predict":
             return False
+        if ctx.cfg.batch_correction.algorithm == "none":
+            return False
+        if ctx.cfg.batch_correction.algorithm in {"frozen_quantile", "reference_ruv", "fsva_exact"}:
+            return True
         if ctx.opts.run_batch is not None:
             return ctx.opts.run_batch
         if ctx.opts.input_mode == "ready_for_training":
@@ -31,6 +34,11 @@ class BatchCorrectionStep:
         """
         Run limma batch correction + batch holdout, store result in ctx.cache["X_corrected"].
         """
+        if ctx.cfg.batch_correction.algorithm in {"frozen_quantile", "reference_ruv", "fsva_exact"}:
+            from omiclass.batch.reference_pipeline import fit_reference
+            fit_reference(ctx)
+            return
+        from omiclass.batch.limma_runner import LimmaRunner
         full_expr = ctx.cache["full_expr"]
 
         full_expr, did_log, log_reason = maybe_log1p_expression(

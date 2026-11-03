@@ -357,6 +357,17 @@ class ProjectCfg(BaseModel):
 
 # ---------- batch correction ----------
 class BatchCorrectionCfg(BaseModel):
+    # `method` remains the legacy limma adjustment flags.
+    algorithm: Literal["limma", "none", "frozen_quantile", "reference_ruv", "fsva_exact"] = "limma"
+    input_scale: Literal["tpm", "log1p_tpm"] = "tpm"
+    training_samples_path: Optional[Path] = None
+    reference_path: Optional[Path] = None
+    control_genes_path: Optional[Path] = None
+    control_justification: Optional[str] = None
+    n_factors: int = Field(default=1, gt=0)
+    rscript_path: Optional[Path] = None
+    r_library_path: Optional[Path] = None
+    reference_random_state: int = 11
     method: List[BatchMethod] = Field(default_factory=list)
     batch_column: Optional[str] = None
     design_columns: Optional[List[str]] = None
@@ -653,6 +664,9 @@ class Config(BaseModel):
 
     @model_validator(mode="after")
     def _final_checks(self):
+        if self.batch_correction.algorithm in {"frozen_quantile", "reference_ruv", "fsva_exact"}:
+            if self.project.modality != "rnaseq" or self.bulkformer.enabled or self.cellfm.enabled or self.bulkrnabert.enabled:
+                raise ValueError("Frozen expression references currently require rnaseq without embedding backends")
         if self.bulkrnabert.enabled:
             if self.bulkformer.enabled or self.cellfm.enabled:
                 raise ValueError("BulkRNABert is an alternative embedding backend; enable only one.")

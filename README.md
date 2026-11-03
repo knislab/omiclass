@@ -52,6 +52,13 @@ ighv_mut
 ```
 
 Batch correction is optional. If you do not provide any batch-related settings such as `batch_column`, `batch_covariates_path`, or `batch_n_pcs`, the batch-correction step is skipped.
+
+Training-reference alternatives are available through `batch_correction.algorithm`:
+`frozen_quantile`, native `fsva_exact`, and experimental `reference_ruv`.
+They fit on explicitly listed training samples and support independent external
+application through the existing prediction workflow. The default is `limma`;
+`none` explicitly disables correction. See the [methods, configuration and limitations](docs/reference_preprocessing.md)
+and [CLL-Map → DKFZ comparison commands](experiments/reference_preprocessing/README.md).
 If you provide `markers_path` with a predefined gene list, Omiclass skips DE and gene-set selection and uses that list directly.
 
 ## Quick start with Docker
