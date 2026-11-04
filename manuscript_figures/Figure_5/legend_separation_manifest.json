@@ -1,0 +1,218 @@
+{
+  "figure": 5,
+  "plotting_script": "/data01/private/projects/omiclass/manuscript_figures/scripts/separate_legends_figures_3_5.py",
+  "files": [
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5_legend_configuration_status.pdf",
+      "role": "standalone_legend",
+      "sha256": "b2cc7df8d0cb05c0c542d609557bbe3b97ab60b220b112c55bc29366610ed140",
+      "standalone_legends_and_notes": [],
+      "pdf_font_compatibility": "PASS: embedded CID TrueType, live text",
+      "pages": 1
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5_legend_configuration_status.png",
+      "role": "standalone_legend",
+      "sha256": "81bfb7a355c884555dc2f312445c99210ce68daf1dda5ac05b4b7e7010700496",
+      "standalone_legends_and_notes": [],
+      "pixels": [
+        1904,
+        125
+      ],
+      "dpi": [
+        399.9992,
+        399.9992
+      ]
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5_legend_configuration_status.svg",
+      "role": "standalone_legend",
+      "sha256": "cfb0634dd71e0a0b68851f2654df208f96e9c6777f77e00627f44ca7234e22f9",
+      "standalone_legends_and_notes": []
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5_shared_notes.pdf",
+      "role": "standalone_notes",
+      "sha256": "fa2607fe100d1960e19407fc7dae471b7a89db73931e0d65ae3d68aee937fbfd",
+      "standalone_legends_and_notes": [],
+      "pdf_font_compatibility": "PASS: embedded CID TrueType, live text",
+      "pages": 1
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5_shared_notes.png",
+      "role": "standalone_notes",
+      "sha256": "57bb700ce64366123182e8b1bbbde2effd1fa0aacfe4a4be95fe459ed5445e9f",
+      "standalone_legends_and_notes": [],
+      "pixels": [
+        2639,
+        199
+      ],
+      "dpi": [
+        399.9992,
+        399.9992
+      ]
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5_shared_notes.svg",
+      "role": "standalone_notes",
+      "sha256": "20aa3badfd8edac34450e65396c7e77d52a6b8a683c6d4324492c1f6137de4ad",
+      "standalone_legends_and_notes": []
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5a_B-ALL_foundation_performance.pdf",
+      "role": "panel",
+      "sha256": "6fcb4326e3df09934a32046946819b4c3fe6be5288574be412bbdc076edccb1a",
+      "standalone_legends_and_notes": [
+        "Figure_5/Figure_5_legend_configuration_status",
+        "Figure_5/Figure_5_shared_notes"
+      ],
+      "pdf_font_compatibility": "PASS: embedded CID TrueType, live text",
+      "pages": 1
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5a_B-ALL_foundation_performance.png",
+      "role": "panel",
+      "sha256": "aa247ac58a16b5b9edddacde5d7d39a7e84a28e197a4c1924fdd0a33c809e0bb",
+      "standalone_legends_and_notes": [
+        "Figure_5/Figure_5_legend_configuration_status",
+        "Figure_5/Figure_5_shared_notes"
+      ],
+      "pixels": [
+        4302,
+        4646
+      ],
+      "dpi": [
+        399.9992,
+        399.9992
+      ]
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5a_B-ALL_foundation_performance.svg",
+      "role": "panel",
+      "sha256": "bddcef860a384b69ea47a120d9992933eae34a8ac8d13837ef068d323c29cd1c",
+      "standalone_legends_and_notes": [
+        "Figure_5/Figure_5_legend_configuration_status",
+        "Figure_5/Figure_5_shared_notes"
+      ]
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5b_TCGA-BRCA_foundation_performance.pdf",
+      "role": "panel",
+      "sha256": "474f0bde9f1ce2c817a26c35c58d0ed303785c0860283983ab39b86cfc845f52",
+      "standalone_legends_and_notes": [
+        "Figure_5/Figure_5_legend_configuration_status",
+        "Figure_5/Figure_5_shared_notes"
+      ],
+      "pdf_font_compatibility": "PASS: embedded CID TrueType, live text",
+      "pages": 1
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5b_TCGA-BRCA_foundation_performance.png",
+      "role": "panel",
+      "sha256": "cf91e90a6dc532f3c9f940693dd711125dbf54c22ec50e2a709ccebb92a8b1db",
+      "standalone_legends_and_notes": [
+        "Figure_5/Figure_5_legend_configuration_status",
+        "Figure_5/Figure_5_shared_notes"
+      ],
+      "pixels": [
+        4587,
+        7529
+      ],
+      "dpi": [
+        399.9992,
+        399.9992
+      ]
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5b_TCGA-BRCA_foundation_performance.svg",
+      "role": "panel",
+      "sha256": "0440b19800e09f95c193f366999fb72e4fe58545d9ca86ac1372864d171c5459",
+      "standalone_legends_and_notes": [
+        "Figure_5/Figure_5_legend_configuration_status",
+        "Figure_5/Figure_5_shared_notes"
+      ]
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5c_TCGA-BRCA_to_APOLLO_foundation_performance.pdf",
+      "role": "panel",
+      "sha256": "1148967cac1056f8db87462b56acf74d200424147134fe4a69618939db64d6e6",
+      "standalone_legends_and_notes": [
+        "Figure_5/Figure_5_legend_configuration_status",
+        "Figure_5/Figure_5_shared_notes"
+      ],
+      "pdf_font_compatibility": "PASS: embedded CID TrueType, live text",
+      "pages": 1
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5c_TCGA-BRCA_to_APOLLO_foundation_performance.png",
+      "role": "panel",
+      "sha256": "4c530166515f46ffd9a54f85521a3d27f37b992c5cb9aa3ae2f69514f957b516",
+      "standalone_legends_and_notes": [
+        "Figure_5/Figure_5_legend_configuration_status",
+        "Figure_5/Figure_5_shared_notes"
+      ],
+      "pixels": [
+        4587,
+        7529
+      ],
+      "dpi": [
+        399.9992,
+        399.9992
+      ]
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5c_TCGA-BRCA_to_APOLLO_foundation_performance.svg",
+      "role": "panel",
+      "sha256": "46ab032eaeb7875c01afb8d41878ab6338991792822e48b05edc0b364790c9b0",
+      "standalone_legends_and_notes": [
+        "Figure_5/Figure_5_legend_configuration_status",
+        "Figure_5/Figure_5_shared_notes"
+      ]
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5d_CLL-map_foundation_performance.pdf",
+      "role": "panel",
+      "sha256": "8be4ff12eb5eb72f1696f46078e184f4d47ed03edabecd533588ef11e347082e",
+      "standalone_legends_and_notes": [
+        "Figure_5/Figure_5_legend_configuration_status",
+        "Figure_5/Figure_5_shared_notes"
+      ],
+      "pdf_font_compatibility": "PASS: embedded CID TrueType, live text",
+      "pages": 1
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5d_CLL-map_foundation_performance.png",
+      "role": "panel",
+      "sha256": "2e75a52ddd87d4d623595560a79acf3a09323440635263a6b72d727d426c64cc",
+      "standalone_legends_and_notes": [
+        "Figure_5/Figure_5_legend_configuration_status",
+        "Figure_5/Figure_5_shared_notes"
+      ],
+      "pixels": [
+        4587,
+        7529
+      ],
+      "dpi": [
+        399.9992,
+        399.9992
+      ]
+    },
+    {
+      "path": "/data01/private/projects/omiclass/manuscript_figures/Figure_5/Figure_5d_CLL-map_foundation_performance.svg",
+      "role": "panel",
+      "sha256": "2770727ffe691f842836921cf15d49b1cbe5f0080f73bcacac1cbaf0a1c9a445",
+      "standalone_legends_and_notes": [
+        "Figure_5/Figure_5_legend_configuration_status",
+        "Figure_5/Figure_5_shared_notes"
+      ]
+    }
+  ],
+  "original_sources_unchanged": true,
+  "all_pdf_fonts_embedded_truetype": true,
+  "retained_scientific_values_and_coordinates_preserved": true,
+  "excluded_representations": [
+    "CLS",
+    "Mean pooled"
+  ],
+  "notes": "Legends and repeated footnotes are standalone files. Physical original panel sizes are retained in Figure 4. Heatmap side colorbars remain attached."
+}
