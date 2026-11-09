@@ -52,6 +52,7 @@ class CVResult:
     oof_proba: Optional[np.ndarray]
     per_fold_metrics: List[Dict[str, Any]]
     fold_recipes: List[FoldRecipe]
+    classes: Optional[np.ndarray] = None
 
 
 # ---------- safe CV helpers ----------
@@ -555,4 +556,5 @@ def nested_oof_cv(
         oof_proba=oof_proba_out,
         per_fold_metrics=per_fold_metrics,
         fold_recipes=fold_recipes,
+        classes=canonical,
     )

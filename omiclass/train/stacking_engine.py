@@ -133,7 +133,7 @@ def train_oof_stacker(
 
     Z_final, final_scopes = stacking_oof(X=X, y=y, fit_bases=fit_bases, splits=outer_splits, seed=seed)
     result = CVResult(oof_true=y.to_numpy(), oof_pred=predictions, oof_proba=probabilities,
-                      per_fold_metrics=metrics, fold_recipes=[])
+                      per_fold_metrics=metrics, fold_recipes=[], classes=canonical)
     result.stacking_final_oof_scopes = final_scopes
     result.stacking_probability_columns = list(Z_final.columns)
     return result, Z_final.to_numpy()

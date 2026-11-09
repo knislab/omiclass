@@ -67,6 +67,7 @@ class BatchCorrectionStep:
         )
         if did_log:
             ctx.cache["_did_log_transform"] = True
+        ctx.cache['batch_input_log1p'] = did_log
         ctx.cache["_log_transform_reason"] = log_reason
         bc = ctx.cfg.batch_correction
         dp = DataProcessor(ctx.cfg)

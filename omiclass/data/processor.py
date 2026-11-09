@@ -454,9 +454,15 @@ class DataProcessor:
     def normalize_raw_counts(
         self,
         X_counts: pd.DataFrame,
+        *, gene_lengths: Optional[pd.Series] = None,
     ) -> pd.DataFrame:
         """Normalize raw counts to true TPM and return log1p(TPM)."""
-        if getattr(self.cfg.normalization, "gene_lengths_path", None):
+        if gene_lengths is not None:
+            missing = set(gene_lengths.index) - set(X_counts.index)
+            if missing:
+                raise DataError(f'Prediction lacks required normalization genes: {sorted(missing)[:10]}')
+            X_counts = X_counts.loc[gene_lengths.index]
+        elif getattr(self.cfg.normalization, "gene_lengths_path", None):
             gene_lengths = self.load_precomputed_gene_lengths(
                 str(self.cfg.normalization.gene_lengths_path)
             )
@@ -503,6 +509,7 @@ class DataProcessor:
             raise DataError("Some samples have zero RPK total.")
 
         tpm = rpk.divide(sf, axis=1) * 1e6
+        self.normalization_gene_lengths_ = lengths.copy()
         return np.log1p(tpm)
     
 

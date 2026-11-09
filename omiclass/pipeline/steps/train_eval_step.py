@@ -19,6 +19,7 @@ from omiclass.utils.splits import apply_split
 from omiclass.train.preprocessing import TrainingPreprocessor
 from omiclass.eval.holdout import evaluate_holdout, evaluate_holdout_with_thresholds, write_holdout_csvs
 from omiclass.eval.thresholds import learn_multiclass_thresholds
+from omiclass.eval.prediction import align_probabilities
 from omiclass.reporting.per_model_report import finalize_report_for_model
 from omiclass.plotting.plotter import FinalSummaryPlotter
 from omiclass.reporting.final_summary_report import render_final_summary_html
@@ -118,7 +119,9 @@ class TrainAndEvalStep:
             version=1, train_ids=Xtr.index.tolist(), test_ids=Xte.index.tolist(),
             input_mode=ctx.opts.input_mode,
             fitted_inside_estimators=True, de=prep.de, cptac=prep.cptac, reference=prep.reference,
-            correction_transductive=using_batch_corrected_matrix)))
+            correction_transductive=using_batch_corrected_matrix,
+            batch_input_log1p=ctx.cache.get('batch_input_log1p', False),
+            frozen_raw_count_normalization=(preprocessing_dir / 'raw_count_gene_lengths.joblib').is_file())))
         # 4) Save leaderboard
         leaderboard_csv = ctx.out_dir / "leaderboard.csv"
         summary.metrics.to_csv(leaderboard_csv, index=False)
@@ -130,9 +133,7 @@ class TrainAndEvalStep:
         per_model_payload: Dict[str, Dict[str, np.ndarray]] = {}
         per_model_train_payload: Dict[str, Dict[str, np.ndarray]] = {}
         per_model_threshold_payload: Dict[str, Dict[str, np.ndarray]] = {}
-        original_f1_scores: Dict[str, float] = {}
-        threshold_f1_scores: Dict[str, float] = {}
-        labels_from_first: list[str] = []
+        labels_from_first = [str(label) for label in np.unique(ytr)]
         train_label_index = np.array(sorted(np.unique(ytr.astype(int))), dtype=int)
 
         # Train payload from OOF CV outputs (same source used to create summary.metrics).
@@ -145,13 +146,18 @@ class TrainAndEvalStep:
                 continue
             y_proba = getattr(cvres, "oof_proba", None)
             if y_proba is None:
-                # Fallback for estimators without predict_proba in CV: one-hot from predictions.
-                y_proba = (y_pred[:, None] == train_label_index[None, :]).astype(float)
+                continue  # Hard predictions are not probability estimates for ROC/PR plots.
             per_model_train_payload[model_name] = {
                 "y_pred": y_pred,
-                "y_proba": np.asarray(y_proba),
+                "y_proba": align_probabilities(y_proba,
+                    getattr(cvres, 'classes', None) if getattr(cvres, 'classes', None) is not None
+                    else np.unique(cvres.oof_true), train_label_index),
             }
 
+        # Persist the training-only threshold decision before reading holdout labels.
+        threshold_infos = {key: learn_multiclass_thresholds(trainer.cv_results[key])
+            for key in summary.artifact_paths if key in trainer.cv_results}
+        (train_dir / 'thresholds.json').write_text(json.dumps(threshold_infos, indent=2), encoding='utf-8')
         i = 1
         for key, model_path in summary.artifact_paths.items():
             i += 1
@@ -160,7 +166,7 @@ class TrainAndEvalStep:
 
             report = evaluate_holdout(model, Xte, yte)
             cvres = trainer.cv_results.get(key)
-            threshold_info = learn_multiclass_thresholds(cvres) if cvres is not None else None
+            threshold_info = threshold_infos.get(key)
             threshold_report = None
             if threshold_info is not None:
                 threshold_report = evaluate_holdout_with_thresholds(
@@ -194,19 +200,16 @@ class TrainAndEvalStep:
                 labels_from_first = list(pp.get("labels", []))
             per_model_payload[key] = {
                 "y_pred": pp.get("y_pred"),
-                "y_proba": pp.get("y_proba"),
+                "y_proba": (align_probabilities(pp['y_proba'], report['classes'], train_label_index)
+                            if pp.get('y_proba') is not None else None),
             }
 
-            # Track original F1 score
-            original_f1_scores[key] = report.get("f1_macro")
-
-            # threshold final summary payload (only if it improves F1)
+            # The OOF-defined derivative is always reported, irrespective of holdout F1.
             if threshold_report is not None:
-                threshold_f1_scores[key] = threshold_report.get("f1_macro")
                 tpp = threshold_report.get("plot_payload", {})
                 per_model_threshold_payload[key] = {
                     "y_pred": tpp.get("y_pred"),
-                    "y_proba": tpp.get("y_proba"),
+                    "y_proba": align_probabilities(tpp['y_proba'], threshold_report['classes'], train_label_index),
                 }
 
             test_rows.append({
@@ -266,7 +269,7 @@ class TrainAndEvalStep:
                     "y_true": yte.to_numpy(),
                     "y_pred": selected_payload["y_pred"],
                     "y_proba": selected_payload["y_proba"],
-                    "labels": sorted(np.unique(yte.astype(int))).copy(),
+                    "labels": train_label_index.copy(),
                 }
             }
 
@@ -303,15 +306,14 @@ class TrainAndEvalStep:
         ctx.cache["best_model"] = best_model
         ctx.cache["best_model_path"] = best_model_path
         
+        scope_path = preprocessing_dir / 'scoped.json'
+        scope = json.loads(scope_path.read_text())
+        scope.update(selected_model=best_model,
+                     model_path=str(best_model_path.resolve().relative_to(ctx.out_dir.resolve())))
+        scope_path.write_text(json.dumps(scope, indent=2))
         fr = getattr(ctx.cfg.runtime, "feature_reduction", None)
-        try:
-            if bool(fr and fr.enabled):
-                ctx.cache["X_train"] = Xtr
-                ctx.cache["y_train"] = ytr
-                fr_class = FeatureReductionStep()
-                fr_class.run(ctx)
-        except Exception as e:
-            pass
+        if fr and fr.enabled:
+            FeatureReductionStep().run(ctx)
 
         meta_payload = {
             "n_test": int(len(yte)),
@@ -334,14 +336,8 @@ class TrainAndEvalStep:
             ctx=ctx
         )
 
-        # Check if best model's threshold optimization improves F1
-        best_model_improves_with_threshold = (
-            best_model in threshold_f1_scores
-            and threshold_f1_scores[best_model] > original_f1_scores[best_model]
-        )
-
         threshold_plotter = None
-        if per_model_threshold_payload and best_model_improves_with_threshold:
+        if per_model_threshold_payload:
             threshold_plotter = FinalSummaryPlotter(
                 labels=labels_for_plot,
                 y_true=yte,
@@ -359,6 +355,7 @@ class TrainAndEvalStep:
             "Selected model": best_model.replace("_", " ").title(),
             "Selected metric": selected_metric_col,
             "Threshold optimized appendix": "yes" if threshold_plotter is not None else "no",
+            "Feature reduction diagnostic": ctx.cache.get('feature_reduction_status', {}).get('reason', 'not requested'),
             "input_modality": str(getattr(ctx.cfg.project, "modality", "rnaseq")),
             "input_modality_label": (
                 "CPTAC MS proteomics"

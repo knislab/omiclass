@@ -113,7 +113,7 @@ def _best_model_holdout_score_html(plotter: FinalSummaryPlotter, selected_model:
         return f"<div class='muted'>No holdout predictions available for <code>{esc(selected_clean)}</code>.</div>"
 
     acc = float(accuracy_score(plotter.y_true, y_pred)) * 100.0
-    f1m = float(f1_score(plotter.y_true, y_pred, average="macro", zero_division=0)) * 100.0
+    f1m = float(f1_score(plotter.y_true, y_pred, labels=plotter._get_label_index(), average="macro", zero_division=0)) * 100.0
 
     return split_card_1_1(
         title="Best Model Holdout Score",
@@ -281,7 +281,7 @@ def render_final_summary_html(
                     collapsible=True,
                     download_name="confusion_matrices_grid_threshold_optimized.svg",
                 ),
-                subtitle="Shown only when threshold optimization improves the selected model F1",
+                subtitle="OOF-learned thresholds; reported independently of holdout improvement",
             )
         )
     

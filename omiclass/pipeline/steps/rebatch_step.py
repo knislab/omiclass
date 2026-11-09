@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Dict, Any
 import pandas as pd
 import joblib
 import json
+import numpy as np
 
 if TYPE_CHECKING:
     from omiclass.pipeline.orchestrator import RunContext
@@ -56,12 +57,17 @@ class RebatchCorrectionStep:
             if ctx.cfg.cptac_ms_preprocessing.log2_transform:
                 ctx.cache['_did_log_transform'] = True
 
-        full_expr, did_log, log_reason = maybe_log1p_expression(
-            full_expr,
-            enabled=ctx.cfg.runtime.log_transform is True,
-            already_normalized_or_logged=ctx.cache.get("_did_raw_count_norm", False)
-            or ctx.cache.get("_did_log_transform", False),
-        )
+        if scope is not None and 'batch_input_log1p' in scope:
+            did_log = bool(scope['batch_input_log1p'])
+            if did_log and (full_expr <= -1).any().any():
+                raise ValueError('Prediction values are incompatible with the saved correction input log1p')
+            full_expr = np.log1p(full_expr) if did_log else full_expr
+            log_reason = 'saved correction input transform'
+        else:
+            full_expr, did_log, log_reason = maybe_log1p_expression(
+                full_expr, enabled=ctx.cfg.runtime.log_transform is True,
+                already_normalized_or_logged=ctx.cache.get('_did_raw_count_norm', False)
+                or ctx.cache.get('_did_log_transform', False))
         if did_log:
             ctx.cache["_did_log_transform"] = True
         ctx.cache["_log_transform_reason"] = log_reason

@@ -1,6 +1,6 @@
 # Foundation models through api.py
 
-The opt-in `foundation` block exposes the recovered manuscript protocols. Existing marker and legacy embedding calls remain on their original route. [Step 3 Stage 1](step3-stage1-report.md) adds configuration, selection and artifact reliability fixes; [Stage 2](step3-stage2-report.md) corrects split and preprocessing scopes; [Stage 3](step3-stage3-report.md) corrects fit-local weighting, RF calibration consistency and infeasible CV handling; [Stage 4](step3-stage4-report.md) corrects nested evaluation and feature alignment of the existing stacker. The remaining methodological boundaries are identified below.
+The opt-in `foundation` block exposes the recovered manuscript protocols. Existing marker and legacy embedding calls remain on their original route. [Step 3 Stage 1](step3-stage1-report.md) adds configuration, selection and artifact reliability fixes; [Stage 2](step3-stage2-report.md) corrects split and preprocessing scopes; [Stage 3](step3-stage3-report.md) corrects fit-local weighting, RF calibration consistency and infeasible CV handling; [Stage 4](step3-stage4-report.md) corrects nested evaluation and feature alignment of the existing stacker; [Stage 5](step3-stage5-report.md) corrects core evaluation/threshold reporting and external preprocessing replay. The remaining methodological boundaries are identified below.
 
 ## Evidence and complete configuration set
 
@@ -108,6 +108,8 @@ The existing severity thresholds, candidate sets, search spaces and calibration 
 
 Stage 4 applies the same native family-selection procedure within each stacking training partition. It retains RF, XGBoost and LightGBM bases and logistic-regression meta fitting, with all class-probability columns retained, including both binary columns. Each base uses its own fitted input schema; passthrough preprocessing fits on the meta-training partition. Historical saved stacks retain their original prediction path. Honest nesting increases fitting cost and can fail explicitly when an inner partition cannot support requested calibration; it never substitutes in-sample predictions. New native stack runs write `stacking_fit_scope.json` in their model-artifact directory (`train_artifacts` on this foundation route) with the partition and schema records.
 
+Stage 5 preserves the foundation route's evaluation protocols and ordinary classifier predictions, including SVM decisions that differ from probability argmax. External head/representation prediction uses saved fitted state, restores the manifest's raw feature order, and rejects incompatible class/probability schemas. No threshold optimization or outer CV is added to standalone heads. The core marker/legacy route separately reports its existing OOF-threshold derivative without choosing it by holdout improvement; its holdout metrics retain all fitted classes. The historical validation-ranked feature-reduction diagnostic is explicitly disabled rather than replaced with a new method.
+
 ## Historical correction before extraction
 
 Enable explicitly:
@@ -155,6 +157,6 @@ Original marker calls through `api.run(expression, markers_path=..., ...)` retai
 
 Unsupported: token SVM/LR/SMOTE/native suites; CellFM/BERT max/median pooling; non-RNA-seq modalities; outcome-dependent correction; correction methods without an observed adapter; unsupported checkpoint shapes/layers; GPU head training. Missing local vendor/checkpoint/JAX/R dependencies produce errors rather than downloads, silent fallback, or modified scientific settings.
 
-The following remain for subsequent approved stages or explicit discussion: holdout threshold selection/reporting; external re-correction; BERT corrected-value clipping; BulkFormer all-pooling sum; and positional alignment of CellFM token sequences. Explicitly transductive limma correction, existing imbalance thresholds, fixed heads without outer CV and BERT early stopping without all-training refit retain their intended protocols. Historical repeated seeds on fixed splits measure a different source of variability from newly generated splits.
+The following remain for the subsequent approved stage or explicit discussion: foundation external re-correction/extraction consistency; BERT corrected-value clipping; BulkFormer all-pooling sum; and positional alignment of CellFM token sequences. Explicitly transductive limma correction, existing imbalance thresholds, fixed heads without outer CV and BERT early stopping without all-training refit retain their intended protocols. Historical repeated seeds on fixed splits measure a different source of variability from newly generated splits.
 
 No CPOP, RankTreeEnsemble, Multi-class Pairs, MINT or other external comparison-tool logic is incorporated.

@@ -21,6 +21,9 @@ class CPTACPreprocessingStep:
             return  # Fitted separately inside every estimator/DE training call.
         if (ctx.out_dir / 'preprocessing/scoped.json').is_file():
             return  # The saved estimator owns its fitted transform.
+        if ctx.opts.mode == 'clean_and_predict':
+            raise ValueError('Historical CPTAC run lacks fitted preprocessing state; '
+                             'prediction cannot refit imputation or transforms on external samples')
         full_expr = ctx.cache["full_expr"]
         dp = DataProcessor(ctx.cfg)
         processed, summary = dp.preprocess_cptac_ms(full_expr)

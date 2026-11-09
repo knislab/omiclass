@@ -393,7 +393,7 @@ def _render_per_class_table(per_class: List[Dict[str, Any]], class_name_map: Dic
 def _per_class_rows_from_report(report_dict: Dict[str, Any]) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     for cls, stats in (report_dict or {}).items():
-        if cls in ("accuracy", "macro avg", "weighted avg"):
+        if cls in ("accuracy", "micro avg", "macro avg", "weighted avg"):
             continue
         if not isinstance(stats, dict):
             continue

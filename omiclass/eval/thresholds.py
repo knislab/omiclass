@@ -4,6 +4,23 @@ from typing import Any, Dict, Optional, Sequence
 
 import numpy as np
 from sklearn.metrics import f1_score
+from .prediction import validate_probabilities
+
+
+def ordered_thresholds(info, classes):
+    values = info.get('thresholds', info)
+    saved_classes = list(info.get('classes', classes))
+    if len(saved_classes) != len(classes) or set(saved_classes) != set(classes):
+        raise ValueError('Threshold class schema differs from fitted model classes')
+    try:
+        mapping = {label: float(values[str(label)] if str(label) in values else values[label])
+                   for label in saved_classes}
+        result = np.asarray([mapping[label] for label in classes])
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError('Threshold values must cover every fitted class') from error
+    if not np.isfinite(result).all() or (result <= 0).any() or (result > 1).any():
+        raise ValueError('Threshold values must be finite and within (0, 1]')
+    return result
 
 
 def _normalize_proba_rows(p: np.ndarray, eps: float = 1e-15) -> np.ndarray:
@@ -25,7 +42,7 @@ def apply_multiclass_thresholds(
     A lower threshold makes a class easier to select; prediction is the class
     with the largest probability/threshold ratio.
     """
-    p = _normalize_proba_rows(np.asarray(proba, dtype=float))
+    p = validate_probabilities(proba, classes, len(proba))
     thr = np.asarray(thresholds, dtype=float)
     if p.ndim != 2:
         raise ValueError("proba must be a 2D array")
@@ -34,7 +51,8 @@ def apply_multiclass_thresholds(
     if p.shape[1] != len(classes):
         raise ValueError("class count must match probability columns")
 
-    thr = np.clip(thr, 1e-6, 1.0)
+    if not np.isfinite(thr).all() or (thr <= 0).any() or (thr > 1).any():
+        raise ValueError('Threshold values must be finite and within (0, 1]')
     idx = np.argmax(p / thr[None, :], axis=1)
     return np.asarray(classes)[idx]
 
@@ -51,27 +69,26 @@ def learn_multiclass_thresholds(
     The thresholds are optimized only on CV out-of-fold probabilities and can
     then be applied to an untouched holdout set.
     """
-    y_true = np.asarray(getattr(cv_result, "oof_true", None))
+    raw_truth = getattr(cv_result, "oof_true", None)
+    if raw_truth is None:
+        return None
+    y_true = np.asarray(raw_truth)
     proba = getattr(cv_result, "oof_proba", None)
     if y_true.size == 0 or proba is None:
         return None
 
-    p = np.asarray(proba, dtype=float)
-    if p.ndim != 2 or p.shape[0] != y_true.shape[0]:
-        return None
-
-    finite_rows = np.isfinite(p).all(axis=1)
-    if not finite_rows.any():
-        return None
-
-    y_true = y_true[finite_rows]
-    p = _normalize_proba_rows(p[finite_rows])
-    classes = np.array(sorted(np.unique(y_true)))
-    if p.shape[1] != len(classes):
-        return None
-
-    base_pred = classes[np.argmax(p, axis=1)]
-    base_score = float(f1_score(y_true, base_pred, average=average, zero_division=0))
+    stored_classes = getattr(cv_result, 'classes', None)
+    # Historical CVResult columns were generated in sorted training-label order.
+    classes = np.asarray(stored_classes if stored_classes is not None else np.unique(y_true))
+    if len(classes) < 2 or set(classes) != set(y_true) or len(set(classes)) != len(classes):
+        raise ValueError('OOF threshold optimization requires the complete training class schema')
+    p = _normalize_proba_rows(validate_probabilities(proba, classes, len(y_true)))
+    base_pred = getattr(cv_result, 'oof_pred', None)
+    if base_pred is None:
+        base_pred = classes[np.argmax(p, axis=1)]
+    if np.asarray(base_pred).shape != y_true.shape or not set(base_pred).issubset(set(classes)):
+        raise ValueError('Invalid OOF estimator predictions')
+    base_score = float(f1_score(y_true, base_pred, labels=classes, average=average, zero_division=0))
 
     candidates = (
         np.asarray(list(grid), dtype=float)

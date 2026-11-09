@@ -54,9 +54,9 @@ class FinalSummaryPlotter:
             rows.append({
                 "model": name,
                 "accuracy": accuracy_score(self.y_true, y_pred),
-                "precision": precision_score(self.y_true, y_pred, average="macro", zero_division=0),
-                "recall":    recall_score(self.y_true, y_pred, average="macro", zero_division=0),
-                "macro_f1":  f1_score(self.y_true, y_pred, average="macro", zero_division=0),
+                "precision": precision_score(self.y_true, y_pred, labels=self._get_label_index(), average="macro", zero_division=0),
+                "recall":    recall_score(self.y_true, y_pred, labels=self._get_label_index(), average="macro", zero_division=0),
+                "macro_f1":  f1_score(self.y_true, y_pred, labels=self._get_label_index(), average="macro", zero_division=0),
             })
         df = pd.DataFrame(rows).sort_values("macro_f1", ascending=False)
 
@@ -289,9 +289,9 @@ class FinalSummaryPlotter:
             records.append({
                 "model":     cleaned_name,
                 "Accuracy":  accuracy_score(self.y_true_train, y_pred),
-                "Precision": precision_score(self.y_true_train, y_pred, average="macro", zero_division=0),
-                "Recall":    recall_score(self.y_true_train, y_pred, average="macro", zero_division=0),
-                "Macro F1":  f1_score(self.y_true_train, y_pred, average="macro", zero_division=0),
+                "Precision": precision_score(self.y_true_train, y_pred, labels=self._get_label_index(), average="macro", zero_division=0),
+                "Recall":    recall_score(self.y_true_train, y_pred, labels=self._get_label_index(), average="macro", zero_division=0),
+                "Macro F1":  f1_score(self.y_true_train, y_pred, labels=self._get_label_index(), average="macro", zero_division=0),
             })
         if not records:
             fig, ax = plt.subplots(figsize=(7, 3))
@@ -369,25 +369,19 @@ class FinalSummaryPlotter:
         return "".join(char for char in str(name).casefold() if char.isalnum())
 
     def _ensure_proba_shape(self, P: np.ndarray, K: int) -> np.ndarray:
-        """
-        Return probabilities with shape (n, K). Handles binary (n,) or (n,1) or (n,2).
-        Pads/truncates to K if mismatched (strictly for plotting).
-        """
-        if P.ndim == 1:
-            P = np.column_stack([1 - P, P])
-        if P.shape[1] == 1 and K == 2:
-            P = np.column_stack([1 - P[:, 0], P[:, 0]])
-        if P.shape[1] != K:
-            if P.shape[1] > K:
-                P = P[:, :K]
-            else:
-                pad = np.zeros((P.shape[0], K - P.shape[1]))
-                P = np.hstack([P, pad])
-        return P
+        from omiclass.eval.prediction import validate_probabilities
+        return validate_probabilities(P, np.arange(K), len(P))
 
 
     def _get_label_index(self) -> np.ndarray:
-        # If we were given an explicit mapping, its keys define the label IDs.
+        # Explicit numeric labels define probability-column order, including absent classes.
+        try:
+            labels = np.asarray([int(label) for label in self.labels])
+            if len(labels) and len(set(labels)) == len(labels):
+                return labels
+        except (ValueError, TypeError):
+            pass
+        # Historical display-name callers retain their mapped-label behavior.
         if hasattr(self, "class_name_map") and self.class_name_map:
             return np.array(sorted(self.class_name_map.keys()), dtype=int)
 

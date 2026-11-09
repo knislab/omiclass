@@ -15,6 +15,8 @@ from omiclass.survival.plotter import plot_confidence_histogram, plot_confidence
 from omiclass.survival.report import render_survival_prediction_html
 from omiclass.errors.errors import SurvivalPredictionError
 from omiclass.train.cv_engine import _bulkformer_representation_from_model
+from omiclass.eval.prediction import match_features, canonical_classes, predict_estimator, validate_probabilities
+from omiclass.eval.thresholds import ordered_thresholds, apply_multiclass_thresholds
 from omiclass.utils.debug import debug_prediction_and_survival_inputs
 from omiclass.features.embedding_backend import (
     embedding_backend, embedding_config, extraction_signature,
@@ -34,25 +36,15 @@ class SurvivalPredictionResult:
 
 def _build_proba_df(model, X: pd.DataFrame) -> pd.DataFrame:
     """Return a DataFrame of predicted probabilities (index = samples)."""
-    proba = model.predict_proba(X)
-    if hasattr(model, "classes_"):
-        cols = list(model.classes_)
-    else:
-        cols = list(range(1, proba.shape[1] + 1))
-    proba_df = pd.DataFrame(proba, index=X.index, columns=cols)
-    return proba_df
+    classes = canonical_classes(model)
+    proba = validate_probabilities(model.predict_proba(X), classes, len(X))
+    return pd.DataFrame(proba, index=X.index, columns=classes)
 
-def _predict_with_thresholds(proba_df: pd.DataFrame, threshold_info: Dict[str, Any]) -> pd.Series:
-    thresholds = threshold_info.get("thresholds") or threshold_info
 
-    scores = proba_df.copy()
-    for cls in scores.columns:
-        thr = float(thresholds.get(str(cls), thresholds.get(cls, 0.5)))
-        scores[cls] = scores[cls] / max(thr, 1e-12)
-
-    pred = scores.idxmax(axis=1)
-    pred.name = "threshold_optimized_prediction"
-    return pred
+def _predict_with_thresholds(proba_df, threshold_info):
+    thresholds = ordered_thresholds(threshold_info, proba_df.columns)
+    pred = apply_multiclass_thresholds(proba_df.to_numpy(), thresholds, proba_df.columns)
+    return pd.Series(pred, index=proba_df.index, name='threshold_optimized_prediction')
 
 def run_survival_prediction(X: Union[pd.DataFrame, Path, str],
     *,
@@ -95,32 +87,16 @@ def run_survival_prediction(X: Union[pd.DataFrame, Path, str],
                 "Embedding extraction configuration differs from the fitted model: "
                 f"trained={trained_signature}, current={current_signature}."
             )
-    expected_features = (
-        getattr(representation, "feature_names_in_", None)
-        if representation is not None else getattr(model, "feature_names_in_", None)
-    )
-    if expected_features is None:
-        expected_features = getattr(model, "_feature_names_in", None)
-    from omiclass.train.scoped import fitted_partitions
-    if fitted_partitions(model):
-        pass  # The saved preprocessing state owns schema checks and imputation.
-    elif representation is not None:
-        missing = [feature for feature in expected_features if feature not in X_df.columns]
-        extra = [feature for feature in X_df.columns if feature not in set(expected_features)]
-        strict_extra = getattr(representation, "strategy", "full") != "full"
-        if missing or (extra and strict_extra):
-            raise SurvivalPredictionError(
-                f"Embedding schema mismatch; missing={missing[:5]}, extra={extra[:5]}."
-            )
-        X_df = X_df.loc[:, expected_features]
-    else:
-        X_df = X_df.reindex(columns=expected_features).fillna(0.0)
-    
-    # --- predictions ---
-    proba_df = _build_proba_df(model, X_df)
+    try:
+        X_df = match_features(X_df, model)
+        y_pred, probabilities = predict_estimator(model, X_df)
+        if probabilities is None:
+            raise ValueError('Survival confidence output requires fitted predict_proba probabilities')
+    except ValueError as error:
+        raise SurvivalPredictionError(str(error)) from error
+    proba_df = pd.DataFrame(probabilities, index=X_df.index, columns=canonical_classes(model))
 
-    # regular prediction always stays the main prediction
-    y_pred = model.predict(X_df)
+    # Ordinary estimator decisions remain the primary predictions.
     y_pred_series = pd.Series(y_pred, index=X_df.index, name="prediction")
 
     # optional threshold-optimized prediction for extra survival plot
@@ -229,9 +205,11 @@ def run_survival_prediction(X: Union[pd.DataFrame, Path, str],
     )
     y_pred_df = y_pred_series.to_frame()
     y_pred_df.columns = ["prediction"]
-    y_pred_df["proba"] = proba_df.max(axis=1)
+    positions = [proba_df.columns.get_loc(label) for label in y_pred_series]
+    y_pred_df["proba"] = proba_df.to_numpy()[np.arange(len(proba_df)), positions]
     y_pred_df["class_names"] = y_pred_df["prediction"].map(
-        lambda x: class_names[x] if class_names is not None and x < len(class_names) else str(x)
+        lambda x: class_names[int(x)] if class_names is not None and isinstance(x, (int, np.integer))
+                  and 0 <= x < len(class_names) else str(x)
     )
     y_pred_df.to_csv(artifacts_dir / "model_predictions.csv")
     return SurvivalPredictionResult(

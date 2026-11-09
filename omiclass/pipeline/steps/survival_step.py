@@ -6,7 +6,6 @@ if TYPE_CHECKING:
     from omiclass.pipeline.orchestrator import RunContext
 from omiclass.survival.predict import run_survival_prediction
 from omiclass.errors.errors import SurvivalPredictionError
-from omiclass.utils.io import load_matrix
 import json
 
 class SurvivalStep:
@@ -44,97 +43,49 @@ class SurvivalStep:
                         )
                         return
                     
-            model_base_path = ctx.cache.get("best_model_path")
+            model_key = ctx.cache.get('best_model')
+            model_base_path = ctx.cache.get('best_model_path')
+            scope_path = ctx.out_dir / 'preprocessing/scoped.json'
+            scope = json.loads(scope_path.read_text()) if scope_path.is_file() else {}
+            if model_base_path is None and scope.get('model_path'):
+                model_key = scope['selected_model']
+                model_base_path = (ctx.out_dir / scope['model_path']).resolve()
+                if not model_base_path.is_relative_to(ctx.out_dir.resolve()):
+                    raise SurvivalPredictionError('Saved selected-model path escapes its run directory')
             if model_base_path is None:
-                # Fallback for reruns without cache.
-                best_model_name = ctx.cache.get("best_model")
-                if best_model_name:
-                    model_base_path = ctx.out_dir / "train_artifacts" / f"{best_model_name}.joblib"
-                else:
-                    leaderboard_path = Path(ctx.out_dir) / "leaderboard.csv"
-                    leaderboard = load_matrix(leaderboard_path, numeric=False)
-                    if "status" in leaderboard.columns:
-                        leaderboard = leaderboard[leaderboard["status"] == "ok"]
-                    if "model" in leaderboard.columns:
-                        best_model_name = str(leaderboard.iloc[0]["model"])
-                    elif leaderboard.index.name == "model" or leaderboard.index[0] is not None:
-                        best_model_name = str(leaderboard.index[0])
-                    else:
-                        raise ValueError("Could not determine best model name from leaderboard.")
-
-                    model_base_path = ctx.out_dir / "train_artifacts" / f"{best_model_name}.joblib"
+                from omiclass.train.selection import rank_candidates
+                import pandas as pd
+                filenames = {key: value.filename for key, value in
+                             vars(ctx.cfg.models.random_forest.variants).items()}
+                filenames.update(xgboost=ctx.cfg.models.xgboost.filename,
+                    weighted_xgboost=ctx.cfg.models.xgboost.weighted_filename,
+                    light_gbm=ctx.cfg.models.light_gbm.filename,
+                    weighted_light_gbm=ctx.cfg.models.light_gbm.weighted_filename,
+                    stacked_ensemble=ctx.cfg.models.stacked_ensemble.filename)
+                available = {key: ctx.out_dir / 'train_artifacts' / filename
+                             for key, filename in filenames.items() if filename is not None
+                             and (ctx.out_dir / 'train_artifacts' / filename).is_file()}
+                if model_key is None:
+                    board = pd.read_csv(ctx.out_dir / 'leaderboard.csv')
+                    ranked, _ = rank_candidates(board, available, ctx.cfg.runtime.scoring)
+                    model_key = str(ranked.iloc[0]['model'])
+                model_base_path = available[model_key]
             model_base_path = Path(model_base_path)
-            labels_for_plot = ctx.cache.get("labels_for_plot", None)
-
-            # optional threshold-optimized survival report
-            model_name = model_base_path.stem
-            report_json = ctx.out_dir / "reports" / f"{model_name}.report.json"
-            model_path = ctx.out_dir / "train_artifacts" / f"{model_name}.joblib"
-
-            if report_json.exists():
-                data = json.loads(report_json.read_text(encoding="utf-8"))
-                threshold_block = data.get("threshold_optimized_holdout") or {}
-                threshold_info = threshold_block.get("thresholds")
-
-                # Only use threshold info if it improves F1
-                if threshold_info:
-                    original_f1 = data.get("test", {}).get("metrics", {}).get("f1_macro", 0)
-                    threshold_f1 = threshold_block.get("metrics", {}).get("f1_macro", 0)
-
-                    if threshold_f1 > original_f1:
-                        survival_results_threshold = run_survival_prediction(
-                            X=X,
-                            model_path=model_path,
-                            survival_path=surv_path,
-                            time_col=time_col,
-                            event_col=event_col,
-                            time_scale=time_scale,
-                            artifacts_dir=ctx.out_dir / "survival_prediction",
-                            ctx=ctx,
-                            class_names=labels_for_plot,
-                            threshold_info=threshold_info,
-                        )
-                        ctx.cache["survival_results"] = survival_results_threshold
-                    else:
-                        survival_results = run_survival_prediction(
-                            X=X,
-                            model_path=model_path,
-                            survival_path=surv_path,
-                            time_col=time_col,
-                            event_col=event_col,
-                            time_scale=time_scale,
-                            artifacts_dir=ctx.out_dir / "survival_prediction",
-                            ctx=ctx,
-                            class_names=labels_for_plot,
-                        )
-                        ctx.cache["survival_results"] = survival_results
-                else:
-                    survival_results = run_survival_prediction(
-                        X=X,
-                        model_path=model_path,
-                        survival_path=surv_path,
-                        time_col=time_col,
-                        event_col=event_col,
-                        time_scale=time_scale,
-                        artifacts_dir=ctx.out_dir / "survival_prediction",
-                        ctx=ctx,
-                        class_names=labels_for_plot,
-                    )
-                    ctx.cache["survival_results"] = survival_results
+            model_key = model_key or model_base_path.stem
+            thresholds = ctx.out_dir / 'train_artifacts/thresholds.json'
+            if thresholds.is_file():
+                threshold_info = json.loads(thresholds.read_text()).get(model_key)
             else:
-                survival_results = run_survival_prediction(
-                    X=X,
-                    model_path=model_path,
-                    survival_path=surv_path,
-                    time_col=time_col,
-                    event_col=event_col,
-                    time_scale=time_scale,
-                    artifacts_dir=ctx.out_dir / "survival_prediction",
-                    ctx=ctx,
-                    class_names=labels_for_plot,
-                )
-
-                ctx.cache["survival_results"] = survival_results
-        except SurvivalPredictionError as e:
-            print(f"Survival prediction failed: {e}")
+                # Historical report layout remains readable without consulting
+                # its holdout scores to decide whether learned thresholds apply.
+                report_json = ctx.out_dir / 'reports' / f'{model_key}.report.json'
+                data = json.loads(report_json.read_text()) if report_json.is_file() else {}
+                threshold_info = (data.get('threshold_optimized_holdout') or {}).get('thresholds')
+            result = run_survival_prediction(X=X, model_path=model_base_path,
+                survival_path=surv_path, time_col=time_col, event_col=event_col,
+                time_scale=time_scale, artifacts_dir=ctx.out_dir / 'survival_prediction',
+                ctx=ctx, class_names=ctx.cache.get('labels_for_plot'), threshold_info=threshold_info)
+            ctx.cache['survival_results'] = result
+        except SurvivalPredictionError:
             ctx.cache["survival_results"] = None
+            raise

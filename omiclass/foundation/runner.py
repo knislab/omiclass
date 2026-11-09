@@ -113,6 +113,7 @@ def _split(counts, metadata, cfg):
 
 
 def _probabilities(model, X, cache, ids, n_classes):
+    from omiclass.eval.prediction import canonical_classes, validate_probabilities, align_probabilities
     if isinstance(model, heads.TokenModel):
         raw = model.predict_proba(cache, ids)
         predicted = model.classes_[raw.argmax(1)]
@@ -120,13 +121,10 @@ def _probabilities(model, X, cache, ids, n_classes):
         raw = model.predict_proba(X.loc[ids])
         # SVC decision predictions may differ from probability argmax. Retain them.
         predicted = model.predict(X.loc[ids])
-    p = np.zeros((len(ids), n_classes), dtype=float)
-    for col, cls in enumerate(model.classes_):
-        if int(cls) not in range(n_classes):
-            raise ValueError('Saved classifier class schema differs')
-        p[:, int(cls)] = raw[:, col]
-    if not np.isfinite(p).all() or (p < 0).any() or not np.allclose(p.sum(1), 1, atol=1e-5):
-        raise ValueError('Invalid aligned probabilities')
+    classes = canonical_classes(model)
+    p = align_probabilities(validate_probabilities(raw, classes, len(ids)), classes, np.arange(n_classes))
+    if not set(predicted).issubset(set(classes)):
+        raise ValueError('Saved classifier predictions differ from its class schema')
     return np.asarray(predicted, dtype=int), p
 
 
@@ -205,6 +203,7 @@ def _predict(expression_file, cfg):
         raise ValueError('Encoder assets changed during prediction extraction')
     if set(extracted.features.columns) != set(manifest['raw_features']):
         raise ValueError('Prediction embedding schema differs from training')
+    extracted.features = extracted.features.loc[:, manifest['raw_features']]
     frames = []
     for name, relative in manifest['models'].items():
         model = joblib.load(saved / relative)
