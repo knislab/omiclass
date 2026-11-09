@@ -1,4 +1,118 @@
-# CLL-Map -> DKFZ preprocessing comparison
+# Frozen-reference preprocessing comparisons
+
+## BRCA: TCGA -> APOLLO (launch manually)
+
+`run_brca.sh` prepares a new TCGA/APOLLO snapshot, then runs **both frozen
+quantile and native exact-fSVA**, each with seeds **11, 61, 73, 80, 89**.
+Nothing starts until you invoke it. Preview the commands without preparing data
+or fitting anything:
+
+```bash
+bash experiments/reference_preprocessing/run_brca.sh --dry-run
+```
+
+Start both methods, allowing **two classifier seeds per method** concurrently,
+with **five physical CPU cores per seed** (**20 cores total**):
+
+```bash
+bash experiments/reference_preprocessing/run_brca.sh \
+  --workers 2 --cores-per-seed 5 \
+  --out experiments/reference_preprocessing/outputs/brca_tcga_apollo_5seeds
+```
+
+The output directory must be new. Omit `--out` to generate a unique timestamped
+directory. Preparation finishes first; both methods then preprocess concurrently,
+and each queues its five classifier runs as soon as its own preprocessing finishes.
+Each method fits one shared TCGA reference and applies it to APOLLO once, reusing
+those transformed matrices across its five classifier seeds.
+
+For **all five seeds per method at once**, use `--workers 5 --cores-per-seed 5`
+(**50 physical cores total**). For a smaller allocation, use
+`--workers 1 --cores-per-seed 5` (10 cores total). CPU sets are chosen from the
+current scheduler/process affinity, skipping SMT siblings. Override them with
+`--frozen-quantile-cpus 0-9 --fsva-exact-cpus 10-19`; overlapping physical cores
+are rejected. `--workers` always means workers **per method**.
+
+Run either method alone using `--method frozen_quantile` or `--method fsva_exact`.
+For example, in separate terminals or servers:
+
+```bash
+bash experiments/reference_preprocessing/run_brca.sh --method frozen_quantile \
+  --out experiments/reference_preprocessing/outputs/brca_quantile_5seeds
+bash experiments/reference_preprocessing/run_brca.sh --method fsva_exact \
+  --out experiments/reference_preprocessing/outputs/brca_fsva_5seeds
+```
+
+When launching separate processes on the same server, explicitly assign disjoint
+CPU sets with the corresponding CPU options; automatic allocation is coordinated
+within a single launcher only. To keep both methods running after disconnecting:
+
+```bash
+screen -dmS brca-reference bash experiments/reference_preprocessing/run_brca.sh \
+  --workers 2 --cores-per-seed 5 \
+  --out experiments/reference_preprocessing/outputs/brca_tcga_apollo_5seeds
+screen -r brca-reference
+```
+
+Detach with Ctrl-A then D. Ctrl-C while attached stops the launchers and their
+owned experiment processes. Logs and progress are saved under the output directory:
+
+```text
+prepare.log, launch_plan.json, exit_codes.json
+prepared/                         # hashed immutable inputs
+frozen_quantile/, fsva_exact/
+  progress.json, cpu_allocation.json
+  preprocessing.log, shared/      # one fixed reference per method
+  seed11.log, seed61.log, ...
+  seed11/, seed61/, seed73/, seed80/, seed89/
+```
+
+These runs preserve the saved expression-based BRCA configurations, DE gene lists,
+and **625/169 train/internal-holdout splits (794 TCGA patients)** from
+`final_results_runs/repets_new/brca/no_correction/Omiclass_BRCA_no_correction_seed*/`.
+They evaluate the selected model separately on **68 APOLLO patients**. No historical
+results are overwritten. Following the CLL experiment, each preprocessing reference
+uses the entire saved TCGA pool before the internal classifier split; fSVA therefore
+also uses the TCGA internal-holdout subtype labels in its biological design. This is
+the same reference-population protocol as CLL, not a preprocessing-held-out internal
+validation. APOLLO expression and outcomes never enter reference fitting, classifier
+training, tuning, or model selection.
+
+The default fSVA biological design protects **`classification` (subtype) only**,
+with **one surrogate variable** and a fixed preprocessing seed of 11. Several saved
+TCGA patients lack age/sex/race/stage, so those covariates are not included by default.
+Use `--design-columns age sex ...` to request additional complete covariates; missing
+values fail rather than altering the saved population or imputing. This option
+changes fSVA's design, not the saved classifier/DE settings.
+
+TPM is computed independently for each sample using TCGA count genes and fixed
+**hg38 GENCODE v34 gene lengths** (`omiclass/data/gencode_v34_GRCh38_hg38.csv`).
+These lengths cover all 300 saved BRCA DE genes; the CLL hg19 lengths would omit
+18 of them. This explicitly supplies log1p(TPM) to the new methods; historical
+BRCA input was passed through the expression-file route, so the saved old results
+should not be described as a comparison that changes only batch correction.
+The TPM denominator schema is fixed from TCGA; APOLLO-only genes
+do not alter it. Genes with no positive TCGA counts are then removed. APOLLO must
+provide every normalization gene, including observed zeros. APOLLO subtype labels
+are copied into the snapshot as an opaque file and opened for scoring only after
+predictions are saved. Snapshot hashes cover that file as well.
+
+The script uses the workspace's `viz_env` Python and isolated `outputs/runtime_r_library`
+for sva. Override Python with `OMICLASS_PYTHON=/path/to/python`; use `--rscript` and
+`--r-library` for another compatible R installation. It never installs packages.
+Input paths are configurable through `--source-root`, `--training-counts`,
+`--training-metadata`, `--external-counts`, `--external-metadata`, and `--gene-lengths`.
+Reuse a prepared BRCA snapshot with `--prepared PATH` and a new `--out` directory.
+
+Collect results after completion:
+
+```bash
+python -m experiments.reference_preprocessing.run summarize \
+  --runs-root experiments/reference_preprocessing/outputs/brca_tcga_apollo_5seeds \
+  --out experiments/reference_preprocessing/outputs/brca_tcga_apollo_5seeds_summary
+```
+
+## CLL-Map -> DKFZ
 
 This additive runner uses the expression-based manuscript Omiclass configuration,
 its saved train/holdout split and training-only DE preselection for each of seeds

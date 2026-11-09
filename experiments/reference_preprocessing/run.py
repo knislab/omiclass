@@ -1,4 +1,4 @@
-"""Prepare, validate, or run CLL-Map -> DKFZ without touching manuscript outputs.
+"""Prepare, validate, or run frozen-reference comparisons without touching manuscript outputs.
 
 Invoke from the repository root: python -m experiments.reference_preprocessing.run --help
 Imports of the full classification/R stack are deferred until `run`.
@@ -204,13 +204,13 @@ def build_context(args, out):
         cache={"full_expr": X, "gene_list": genes, "_did_log_transform": True}, artifacts={})
 
 
-def diagnostics(before, after, metadata):
+def diagnostics(before, after, metadata, target_column="ighv_mut", batch_column="cohort"):
     """Training-only partial R2: cohort given target, target given cohort.
 
     These descriptive linear diagnostics do not establish absence of confounding.
     """
-    cohort = pd.get_dummies(metadata.cohort, drop_first=True).to_numpy(dtype=float)
-    target = pd.get_dummies(metadata.ighv_mut, drop_first=True).to_numpy(dtype=float)
+    cohort = pd.get_dummies(metadata[batch_column], drop_first=True).to_numpy(dtype=float)
+    target = pd.get_dummies(metadata[target_column], drop_first=True).to_numpy(dtype=float)
     one = np.ones((len(metadata), 1))
     full = np.column_stack([one, cohort, target])
     result = {}
@@ -246,12 +246,12 @@ def preprocess(args):
     ctx = build_context(args, out)
     if args.method not in {"frozen_quantile", "fsva_exact", "reference_ruv"}:
         raise ValueError("Shared preprocessing cache requires a fitted reference method")
-    print(f"Fitting {args.method} on the declared CLL-Map reference pool", flush=True)
+    print(f"Fitting {args.method} on the declared training reference pool", flush=True)
     fit_reference(ctx)
     reference = out / "preprocessing/reference.npz"
     save_frame(out / "training.npz", ctx.cache["X_corrected"])
     external = read_expression(args.prepared / "external.csv")
-    print(f"Applying {args.method} to {external.shape[1]} independent DKFZ samples", flush=True)
+    print(f"Applying {args.method} to {external.shape[1]} independent external samples", flush=True)
     external = ExpressionReference.load(reference).transform(external)
     save_frame(out / "external.npz", external)
     write_json(out / "complete.json", dict(method=args.method,
@@ -281,19 +281,22 @@ def validate(args):
     X = read_expression(args.prepared / "training.csv")
     external = read_expression(args.prepared / "external.csv")
     meta = pd.read_csv(args.prepared / "training_metadata.csv", index_col=0)
+    config = yaml.safe_load((args.prepared / f"seed{args.seed}/config.yaml").read_text())
+    target = config["project"]["cluster_column"]
+    design = list(dict.fromkeys([target] + (config["batch_correction"].get("design_columns") or [])))
     if args.method not in {"frozen_quantile", "reference_ruv", "fsva_exact"}:
         raise ValueError("Reference validation supports frozen_quantile, fsva_exact or reference_ruv")
     if args.method == "frozen_quantile":
         ref = FrozenQuantile("log1p_tpm")
     elif args.method == "fsva_exact":
         from omiclass.batch.fsva import FrozenSVA
-        ref = FrozenSVA(["ighv_mut", "age", "sex"], args.n_factors, "log1p_tpm",
+        ref = FrozenSVA(design, args.n_factors, "log1p_tpm",
                          args.rscript, args.r_library)
     else:
         if not args.controls:
             raise ValueError("Supply --controls and --control-justification for reference_ruv")
         ref = ReferenceRUV(read_ids(args.controls), args.control_justification, args.n_factors,
-                           ["ighv_mut", "age", "sex"], "log1p_tpm")
+                           design, "log1p_tpm")
     ref.fit(X, meta)
     ref.save(out / "reference.npz")
     before_hash = digest(out / "reference.npz")
@@ -304,7 +307,7 @@ def validate(args):
     pd.testing.assert_frame_equal(ext, ExpressionReference.load(out / "reference.npz").transform(external))
     pd.testing.assert_frame_equal(corrected, ref.transform(X))
     assert before_hash == digest(out / "reference.npz")
-    result = diagnostics(X, corrected, meta)
+    result = diagnostics(X, corrected, meta, target_column=target)
     result.update(training_count=X.shape[1], external_count=external.shape[1], method=args.method,
                   single_sample_equal=True, serialization_equal=True, external_labels_loaded=False,
                   factor_diagnostics=getattr(ref, "diagnostics_", {}))
@@ -329,7 +332,15 @@ def classifier_features(model):
     return names.tolist()
 
 
-def predict_external(model_path, external, classes, metadata_path, out):
+def external_metadata_path(args):
+    explicit = getattr(args, "external_metadata", None)
+    if explicit is not None:
+        return explicit
+    snapshot = args.prepared / "external_metadata.csv"
+    return snapshot if snapshot.is_file() else ROOT / "final_results_runs/ighv/meta_merged_with_dkfz.csv"
+
+
+def predict_external(model_path, external, classes, metadata_path, out, target_column="ighv_mut"):
     """Only saved-model prediction and scoring; no fitting or model selection."""
     import joblib
     from sklearn.metrics import accuracy_score, f1_score
@@ -341,11 +352,13 @@ def predict_external(model_path, external, classes, metadata_path, out):
     pd.DataFrame({"prediction": predictions}, index=external.columns).to_csv(out / "external_predictions.csv")
     # Outcome labels are opened only after predictions have been saved.
     id_column = pd.read_csv(metadata_path, nrows=0).columns[0]
-    labels = pd.read_csv(metadata_path, index_col=0, usecols=[id_column, "ighv_mut"])
-    truth = labels.loc[external.columns, "ighv_mut"]
+    labels = pd.read_csv(metadata_path, index_col=0, usecols=[id_column, target_column])
+    truth = labels.loc[external.columns, target_column]
     if not classes or set(truth.dropna()) - set(classes):
         raise ValueError("External outcomes incompatible with saved class names")
     mask = truth.notna().to_numpy()
+    if not mask.any():
+        raise ValueError("No labeled external samples to score")
     encoded = truth.map({c: i for i, c in enumerate(classes)})
     return dict(accuracy=float(accuracy_score(encoded[mask], predictions[mask])),
         f1_macro=float(f1_score(encoded[mask], predictions[mask], labels=list(range(len(classes))),
@@ -380,7 +393,8 @@ def evaluate(args):
     _, external, _ = cached_preprocessing(args)
     out = args.out.resolve()
     out.mkdir(parents=True, exist_ok=False)
-    metrics = predict_external(model_path, external, config["project"]["classes_names"], args.external_metadata, out)
+    metrics = predict_external(model_path, external, config["project"]["classes_names"],
+        external_metadata_path(args), out, config["project"].get("cluster_column", "ighv_mut"))
     if any(digest(p) != sha for p, sha in hashes.items()):
         raise ValueError("Source artifacts changed during evaluation")
     # Copy only the small records needed for the existing summary collector.
@@ -418,7 +432,8 @@ def run(args):
     meta = pd.read_csv(args.prepared / "training_metadata.csv", index_col=0)
     common = corrected.columns.intersection(meta.index)
     write_json(out / "diagnostics.json", diagnostics(ctx.cache["full_expr"].loc[corrected.index, common],
-                                                     corrected.loc[:, common], meta.loc[common]))
+                                                     corrected.loc[:, common], meta.loc[common],
+                                                     target_column=ctx.cfg.project.cluster_column))
     write_json(out / "status.json", dict(method=args.method, seed=args.seed, stage="classification"))
     # Unmodified existing feature selection, tuning, CV, fitting and evaluation.
     TrainAndEvalStep().run(ctx)
@@ -443,7 +458,7 @@ def run(args):
         step.run(extctx)
         external = extctx.cache["X_corrected"].loc[:, external.columns]
     metrics = predict_external(ctx.cache["best_model_path"], external, ctx.cfg.project.classes_names,
-                               args.external_metadata, out)
+                               external_metadata_path(args), out, ctx.cfg.project.cluster_column)
     write_json(out / "external_metrics.json", metrics)
     write_json(out / "complete.json", dict(method=args.method, seed=args.seed, metrics=metrics,
         correction_fit_uses_external_expression=args.method == "limma", external_outcomes_used_for_fit=False,
@@ -506,7 +521,7 @@ def main():
     recovery.add_argument("--preprocessing-cache", type=Path)
     recovery.add_argument("--cores-per-seed", type=int, default=5)
     recovery.add_argument("--cpu-list")
-    recovery.add_argument("--external-metadata", type=Path, default=ROOT / "final_results_runs/ighv/meta_merged_with_dkfz.csv")
+    recovery.add_argument("--external-metadata", type=Path)
     for command in ("validate", "preprocess", "run"):
         p = sub.add_parser(command)
         p.add_argument("--prepared", type=Path, required=True)
@@ -521,7 +536,7 @@ def main():
         p.add_argument("--preprocessing-cache", type=Path)
         p.add_argument("--cores-per-seed", type=int, default=5)
         p.add_argument("--cpu-list", help="Internal launcher-assigned CPU affinity IDs")
-        p.add_argument("--external-metadata", type=Path, default=ROOT / "final_results_runs/ighv/meta_merged_with_dkfz.csv")
+        p.add_argument("--external-metadata", type=Path)
     args = parser.parse_args()
     if getattr(args, "prepared", None) is not None:
         args.prepared = args.prepared.resolve()
