@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple, Type
+from copy import deepcopy
+from typing import Any, Dict, List, Tuple, Type, get_args
 
 from pydantic import BaseModel
 
@@ -235,9 +236,12 @@ SPEC = OverrideSpec(
         ("runtime", "per_fold_estimators"),
         ("runtime", "tuning"),
     ),
-    # Historical-reproduction launchers need to state this value explicitly.
-    # Keep every other tuning field protected by the frozen-prefix policy.
-    allowed_frozen_paths=(("runtime", "tuning", "inner_cv"),),
+    # Existing tuning controls must work in nested and flat forms alike.
+    allowed_frozen_paths=(
+        ("runtime", "tuning", "inner_cv"),
+        ("runtime", "tuning", "enabled"),
+        ("runtime", "tuning", "method"),
+    ),
 )
 
 
@@ -276,6 +280,39 @@ def _is_model_type(tp: Any) -> bool:
         return isinstance(tp, type) and issubclass(tp, BaseModel)
     except TypeError:
         return False
+
+
+def _model_type(tp):
+    if _is_model_type(tp):
+        return tp
+    return next((arg for arg in get_args(tp) if _is_model_type(arg)), None)
+
+
+def _validate_override_paths(values, model_cls=Config, prefix=()):
+    """Validate user input recursively, including optional schema blocks.
+
+    Saved configurations are deliberately not passed through this check: older
+    bundles may contain historical fields which do not affect prediction.
+    """
+    leaves = []
+    for key, value in values.items():
+        path = prefix + (key,)
+        if path == ("raw_count",):
+            continue  # Existing CLI runtime option, not a Config field.
+        field = model_cls.model_fields.get(key)
+        if field is None:
+            raise ConfigError(f"Unknown override field: {'.'.join(path)}")
+        nested = _model_type(field.annotation)
+        if isinstance(value, BaseModel):
+            value = value.model_dump(exclude_unset=True)
+            values[key] = value
+        if nested is not None and isinstance(value, dict):
+            # An explicit empty optional block instantiates its schema defaults;
+            # omitting it could instead select data-dependent search defaults.
+            leaves.extend(_validate_override_paths(value, nested, path) if value else [path])
+        else:
+            leaves.append(path)
+    return leaves
 
 
 def _collect_leaf_paths(model_cls: Type[BaseModel], prefix: Tuple[str, ...] = ()) -> List[Tuple[str, ...]]:
@@ -331,6 +368,8 @@ def normalize_user_overrides(user_kwargs: Dict[str, Any], *, strict: bool = True
         # 2) alias
         elif key in SPEC.aliases:
             path = tuple(SPEC.aliases[key].split("."))
+        elif key in Config.model_fields:
+            path = (key,)
         # 3) short key 
         else:
             matches = short_idx.get(key, [])
@@ -347,15 +386,33 @@ def normalize_user_overrides(user_kwargs: Dict[str, Any], *, strict: bool = True
                 )
                 continue
 
-        # frozen block
-        if (
-            _is_under_frozen(path, SPEC.frozen_prefixes)
-            and path not in SPEC.allowed_frozen_paths
-        ):
-            errors.append(f"Override blocked (frozen): '{key}' -> {'.'.join(path)}")
-            continue
-
-        _deep_set(out, list(path), val)
+        candidate = {}
+        _deep_set(candidate, list(path), deepcopy(val))
+        try:
+            leaves = _validate_override_paths(candidate)
+            for leaf in leaves:
+                if (_deep_get(candidate, list(leaf)) != {}
+                        and _is_under_frozen(leaf, SPEC.frozen_prefixes)
+                        and leaf not in SPEC.allowed_frozen_paths):
+                    raise ConfigError(f"Override blocked (frozen): {'.'.join(leaf)}")
+                if leaf[-1] == "early_stopping_rounds" and _deep_get(candidate, list(leaf)) not in (None, 0, False, "0"):
+                    raise ConfigError(
+                        f"Unsupported override {'.'.join(leaf)}: early stopping is disabled by the existing trainer; use the n_estimators search space"
+                    )
+            # Merge leaves so mixed nested/dotted input cannot silently erase
+            # another setting. Conflicting values are errors, not order-dependent.
+            for leaf in leaves + ([("raw_count",)] if path == ("raw_count",) else []):
+                for length in range(1, len(leaf)):
+                    parent = _deep_get(out, list(leaf[:length]))
+                    if parent is not None and not isinstance(parent, dict):
+                        raise ConfigError(f"Conflicting overrides for {'.'.join(leaf[:length])}")
+                value = _deep_get(candidate, list(leaf))
+                previous = _deep_get(out, list(leaf))
+                if previous is not None and previous != value:
+                    raise ConfigError(f"Conflicting overrides for {'.'.join(leaf)}")
+                _deep_set(out, list(leaf), value)
+        except ConfigError as exc:
+            errors.append(str(exc))
 
     # sync batch_correction.design_columns <-> de.covariates
     design_path = ["batch_correction", "design_columns"]

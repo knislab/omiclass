@@ -1,15 +1,8 @@
-if (!requireNamespace("limma", quietly = TRUE)) {
-    if (!requireNamespace("BiocManager", quietly = TRUE))
-        install.packages("BiocManager")
-    BiocManager::install("limma")
-}
-if (!requireNamespace("jsonlite", quietly = TRUE)) {
-    install.packages("jsonlite")
-}
-if (!requireNamespace("edgeR", quietly = TRUE)) {
-    if (!requireNamespace("BiocManager", quietly = TRUE))
-        install.packages("BiocManager")
-    BiocManager::install("edgeR")
+for (package in c("limma", "jsonlite", "edgeR")) {
+    if (!requireNamespace(package, quietly = TRUE)) {
+        stop(paste0("Missing R dependency: ", package,
+                    ". Provision it in the intended environment before running Omiclass; runtime installation is disabled."))
+    }
 }
 
 library(limma)

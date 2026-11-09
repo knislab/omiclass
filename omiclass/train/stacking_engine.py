@@ -14,6 +14,7 @@ from sklearn.metrics import get_scorer
 
 from skopt import BayesSearchCV
 from omiclass.train.cv_engine import nested_oof_cv, CVResult, _safe_stratified_kfold
+from omiclass.train.selection import fold_selection_score
 
 def train_oof_stacker(
     *,
@@ -106,6 +107,9 @@ def train_oof_stacker(
             "f1_macro": float(f1_score(yva, pred, average="macro")),
             "accuracy": float(accuracy_score(yva, pred)),
         })
+        per_fold[-1]["selection_score"] = fold_selection_score(
+            tune_scoring, meta, Zva, yva, per_fold[-1]
+        )
 
     return (
         CVResult(

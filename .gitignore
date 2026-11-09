@@ -1,6 +1,7 @@
 # .gitignore for the project
 
 # virtual environment and logs
+.step3-validation/
 .env
 .venv/
 venv/

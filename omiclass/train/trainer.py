@@ -18,6 +18,7 @@ from ..config.schema import Config
 from ..models.registry import get_builder
 from .cv_engine import nested_oof_cv, CVResult
 from .stacking_engine import train_oof_stacker
+from .selection import rank_candidates, selection_summary
 from .tune import build_rf_search_space, build_lgbm_param_grid, build_xgb_param_grid
 from ..utils.imbalance import assess_imbalance, Severity
 from ..utils.toolbox import _to_dict, _aggregate_best_rounds, sanitize_fit_kwargs_for_xgb, _build_class_name_map, unwrap_for_export
@@ -92,6 +93,8 @@ class Trainer:
     
     def _tune_full(self, key: str, base_builder, X: pd.DataFrame, y: pd.Series, fit_kwargs: dict | None = None) -> dict:
         """Run BayesSearchCV on ALL data to get best_params_ for the FINAL model only."""
+        if self._tune_iterations() == 0:
+            return {}
         # Build search space and prefix
         if key.endswith("forest"):
             prefix = "" if key in ("plain_random_forest", "weighted_random_forest") else "rf__"
@@ -109,7 +112,7 @@ class Trainer:
         tun = self.cfg.runtime.tuning
         runt = self.cfg.runtime
 
-        inner = self._safe_inner_cv(y, cv=int(tun.inner_cv), seed=int(runt.random_state))
+        inner = self._safe_inner_cv(y, cv=int(tun.inner_cv or 3), seed=int(runt.random_state))
         if inner == 0:
             # Cannot split safely; skip tuning
             return {}
@@ -131,6 +134,14 @@ class Trainer:
             return search.best_params_
         except Exception as e:
             raise TuningError(f"Tuning failed for {key}: {e}") from e
+
+    def _tune_iterations(self):
+        runtime = self.cfg.runtime
+        if not runtime.tuning.enabled or runtime.bayesian_iterations == 0:
+            return 0
+        if runtime.tuning.method != "bayes":
+            raise TuningError("Only the existing Bayesian native search is implemented")
+        return int(runtime.bayesian_iterations)
         
     def _save_genesets_from_cvres(self, model_key: str,cvres: Any, feature_selection_cfg: Any = None) -> Tuple[List[str], pd.DataFrame, CVResult]:
         out_dir = (self.artifacts_dir / "genesets" / model_key).resolve()
@@ -378,9 +389,9 @@ class Trainer:
             outer_splits=int(cvs),
             seed=int(r.random_state),
             tune_space=space,
-            tune_iter=int(r.bayesian_iterations),
+            tune_iter=self._tune_iterations(),
             tune_scoring=scoring,
-            tune_inner_cv=int(getattr(tun, "inner_cv", 3) if tun is not None else 3),
+            tune_inner_cv=int(getattr(tun, "inner_cv", None) or 3),
             n_jobs=int(r.n_jobs),
             feature_cfg=fs,
             eval_calibrated_in_cv= eval_calibrated_in_cv,
@@ -405,6 +416,7 @@ class Trainer:
             "accuracy_mean": df["accuracy"].mean(),
             "accuracy_std": df["accuracy"].std(),
         }
+        row.update(selection_summary(cvres.per_fold_metrics, scoring))
         if self._bulkformer_reduction_active():
             reduction = embedding_config(self.cfg).reduction
             row.update(
@@ -436,8 +448,8 @@ class Trainer:
                 "calibrate": bool(getattr(cal, "calibrate", False)),
                 "calibration_cv": int(cvs),
                 "calibration_ensemble": bool(cal.ensemble),
-                "tune_inner_cv": int(getattr(getattr(r, "tuning", None), "inner_cv", 3)),
-                "bayes_iter": int(getattr(r, "bayesian_iterations", 0)),
+                "tune_inner_cv": int(getattr(getattr(r, "tuning", None), "inner_cv", None) or 3),
+                "bayes_iter": self._tune_iterations(),
             },
             final_params_full_data=best_params or {},
             class_name_map=self.class_name_map, 
@@ -562,9 +574,9 @@ class Trainer:
             outer_splits=int(cvs),
             seed=int(r.random_state),
             tune_space=space,
-            tune_iter=int(r.bayesian_iterations),
+            tune_iter=self._tune_iterations(),
             tune_scoring=scoring,
-            tune_inner_cv=int(getattr(tun, "inner_cv", 3) if tun is not None else 3),
+            tune_inner_cv=int(getattr(tun, "inner_cv", None) or 3),
             n_jobs=int(r.n_jobs),
             feature_cfg=fs,
             eval_calibrated_in_cv=eval_calibrated_in_cv,
@@ -587,6 +599,7 @@ class Trainer:
             "accuracy_mean": df["accuracy"].mean(),
             "accuracy_std": df["accuracy"].std(),
         }
+        row.update(selection_summary(cvres.per_fold_metrics, scoring))
         if self._bulkformer_reduction_active():
             reduction = embedding_config(self.cfg).reduction
             row.update(
@@ -634,8 +647,8 @@ class Trainer:
                 "eval_calibrated_in_cv": bool(eval_calibrated_in_cv),
                 "calib_method": cal_method if eval_calibrated_in_cv else "",
                 "calib_cv": int(cvs) if eval_calibrated_in_cv else 0,
-                "tune_inner_cv": int(getattr(tun, "inner_cv", 3) if tun is not None else 3),
-                "bayes_iter": int(r.bayesian_iterations),
+                "tune_inner_cv": int(getattr(tun, "inner_cv", None) or 3),
+                "bayes_iter": self._tune_iterations(),
             },
             final_params_full_data=best_params or {},
             class_name_map=self.class_name_map,
@@ -672,29 +685,28 @@ class Trainer:
         return row, saved_path
 
     def best_rf_key_from_cv(self) -> str:
-        metric = str(self.cfg.runtime.scoring)
-
-        rf_keys = [k for k in self.cv_results.keys() if k.endswith("random_forest")]
-        rows = []
-        for k in rf_keys:
-            cvres = self.cv_results.get(k)
-            if cvres is None or not getattr(cvres, "per_fold_metrics", None):
-                continue
-            df = pd.DataFrame(cvres.per_fold_metrics)
-            if metric not in df.columns:
-                continue
-            rows.append({
-                "model": k,
-                f"{metric}_mean": float(df[metric].mean()),
-                f"{metric}_std":  float(df[metric].std(ddof=0)),
-            })
-
-        out = pd.DataFrame(rows).sort_values(
-            by=[f"{metric}_mean", "model"],
-            ascending=[False, True],
-            kind="mergesort",
+        return self._best_completed_key(
+            [key for key in self.final_models if key.endswith("random_forest")]
         )
-        return out.iloc[0]["model"]
+
+    def _best_completed_key(self, keys):
+        scoring = self.cfg.runtime.scoring
+        rows = []
+        for key in keys:
+            # CV records can survive a subsequent final-fit/reporting failure.
+            if key not in self.final_models or key in getattr(self, "_failed_keys", set()):
+                continue
+            result = self.cv_results.get(key)
+            if result is None:
+                continue
+            try:
+                rows.append(dict(model=key, **selection_summary(result.per_fold_metrics, scoring)))
+            except ValueError:
+                continue
+        if not rows:
+            raise ValueError("No completed base candidates with usable training-CV scores")
+        ranked, _ = rank_candidates(pd.DataFrame(rows), keys, scoring)
+        return str(ranked.iloc[0]["model"])
 
     # ----- stacked -----
     def run_stacked(self, key: str, X: pd.DataFrame, y: pd.Series, filename_for_artifact: str, model_conf: Config) -> tuple[dict, Path]:
@@ -735,9 +747,9 @@ class Trainer:
             y=y,
             outer_splits=int(r.cv_folds),
             seed=int(r.random_state),
-            tune_iter=int(r.bayesian_iterations),
+            tune_iter=self._tune_iterations(),
             tune_scoring=scoring,
-            tune_inner_cv=int(getattr(tun, "inner_cv", 3) if tun is not None else 3),
+            tune_inner_cv=int(getattr(tun, "inner_cv", None) or 3),
             n_jobs=int(r.n_jobs),
             feature_cfg=fs,
             meta_builder=meta_builder,
@@ -753,6 +765,7 @@ class Trainer:
             "accuracy_mean": df["accuracy"].mean(),
             "accuracy_std": df["accuracy"].std(),
         }
+        row.update(selection_summary(stack_cvres.per_fold_metrics, scoring))
         if self._bulkformer_reduction_active():
             row["bulkformer_reduction_strategy"] = embedding_config(self.cfg).reduction.strategy
         from sklearn.utils.validation import check_is_fitted
@@ -813,34 +826,17 @@ class Trainer:
         return row, saved_path
     
     def best_boosting_key_from_cv(self, keys: list[str]) -> str:
-        metric = str(self.cfg.runtime.scoring)
-        rows = []
-
-        for k in keys:
-            cvres = self.cv_results.get(k)
-            if cvres is None or not getattr(cvres, "per_fold_metrics", None):
-                continue
-            df = pd.DataFrame(cvres.per_fold_metrics)
-            if metric not in df.columns:
-                continue
-            rows.append({
-                "model": k,
-                f"{metric}_mean": float(df[metric].mean()),
-            })
-
-        if not rows:
-            return keys[0]
-
-        return pd.DataFrame(rows).sort_values(
-            by=[f"{metric}_mean", "model"],
-            ascending=[False, True],
-            kind="mergesort",
-        ).iloc[0]["model"]
+        return self._best_completed_key(keys)
 
 
 
     # ----- entry point -----
     def run(self, X: pd.DataFrame, y: pd.Series) -> TrainSummary:
+        # Reusing a Trainer must not retain completed state from an earlier run.
+        self.final_models.clear()
+        self.cv_results.clear()
+        self.builders.clear()
+        self._failed_keys = set()
         rf_var = self.cfg.models.random_forest.variants
         model_imbalance_ = self.cfg.runtime.imbalance
         info = assess_imbalance(y, mild_threshold=model_imbalance_.mild_threshold, severe_threshold=model_imbalance_.severe_threshold)
@@ -912,6 +908,7 @@ class Trainer:
                 rows.append(row)
                 paths[key] = p
             except Exception as e:
+                self._failed_keys.add(key)
                 rows.append(_failed_row(key, e))
 
         #--- LightGBM ---
@@ -923,6 +920,7 @@ class Trainer:
                 rows.append(row)
                 paths["light_gbm"] = p
             except Exception as e:
+                self._failed_keys.add("light_gbm")
                 print(traceback.format_exc())
                 rows.append(_failed_row("light_gbm", e))
         if "weighted_light_gbm" in selected_model_keys:
@@ -939,6 +937,7 @@ class Trainer:
                 rows.append(row)
                 paths["weighted_light_gbm"] = p
             except Exception as e:
+                self._failed_keys.add("weighted_light_gbm")
                 print(traceback.format_exc())
                 rows.append(_failed_row("weighted_light_gbm", e))
 
@@ -951,6 +950,7 @@ class Trainer:
                 rows.append(row)
                 paths["xgboost"] = p
             except Exception as e:
+                self._failed_keys.add("xgboost")
                 print(traceback.format_exc())
                 rows.append(_failed_row("xgboost", e))
 
@@ -968,13 +968,14 @@ class Trainer:
                 rows.append(row)
                 paths["weighted_xgboost"] = p
             except Exception as e:
+                self._failed_keys.add("weighted_xgboost")
                 print(traceback.format_exc())
                 rows.append(_failed_row("weighted_xgboost", e))
 
         # --- Stacked ensemble (only if prerequisites exist) ---
-        have_rf = any(k.endswith("random_forest") and (k in self.final_models) for k, _ in variants)
-        have_xgb = any(k in self.final_models for k in ["xgboost", "weighted_xgboost"])
-        have_lgbm = any(k in self.final_models for k in ["light_gbm", "weighted_light_gbm"])
+        have_rf = any(k.endswith("random_forest") and k in paths for k, _ in variants)
+        have_xgb = any(k in paths for k in ["xgboost", "weighted_xgboost"])
+        have_lgbm = any(k in paths for k in ["light_gbm", "weighted_light_gbm"])
 
 
         if "stacked_ensemble" in selected_model_keys and have_rf and have_xgb and have_lgbm:
@@ -1000,8 +1001,10 @@ class Trainer:
                 "status": "skipped",
                 "error": f"Missing prerequisites: {', '.join(missing)}",
             })
-        metrics_df = pd.DataFrame(rows).sort_values(
-            by=["f1_macro_mean", "model"],
+        metrics_df = pd.DataFrame(rows)
+        sort_metric = "selection_score_mean" if "selection_score_mean" in metrics_df else "f1_macro_mean"
+        metrics_df = metrics_df.sort_values(
+            by=[sort_metric, "model"],
             ascending=[False, True],
             kind="mergesort",
             na_position="last",

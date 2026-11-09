@@ -17,6 +17,7 @@ from omiclass.foundation import extraction, heads
 from omiclass.foundation.io import save_frame, write_json
 from omiclass.pipeline.runner_result import PipelineRunResult
 from omiclass.utils.splits import holdout_split
+from omiclass.train.selection import rank_candidates
 
 
 def _metadata(cfg):
@@ -53,8 +54,15 @@ def _signature(cfg):
 
 
 
-def _resource_digests(cfg):
+def _resource_digests(cfg, version=2):
     """Bind saved prediction to the same supplied encoder assets, not just paths."""
+    if version == 2:
+        from omiclass.foundation.assets import encoder_identities
+        return encoder_identities(cfg)
+    if version != 1:
+        raise ValueError(f"Unsupported foundation artifact format: {version}")
+    # Preserve the exact checks available in original Step 2 bundles. They
+    # cannot retroactively verify sources or checkpoint-directory contents.
     result = {}
     encoder = getattr(cfg, extraction.backend_name(cfg))
     for name, value in encoder:
@@ -161,6 +169,13 @@ def _new_output(cfg, prediction=False):
 
 def _verify_bundle(saved):
     manifest = json.loads((saved / 'foundation.json').read_text())
+    if manifest.get('format_version') not in {1, 2}:
+        raise ValueError('Unsupported foundation artifact format')
+    if manifest.get('status') != 'complete':
+        raise ValueError('Saved foundation run is not complete')
+    required = {'config.freeze.yaml', *manifest['models'].values()}
+    if not required.issubset(manifest['artifact_sha256']):
+        raise ValueError('Saved foundation models/configuration lack checksums')
     for name, expected in manifest['artifact_sha256'].items():
         path = (saved / name).resolve()
         if not path.is_relative_to(saved) or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
@@ -174,7 +189,8 @@ def _predict(expression_file, cfg):
     original_cfg = Config(**yaml.safe_load((saved / 'config.freeze.yaml').read_text()))
     if _signature(cfg) != _signature(original_cfg):
         raise ValueError('Prediction overrides change the fitted extraction/protocol configuration')
-    if _resource_digests(cfg) != manifest['encoder_assets']:
+    version = manifest['format_version']
+    if _resource_digests(cfg, version) != manifest['encoder_assets']:
         raise ValueError('Encoder assets changed since training')
     counts = extraction.read_expression(expression_file)
     known = set(manifest['split']['train_index'] + manifest['split']['test_index'])
@@ -185,7 +201,7 @@ def _predict(expression_file, cfg):
         raise ValueError('Historical external re-correction requires the full original input cohort plus external samples')
     out = _new_output(cfg, prediction=True)
     extracted = extraction.extract(counts, cfg, out / 'extraction', _metadata(cfg) if cfg.foundation.correction != 'none' else None)
-    if _resource_digests(cfg) != manifest['encoder_assets']:
+    if _resource_digests(cfg, version) != manifest['encoder_assets']:
         raise ValueError('Encoder assets changed during prediction extraction')
     if set(extracted.features.columns) != set(manifest['raw_features']):
         raise ValueError('Prediction embedding schema differs from training')
@@ -198,6 +214,10 @@ def _predict(expression_file, cfg):
     pd.concat(frames, ignore_index=True).to_csv(path, index=False)
     write_json(out / 'prediction.json', dict(source_run=str(saved), samples=ids, refitted=False,
         correction='full supplied prediction input re-corrected' if cfg.foundation.correction != 'none' else 'none',
+        source_format_version=version,
+        encoder_verification='file_and_source_identities' if version == 2 else 'legacy_file_checks_only',
+        input_expression=str(Path(expression_file).resolve()),
+        tpm_input_path=str(cfg.bulkrnabert.tpm_input_path) if extraction.backend_name(cfg) == 'bulkrnabert' and cfg.bulkrnabert.tpm_input_path else None,
         classes=manifest['classes'], selected_model=manifest['selected_model']))
     return PipelineRunResult(out, None, None, {'predictions': path}, {}, path)
 
@@ -225,12 +245,13 @@ def run_foundation(expression_file, cfg):
     models, board = heads.fit(cfg, X, y, train, test, classes, extracted.token_cache, out / 'training')
     if not models:
         raise RuntimeError('No fitted foundation models')
-    if len(models) == 1:
+    if cfg.foundation.classifier in {'omiclass', 'foundation_classifier'}:
+        ranked, _ = rank_candidates(board, models, cfg.runtime.scoring)
+        selected = str(ranked.iloc[0]['model'])
+    elif len(models) == 1:
         selected = next(iter(models))
     else:
-        if 'f1_macro_mean' not in board or not np.isfinite(board.f1_macro_mean).all():
-            raise ValueError('Native candidate selection requires finite training-CV scores')
-        selected = board.sort_values(['f1_macro_mean', 'model'], ascending=[False, True], kind='mergesort').iloc[0]['model']
+        raise ValueError('Standalone foundation protocol returned multiple models')
     model_dir = out / 'models'
     model_dir.mkdir()
     artifacts, paths, evaluations, prediction_frames = {}, {}, [], []
@@ -246,7 +267,7 @@ def run_foundation(expression_file, cfg):
     pd.DataFrame(evaluations).to_csv(out / 'test_metrics.csv', index=False)
     pd.concat(prediction_frames, ignore_index=True).to_csv(out / 'holdout_predictions.csv', index=False)
     signed = [*paths.values(), 'config.freeze.yaml']
-    manifest = dict(format_version=1, status='complete', backend=extraction.backend_name(cfg), encoder_assets=encoder_assets,
+    manifest = dict(format_version=2, status='complete', backend=extraction.backend_name(cfg), encoder_assets=encoder_assets,
         model=cfg.foundation.model, representation=cfg.foundation.representation, pooling=cfg.foundation.pooling,
         classifier=cfg.foundation.classifier, classes=classes, split=split, source_ids=counts.columns.tolist(),
         raw_features=extracted.features.columns.tolist(), selected_model=selected, models=paths,

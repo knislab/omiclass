@@ -1,6 +1,6 @@
 # Foundation models through api.py
 
-The opt-in `foundation` block exposes the recovered manuscript protocols. Existing marker and legacy embedding calls remain on their original route. This is Step 2 integration: historical methodological choices are retained and identified below, rather than silently corrected.
+The opt-in `foundation` block exposes the recovered manuscript protocols. Existing marker and legacy embedding calls remain on their original route. [Step 3 Stage 1](step3-stage1-report.md) adds configuration, selection and artifact reliability fixes. The remaining methodological boundaries are identified below.
 
 ## Evidence and complete configuration set
 
@@ -89,7 +89,7 @@ python api.py \
 
 | Classifier | Protocol, final fitting and selection |
 |---|---|
-| `omiclass` (`foundation_classifier` alias) | Existing `Trainer` unchanged: nested CV/tuning, calibration, native imbalance dispatch and stacker. Every applicable candidate is saved and evaluated on holdout; suite selection uses training CV macro-F1, with the historical alphabetical tie break. |
+| `omiclass` (`foundation_classifier` alias) | Existing native algorithms: nested CV/tuning, calibration, imbalance dispatch and stacker. Every applicable candidate is saved and evaluated on holdout; selection uses the requested `runtime.scoring` training-CV score (default macro-F1), with the historical alphabetical tie break. Calibration/stacking methodological corrections remain pending. |
 | `lr` | Original L2/lbfgs LR, max_iter 5000; scaler and representation inside each inner/outer fit. Grid C = .01, .1, 1, 10, 100 and class_weight None/balanced; five outer/three inner folds by default, safely limited by class counts. Final grid search refits on all outer training data. `foundation.lr_c_values` supports small test grids. |
 | `svm` | Fixed RBF SVC, C=1, gamma=scale, no class weights, probability=True, ovr decision function. Representation and scaler fit only on outer training data; libsvm's probability calibration remains training-only. No fabricated outer CV score or hyperparameter search. Decision predictions are preserved even when they differ from probability argmax. |
 | BulkFormer/CellFM `mlp`, `mlp_smote` | Original article head: LayerNorm, [64] GELU/dropout .2, 50 fixed epochs, batch size 8, AdamW lr .001/weight_decay .0001. Pooled reduction fits on outer training; optional SMOTE sees that training set only. No holdout-based epoch selection or CV score. |
@@ -139,7 +139,9 @@ prediction = api.predict(
 print(prediction.artifacts['predictions'])
 ```
 
-For BERT TPM mode, supply an external **unlogged TPM** CSV. Prediction reloads the saved config and every fitted model, verifies model/configuration checksums, encoder asset digests and configuration compatibility, extracts frozen features, and reuses fitted transforms/scalers and class order. It never tunes, resamples or fits heads. Native log/constant-column decisions are persisted for consistent inference; the legacy route is not changed. New prediction outputs must be outside the saved training run.
+For BERT TPM mode, supply an external **unlogged TPM** CSV. When training used a separate `bulkrnabert_tpm_input_path`, prediction does not inherit that cohort file: provide a new `bulkrnabert_tpm_input_path` explicitly, or supply counts with the saved verified gene-length normalization. Prediction reloads the saved config and every fitted model, verifies model/configuration checksums, encoder asset digests and configuration compatibility, extracts frozen features, and reuses fitted transforms/scalers and class order. It never tunes, resamples or fits heads. Native log/constant-column decisions are persisted for consistent inference. New prediction outputs must be outside the saved training run.
+
+New bundles use artifact format 2, including checkpoint contents and upstream Python/vendor implementation identities. Existing format-1 bundles remain readable with their original file checks; their missing source/checkpoint-directory identities cannot be reconstructed retrospectively. `prediction.json` records which verification was available. Saved training bundles are never rewritten.
 
 Default prediction excludes training/holdout IDs and returns external IDs only. To replay inference explicitly on known samples, pass `foundation={'prediction_scope': 'all'}` to `api.predict`; this does not fit anything.
 

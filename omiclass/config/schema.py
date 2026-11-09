@@ -621,6 +621,7 @@ class LogisticRegressionCfg(BaseModel):
 # ---------- stacked_ensemble ----------
 class logisticRegressionCfg(BaseModel):
     filename: Optional[str] = None
+    passthrough: bool = True
     logistic_regression: LogisticRegressionCfg = Field(default_factory=LogisticRegressionCfg)
 
     @model_validator(mode="after")

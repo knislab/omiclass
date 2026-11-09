@@ -13,6 +13,7 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import get_scorer
 
 from skopt import BayesSearchCV
+from omiclass.train.selection import fold_selection_score
 
 
 def _bulkformer_representation_from_model(model):
@@ -499,6 +500,7 @@ def nested_oof_cv(
                 m["bulkformer_selected_dimensions"] = list(selector.selected_features_)
                 m["bulkformer_close_pairs"] = list(selector.selected_close_pairs_)
         m.update(prob_metrics)
+        m["selection_score"] = fold_selection_score(tune_scoring, model, Xva_used, yva, m)
         per_fold_metrics.append(m)
 
         fold_recipes.append(

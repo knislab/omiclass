@@ -51,10 +51,29 @@ def load_config(cli_overrides: Optional[Dict[str, Any]] = None) -> Config:
                 base_data = yaml.safe_load(stream) or {}
             if not base_data.get("foundation", {}).get("enabled"):
                 raise ValueError("Saved run is not a foundation API run")
+            # A TPM file describes a cohort, not the fitted encoder. Prediction
+            # must use this invocation's file or normalize its supplied counts.
+            base_data.get("bulkrnabert", {}).pop("tpm_input_path", None)
 
         merged = _deep_update(base_data, cli_overrides) if base_data else cli_overrides
 
+        merged.pop("raw_count", None)  # Consumed by CLI runtime routing.
         raw = Config(**merged)
+        prediction_only = (raw.foundation.enabled and raw.foundation.mode == "predict") or (
+            not raw.foundation.enabled and has_leaderboard(raw.project.out_dir)
+        )
+        if not prediction_only:
+            if raw.runtime.tuning.method != "bayes":
+                raise ConfigError("runtime.tuning.method supports only 'bayes'; random/grid are not implemented")
+            if raw.runtime.bayesian_iterations < 0:
+                raise ConfigError("bayesian_iterations must be nonnegative")
+            if raw.runtime.tuning.inner_cv is not None and raw.runtime.tuning.inner_cv < 2:
+                raise ConfigError("runtime.tuning.inner_cv must be at least two")
+            from sklearn.metrics import get_scorer
+            try:
+                get_scorer(raw.runtime.scoring)
+            except ValueError as exc:
+                raise ConfigError(str(exc)) from exc
         return Config.model_validate(raw)
 
     except ValidationError as e:

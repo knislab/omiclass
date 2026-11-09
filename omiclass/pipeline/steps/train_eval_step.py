@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 from omiclass.utils.pipeline import make_or_load_split, maybe_log1p_expression
 from omiclass.data.processor import DataProcessor
 from omiclass.train.trainer import Trainer
+from omiclass.train.selection import rank_candidates
 from omiclass.eval.holdout import evaluate_holdout, evaluate_holdout_with_thresholds, write_holdout_csvs
 from omiclass.eval.thresholds import learn_multiclass_thresholds
 from omiclass.reporting.per_model_report import finalize_report_for_model
@@ -220,35 +221,8 @@ class TrainAndEvalStep:
             getattr(getattr(ctx.cfg.runtime, "tuning", None), "scoring_override", None)
             or ctx.cfg.runtime.scoring
         )
-        cv_metric_col = f"{scoring_metric}_mean"
-        fallback_cv_cols = ["f1_macro_mean", "accuracy_mean"]
-
-        cv_leaderboard = summary.metrics.copy()
-        if "status" in cv_leaderboard.columns:
-            cv_leaderboard = cv_leaderboard[cv_leaderboard["status"] == "ok"]
-        cv_leaderboard = cv_leaderboard[
-            cv_leaderboard["model"].isin(summary.artifact_paths.keys())
-        ]
-
-        selected_metric_col = None
-        if cv_metric_col in cv_leaderboard.columns and cv_leaderboard[cv_metric_col].notna().any():
-            selected_metric_col = cv_metric_col
-        else:
-            for col in fallback_cv_cols:
-                if col in cv_leaderboard.columns and cv_leaderboard[col].notna().any():
-                    selected_metric_col = col
-                    break
-        if selected_metric_col is None:
-            raise RuntimeError(
-                "Could not select best model from CV leaderboard: no usable CV metric column found."
-            )
-
-        ascending = not self._is_higher_better_metric(selected_metric_col.replace("_mean", ""))
-        cv_leaderboard = cv_leaderboard.sort_values(
-            by=[selected_metric_col, "model"],
-            ascending=[ascending, True],
-            kind="mergesort",
-            na_position="last",
+        cv_leaderboard, selected_metric_col = rank_candidates(
+            summary.metrics, summary.artifact_paths, scoring_metric
         )
         best_model = str(cv_leaderboard.iloc[0]["model"])
         best_model_path = summary.artifact_paths[best_model]
