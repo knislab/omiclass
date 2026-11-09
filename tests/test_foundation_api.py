@@ -49,7 +49,7 @@ def mock_encoders(monkeypatch):
             for view in range(observer.num_views):
                 tokens = np.repeat(values.to_numpy()[:, None, :], 4, axis=1) + np.arange(4)[None, :, None]*0.01 + view*0.001
                 observer(tokens.astype(np.float32), np.ones(tokens.shape[:2], bool),
-                    np.tile(np.arange(4), (len(values), 1)), values.index, view)
+                    np.tile(np.arange(1, 5), (len(values), 1)), values.index, view)
             observer.finish(values.index)
         return extraction.Extraction(values, {'mocked_encoder': True}, token_cache)
     monkeypatch.setattr(extraction, 'extract', extract)

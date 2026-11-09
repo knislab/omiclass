@@ -23,7 +23,17 @@ class EmbeddingFeatureExtractionStep:
             extractor = BulkFormerFeatureExtractor(ctx.cfg.bulkformer)
             writer = write_bulkformer_artifacts
         elif backend == "cellfm":
-            extractor = CellFMFeatureExtractor(ctx.cfg.cellfm)
+            import json
+            saved = ctx.out_dir / 'cellfm/cellfm_metadata.json'
+            legacy = False
+            if ctx.opts.mode == 'clean_and_predict' and ctx.cfg.cellfm.num_views == 1:
+                if not saved.is_file():
+                    raise ValueError('Saved CellFM single-view sampling metadata is required for replay')
+                strategy = json.loads(saved.read_text()).get('view_seed_strategy', 'legacy_global_numpy_random_state')
+                if strategy not in {'legacy_global_numpy_random_state', 'sha256_sample_id_global_seed_zero_based_view_index'}:
+                    raise ValueError('Unsupported saved CellFM sampling protocol')
+                legacy = strategy == 'legacy_global_numpy_random_state'
+            extractor = CellFMFeatureExtractor(ctx.cfg.cellfm, **({'legacy_single_view': True} if legacy else {}))
             writer = write_cellfm_artifacts
         elif backend == "bulkrnabert":
             from omiclass.features.bulkrnabert import BulkRNABertFeatureExtractor, write_bulkrnabert_artifacts

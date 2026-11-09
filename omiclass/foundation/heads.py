@@ -15,7 +15,7 @@ from sklearn.svm import SVC
 
 from omiclass.features.bulkformer_reduction import EmbeddingRepresentation
 from omiclass.foundation.extraction import backend_name
-from omiclass.foundation.io import token_record, write_json
+from omiclass.foundation.io import token_record, write_json, load_token_manifest, load_token_arrays
 
 
 def representation(cfg):
@@ -161,12 +161,14 @@ class TokenModel(NeuralModel):
     def predict_proba(self, cache, ids):
         import torch
         from omiclass.foundation.bert_head import torch_reproducibility
-        manifest = json.loads((Path(cache) / 'manifest.json').read_text())
+        manifest = load_token_manifest(cache, expected_schema=getattr(self, 'token_schema_', None))
         grouped = {str(s): [] for s in ids}
         for record in manifest['records']:
             if str(record['sample_id']) in grouped:
                 grouped[str(record['sample_id'])].append(record)
         expected_views = int(manifest['metadata']['num_views'])
+        if getattr(self, 'token_num_views_', expected_views) != expected_views:
+            raise ValueError('Prediction view count differs from the saved token protocol')
         with torch_reproducibility(0, 1), torch.inference_mode():
             model = self.network()
             all_probabilities = []
@@ -174,13 +176,14 @@ class TokenModel(NeuralModel):
                 records = grouped[str(sid)]
                 if sorted(int(r['view']) for r in records) != list(range(expected_views)):
                     raise ValueError('Incomplete or duplicated prediction views')
+                if getattr(self, 'token_schema_', None) is not None:
+                    records = sorted(records, key=lambda record: int(record['view']))
                 total = np.zeros(len(self.classes_), dtype=np.float64)
                 for record in records:
-                    with token_record(cache, record) as z:
-                        x, mask = np.asarray(z['tokens'], dtype=np.float32), np.asarray(z['mask'], dtype=bool)
-                        if x.shape != (self.architecture['token_count'], self.architecture['width']) or mask.shape != (len(x),) or not mask.any() or not np.isfinite(x).all():
-                            raise ValueError('Token prediction shape/mask mismatch')
-                        total += model(torch.from_numpy(x.copy())[None], torch.from_numpy(mask.copy())[None]).softmax(-1).numpy()[0]
+                    x, mask = load_token_arrays(cache, record, schema=manifest['metadata'].get('token_schema'))
+                    if x.shape != (self.architecture['token_count'], self.architecture['width']):
+                        raise ValueError('Token prediction shape/mask mismatch')
+                    total += model(torch.from_numpy(x)[None], torch.from_numpy(mask)[None]).softmax(-1).numpy()[0]
                 total /= len(records)
                 all_probabilities.append(total / total.sum())
         return np.stack(all_probabilities)[:, self.column_order]
@@ -237,6 +240,9 @@ def fit_article(cfg, X, y, train_ids, test_ids, classes, cache, out):
     cls = TokenModel if token else NeuralModel
     estimator = cls({k: v.numpy().copy() for k, v in saved['state_dict'].items()}, architecture,
         classes, transform, trained_class_order=run['classes'])
+    if token:
+        estimator.token_schema_ = run.get('token_schema')
+        estimator.token_num_views_ = run.get('token_num_views')
     write_json(out / 'fit_scope.json', dict(protocol='article_fixed_epochs', representation_fit_ids=train_ids if not token else [],
         head_training_ids=train_ids, smote_fit_ids=train_ids if args.resampling == 'smote' else [],
         evaluation_used_for_selection=False, token_views='equal per-view loss; mean view probabilities'))
@@ -244,6 +250,13 @@ def fit_article(cfg, X, y, train_ids, test_ids, classes, cache, out):
 
 
 def fit(cfg, X, y, train_ids, test_ids, classes, cache, out):
+    import sys
+    from omiclass.utils.reproducibility import random_state_scope
+    with random_state_scope(torch_enabled=cfg.foundation.classifier in {'mlp', 'mlp_smote'} or 'torch' in sys.modules):
+        return _fit(cfg, X, y, train_ids, test_ids, classes, cache, out)
+
+
+def _fit(cfg, X, y, train_ids, test_ids, classes, cache, out):
     out.mkdir(exist_ok=False)
     classifier = cfg.foundation.classifier
     if classifier in {'omiclass', 'foundation_classifier'}:

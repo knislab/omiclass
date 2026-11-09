@@ -122,19 +122,9 @@ def smote_settings(y, k_neighbors):
 
 @contextmanager
 def torch_reproducibility(seed, threads):
-    import torch
-    old_threads = torch.get_num_threads()
-    old_deterministic = torch.are_deterministic_algorithms_enabled()
-    old_warn = torch.is_deterministic_algorithms_warn_only_enabled()
-    try:
-        torch.set_num_threads(threads)
-        torch.use_deterministic_algorithms(True)
-        with torch.random.fork_rng(devices=[]):
-            torch.random.default_generator.manual_seed(seed)
-            yield
-    finally:
-        torch.set_num_threads(old_threads)
-        torch.use_deterministic_algorithms(old_deterministic, warn_only=old_warn)
+    from omiclass.utils.reproducibility import random_state_scope
+    with random_state_scope(seed, threads=threads, deterministic=True):
+        yield
 
 
 def fit_mlp(X_train, y_train, train_ids, n_classes, config, inner_seed, input_width=256):

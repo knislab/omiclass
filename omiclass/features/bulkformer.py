@@ -314,6 +314,11 @@ class BulkFormerFeatureExtractor:
         self.continuous = continuous
 
     def extract(self, counts: pd.DataFrame) -> BulkFormerExtractionResult:
+        from omiclass.utils.reproducibility import random_state_scope
+        with random_state_scope(cuda=self.cfg.device != 'cpu'):
+            return self._extract(counts)
+
+    def _extract(self, counts: pd.DataFrame) -> BulkFormerExtractionResult:
         cfg = self.cfg
         _validate_bulkformer_resources(cfg)
         prepared = (align_to_bulkformer_vocabulary(counts, load_bulkformer_gene_list(cfg.gene_info_path))

@@ -4,11 +4,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 from pathlib import Path
-import random
 
-from omiclass.foundation.io import token_record
+from omiclass.foundation.io import token_record, load_token_manifest, load_token_arrays
 
 
 def digest(path):
@@ -100,6 +98,16 @@ def parse_args():
 
 
 def train(args):
+    # Keep the historical seed and deterministic training choices inside a scope.
+    # Validation failures and training/output failures restore the caller too.
+    from omiclass.utils.reproducibility import random_state_scope
+    with random_state_scope(getattr(args, 'seed', None), deterministic=True,
+                            cudnn_benchmark=False, cublas=True,
+                            cuda=str(getattr(args, 'device', 'cpu')) != 'cpu'):
+        return _train(args)
+
+
+def _train(args):
     if args.variant not in {'full', 'mean'}:
         raise ValueError('Variant must be full or mean')
     if args.smote_k_neighbors < 1:
@@ -116,7 +124,6 @@ def train(args):
         raise ValueError('--features is for mean only and cannot be combined with --cache')
     if not args.features and not args.cache:
         raise ValueError('Provide --cache or, for mean, --features')
-    os.environ.setdefault('CUBLAS_WORKSPACE_CONFIG', ':4096:8')
     import numpy as np
     import pandas as pd
     import sklearn
@@ -125,13 +132,6 @@ def train(args):
     from torch import nn
     from torch.utils.data import DataLoader, Dataset, TensorDataset
 
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(args.seed)
-    torch.use_deterministic_algorithms(True)
-    torch.backends.cudnn.benchmark = False
     device = torch.device(args.device)
     split = json.loads(args.split.read_text())
     partitions = {name: list(map(str, split[key])) for name, key in
@@ -157,9 +157,7 @@ def train(args):
     manifest = None
     grouped = {}
     if args.cache:
-        manifest = json.loads((args.cache / 'manifest.json').read_text())
-        if manifest['format_version'] != 1:
-            raise ValueError('Unsupported cache format')
+        manifest = load_token_manifest(args.cache)
         for record in manifest['records']:
             sid = str(record['sample_id'])
             grouped.setdefault(sid, []).append(record)
@@ -169,6 +167,8 @@ def train(args):
             views = [r['view'] for r in grouped[sid]]
             if sorted(views) != list(range(manifest['metadata']['num_views'])):
                 raise ValueError(f'Incomplete or duplicate views for {sid}')
+            if manifest['metadata'].get('token_schema') is not None:
+                grouped[sid].sort(key=lambda record: int(record['view']))
 
     vectors = {}
     token_count = None
@@ -197,9 +197,8 @@ def train(args):
             if record is None:
                 x, mask = vectors[sid], np.ones(1, dtype=bool)
             else:
-                with token_record(args.cache, record) as z:
-                    x = z['tokens'].astype(np.float32)
-                    mask = z['mask'].astype(bool)
+                x, mask = load_token_arrays(args.cache, record,
+                    schema=manifest['metadata'].get('token_schema'))
                 if x.shape != (token_count, width) or mask.shape != (token_count,):
                     raise ValueError(f'Inconsistent token shape for {sid}')
                 if not np.isfinite(x).all() or not mask.any():
@@ -290,6 +289,8 @@ def train(args):
     configuration = {k: str(v.resolve()) if isinstance(v, Path) else v for k, v in vars(args).items()}
     provenance = dict(arguments=configuration, resampling=resampling, classes=classes, class_to_id=class_to_id,
                       token_count=token_count, embedding_width=width,
+                      token_schema=manifest['metadata'].get('token_schema') if manifest else None,
+                      token_num_views=manifest['metadata']['num_views'] if manifest else None,
                       parameter_count=sum(p.numel() for p in model.parameters()),
                       split=split, split_sha256=digest(args.split), labels_sha256=digest(args.labels),
                       manifest_sha256=digest(args.cache / 'manifest.json') if args.cache else None,

@@ -198,7 +198,16 @@ def _predict(expression_file, cfg):
     if cfg.foundation.correction != 'none' and not set(manifest['source_ids']).issubset(counts.columns):
         raise ValueError('Historical external re-correction requires the full original input cohort plus external samples')
     out = _new_output(cfg, prediction=True)
-    extracted = extraction.extract(counts, cfg, out / 'extraction', _metadata(cfg) if cfg.foundation.correction != 'none' else None)
+    protocol = manifest.get('extraction_protocol', {})
+    strategy = protocol.get('cellfm_single_view', 'legacy_global_numpy_random_state')
+    legacy = (extraction.backend_name(cfg) == 'cellfm' and cfg.cellfm.num_views == 1
+              and strategy == 'legacy_global_numpy_random_state')
+    if extraction.backend_name(cfg) == 'cellfm' and cfg.cellfm.num_views == 1 and strategy not in {
+            'legacy_global_numpy_random_state', 'sha256_sample_id_global_seed_zero_based_view_index'}:
+        raise ValueError('Unsupported saved CellFM single-view sampling protocol')
+    replay = {'legacy_cellfm_single_view': True} if legacy else {}
+    extracted = extraction.extract(counts, cfg, out / 'extraction',
+        _metadata(cfg) if cfg.foundation.correction != 'none' else None, **replay)
     if _resource_digests(cfg, version) != manifest['encoder_assets']:
         raise ValueError('Encoder assets changed during prediction extraction')
     if set(extracted.features.columns) != set(manifest['raw_features']):
@@ -266,7 +275,12 @@ def run_foundation(expression_file, cfg):
     pd.DataFrame(evaluations).to_csv(out / 'test_metrics.csv', index=False)
     pd.concat(prediction_frames, ignore_index=True).to_csv(out / 'holdout_predictions.csv', index=False)
     signed = [*paths.values(), 'config.freeze.yaml']
+    seed, source = extraction.encoder_seed(cfg)
+    protocol = dict(encoder_seed=seed, seed_source=source)
+    if extraction.backend_name(cfg) == 'cellfm' and cfg.cellfm.num_views == 1:
+        protocol['cellfm_single_view'] = 'sha256_sample_id_global_seed_zero_based_view_index'
     manifest = dict(format_version=2, status='complete', backend=extraction.backend_name(cfg), encoder_assets=encoder_assets,
+        extraction_protocol=protocol,
         model=cfg.foundation.model, representation=cfg.foundation.representation, pooling=cfg.foundation.pooling,
         classifier=cfg.foundation.classifier, classes=classes, split=split, source_ids=counts.columns.tolist(),
         raw_features=extracted.features.columns.tolist(), selected_model=selected, models=paths,

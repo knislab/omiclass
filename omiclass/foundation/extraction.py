@@ -4,14 +4,13 @@ from dataclasses import dataclass
 from pathlib import Path
 import json
 import os
-import random
 import subprocess
 import sys
 
 import numpy as np
 import pandas as pd
 
-from omiclass.foundation.io import write_json
+from omiclass.foundation.io import write_json, token_schema, validate_tokens, gene_order_digest
 
 
 @dataclass
@@ -30,7 +29,7 @@ def backend_name(cfg):
     return "cellfm" if cfg.foundation.model.startswith("cellfm") else cfg.foundation.model
 
 
-def continuous_input(counts, cfg):
+def continuous_input(counts, cfg, *, legacy_cellfm_single_view=False):
     """Prepare exactly once, before optional cohort correction; no learned reduction."""
     backend = backend_name(cfg)
     if backend == "bulkformer":
@@ -40,7 +39,7 @@ def continuous_input(counts, cfg):
         if cfg.foundation.correction == "none":
             return counts
         from omiclass.foundation.cellfm_corrected import continuous_expression
-        return continuous_expression(counts, cfg.cellfm)
+        return continuous_expression(counts, cfg.cellfm, legacy_single_view=legacy_cellfm_single_view)
     from omiclass.features.bulkrnabert import prepare_tpm
     if cfg.foundation.input_scale == "tpm":
         tpm = counts
@@ -112,7 +111,17 @@ class TokenObserver:
         self.num_views = num_views
         self.records = []
         self.coordinates = set()
+        self.schema = None
+        self.cellfm_protocol = {}
         directory.mkdir(exist_ok=False)
+
+    def set_cellfm_vocabulary(self, vocabulary, *, random_state, legacy_single_view=False):
+        if self.schema is not None:
+            raise ValueError('Cannot change the token protocol after recording tokens')
+        self.cellfm_protocol = dict(vocabulary_size=len(vocabulary),
+            vocabulary_sha256=gene_order_digest(vocabulary), selection_random_state=int(random_state),
+            sampling_strategy=('legacy_global_numpy_random_state' if legacy_single_view else
+                               'sha256_sample_id_global_seed_zero_based_view_index'))
 
     def __call__(self, tokens, valid, genes, ids, view):
         def array(value, floating=False):
@@ -120,14 +129,20 @@ class TokenObserver:
                 value = value.detach().float() if floating else value.detach()
                 return value.cpu().numpy()
             return np.asarray(value, dtype=np.float32) if floating else np.asarray(value)
-        values, masks, gene_ids = array(tokens, True), array(valid).astype(bool), array(genes)
-        if values.ndim != 3 or masks.shape != values.shape[:2] or len(ids) != len(values):
+        values, masks, gene_ids = array(tokens, True), array(valid), array(genes)
+        if (values.ndim != 3 or masks.shape != values.shape[:2] or gene_ids.shape != values.shape[:2]
+                or len(ids) != len(values) or not isinstance(view, (int, np.integer))
+                or not 0 <= int(view) < self.num_views):
             raise ValueError("Token/mask/sample shape mismatch")
         for i, sid in enumerate(ids):
             sid = str(sid)
             coordinate = (sid, int(view))
             if coordinate in self.coordinates or not masks[i].any() or not np.isfinite(values[i]).all():
                 raise ValueError("Duplicated or invalid sample/view token record")
+            if self.schema is None:
+                self.schema = token_schema(self.backend, values[i].shape, gene_ids[i])
+                self.schema.update(self.cellfm_protocol)
+            validate_tokens(values[i], masks[i], gene_ids[i], schema=self.schema)
             self.coordinates.add(coordinate)
             filename = f"record_{len(self.records):08d}.npz"
             np.savez(self.directory / filename, tokens=values[i], mask=masks[i], gene_ids=gene_ids[i])
@@ -138,13 +153,14 @@ class TokenObserver:
         if self.coordinates != expected:
             raise ValueError("Incomplete token view traversal")
         write_json(self.directory / "manifest.json", dict(format_version=1, backend=self.backend,
-            metadata=dict(num_views=self.num_views), records=self.records))
+            metadata=dict(num_views=self.num_views, token_schema=self.schema), records=self.records))
 
 
 def extract_bert(frame, cfg, out, tokens):
     from omiclass.features import bulkrnabert_worker
     b = cfg.bulkrnabert
-    np.savez(out / "worker-input.npz", tpm=frame.T.to_numpy(), sample_ids=np.asarray(frame.columns, dtype=str))
+    np.savez(out / "worker-input.npz", tpm=frame.T.to_numpy(), sample_ids=np.asarray(frame.columns, dtype=str),
+             gene_ids=np.asarray(frame.index, dtype=str))
     cmd = [str(Path(b.python_executable).expanduser().resolve()), "-B", str(Path(bulkrnabert_worker.__file__).resolve()),
         "--root-dir", str(Path(b.root_dir).resolve()), "--checkpoint-directory", str(Path(b.checkpoint_directory).resolve()),
         "--model-name", b.model_name, "--input", str(out / "worker-input.npz"), "--output", str(out / "worker-output.npz"),
@@ -167,25 +183,36 @@ def extract_bert(frame, cfg, out, tokens):
     return Extraction(features, metadata, token_cache)
 
 
-def extract(counts, cfg, out, metadata=None):
+def encoder_seed(cfg):
+    backend = backend_name(cfg)
+    if backend == 'cellfm':
+        return int(cfg.cellfm.random_state), 'cellfm.random_state'
+    if backend == 'bulkrnabert':
+        return 0, 'fixed JAX PRNGKey(0)'
+    return int(cfg.foundation.extraction_seed), 'foundation.extraction_seed'
+
+
+def extract(counts, cfg, out, metadata=None, *, legacy_cellfm_single_view=False):
+    from omiclass.utils.reproducibility import random_state_scope
+    seed, _ = encoder_seed(cfg)
+    pytorch = backend_name(cfg) != 'bulkrnabert'
+    with random_state_scope(seed if pytorch else None, torch_enabled=pytorch,
+                            cuda=pytorch and getattr(cfg, backend_name(cfg)).device != 'cpu'):
+        return _extract(counts, cfg, out, metadata, legacy_cellfm_single_view=legacy_cellfm_single_view)
+
+
+def _extract(counts, cfg, out, metadata=None, *, legacy_cellfm_single_view=False):
     out = Path(out).resolve()
     out.mkdir(parents=True, exist_ok=False)
     backend = backend_name(cfg)
-    frame = continuous_input(counts, cfg)
+    legacy = {'legacy_cellfm_single_view': True} if legacy_cellfm_single_view else {}
+    frame = continuous_input(counts, cfg, **legacy)
     if cfg.foundation.correction == "limma":
         frame = correct_input(frame, cfg, out, metadata)
     tokens = cfg.foundation.representation == "tokens"
     if backend == "bulkrnabert":
         result = extract_bert(frame, cfg, out, tokens)
     else:
-        import torch
-        seed = cfg.cellfm.random_state if backend == "cellfm" else cfg.foundation.extraction_seed
-        # Same explicit encoder seeds as the manuscript; no state in other processes changes.
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(seed)
         observer = TokenObserver(out / "tokens", backend, cfg.cellfm.num_views if backend == "cellfm" else 1) if tokens else None
         if backend == "bulkformer":
             from omiclass.features.bulkformer import BulkFormerFeatureExtractor
@@ -195,16 +222,20 @@ def extract(counts, cfg, out, metadata=None):
             result = Extraction(encoded.features.T, encoded.metadata, out / "tokens" if tokens else None)
         elif cfg.foundation.correction == "limma":
             from omiclass.foundation.cellfm_corrected import extract_corrected
-            features, info = extract_corrected(counts, frame, cfg.cellfm, out, observer=observer)
+            kwargs = {'legacy_single_view': True} if legacy_cellfm_single_view else {}
+            features, info = extract_corrected(counts, frame, cfg.cellfm, out, observer=observer, **kwargs)
             result = Extraction(features, info, out / "tokens" if tokens else None)
         else:
             from omiclass.features.cellfm import CellFMFeatureExtractor
-            encoded = CellFMFeatureExtractor(cfg.cellfm, observer=observer).extract(counts)
+            kwargs = {'legacy_single_view': True} if legacy_cellfm_single_view else {}
+            encoded = CellFMFeatureExtractor(cfg.cellfm, observer=observer, **kwargs).extract(counts)
             result = Extraction(encoded.features.T, encoded.metadata, out / "tokens" if tokens else None)
         if observer is not None:
             observer.finish(counts.columns)
     if result.features.index.has_duplicates or not np.isfinite(result.features.to_numpy()).all():
         raise ValueError("Invalid extracted sample embeddings")
+    seed, source = encoder_seed(cfg)
     write_json(out / "extraction.json", dict(backend=backend, representation=cfg.foundation.representation,
-        encoder_seed=cfg.foundation.extraction_seed, metadata=result.metadata))
+        encoder_seed=seed, seed_source=source, configured_extraction_seed=cfg.foundation.extraction_seed,
+        metadata=result.metadata))
     return result

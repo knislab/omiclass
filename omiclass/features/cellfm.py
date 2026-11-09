@@ -99,6 +99,8 @@ def prepare_cellfm_input(counts: pd.DataFrame, vocabulary: Iterable[str]) -> Cel
     values = counts.copy()
     values.index = values.index.map(str)
     values.columns = values.columns.map(str)
+    if not values.columns.is_unique or any(not name.strip() or name != name.strip() for name in values.columns):
+        raise DataError('CellFM sample IDs must be unique, nonempty and trimmed')
     values = values.apply(pd.to_numeric, errors="coerce")
     array = values.to_numpy(dtype=np.float64)
     if not np.isfinite(array).all():
@@ -112,6 +114,8 @@ def prepare_cellfm_input(counts: pd.DataFrame, vocabulary: Iterable[str]) -> Cel
         array = values.to_numpy(dtype=np.float64)
 
     genes = list(map(str, vocabulary))
+    if not genes or len(set(genes)) != len(genes) or any(not gene.strip() for gene in genes):
+        raise DataError('CellFM vocabulary gene IDs must be unique and nonempty')
     vocab_to_id = {gene: i + 1 for i, gene in enumerate(genes)}
     values.index, ensembl_mapped_genes = _map_ensembl_ids_to_symbols(
         values.index, set(vocab_to_id)
@@ -352,10 +356,10 @@ def _extract_multiview(*, torch, model, prep, prepared: CellFMPreparedInput,
 
 
 def _extract_configured_views(*, cfg: CellFMCfg, utils, torch, model, prep,
-                              prepared: CellFMPreparedInput, device):
-    """Route to the preserved legacy implementation or deterministic multiview."""
+                              prepared: CellFMPreparedInput, device, legacy_single_view=False):
+    """Use sample/view seeds for new runs, or replay legacy single-view draws."""
     num_views = int(cfg.num_views)
-    if num_views == 1:
+    if num_views == 1 and legacy_single_view:
         loader = utils.build_dataset(
             _BulkSampleDataset(prepared), prep=prep, batch_size=int(cfg.batch_size),
             pad_zero=True, drop=False, shuffle=False,
@@ -392,23 +396,32 @@ def _extract_configured_views(*, cfg: CellFMCfg, utils, torch, model, prep,
     )
     return (
         embeddings,
-        retained,
+        [sample[0] for sample in retained] if num_views == 1 else retained,
         "sha256_sample_id_global_seed_zero_based_view_index",
-        "mean",
+        "mean" if num_views > 1 else "single_view",
     )
 
 
 class CellFMFeatureExtractor:
     """Generate frozen, valid-gene mean-pooled embeddings for bulk RNA-seq samples."""
 
-    def __init__(self, cfg: CellFMCfg, *, observer=None):
+    def __init__(self, cfg: CellFMCfg, *, observer=None, legacy_single_view=False):
         self.cfg = cfg
         self.observer = observer
+        self.legacy_single_view = legacy_single_view
 
     def extract(self, counts: pd.DataFrame) -> CellFMExtractionResult:
+        from omiclass.utils.reproducibility import random_state_scope
+        with random_state_scope(self.cfg.random_state, cuda=self.cfg.device != 'cpu'):
+            return self._extract(counts)
+
+    def _extract(self, counts: pd.DataFrame) -> CellFMExtractionResult:
         cfg = self.cfg
         _validate_resources(cfg)
         vocabulary = load_cellfm_vocabulary(Path(cfg.gene_info_path))
+        if hasattr(self.observer, 'set_cellfm_vocabulary'):
+            self.observer.set_cellfm_vocabulary(vocabulary, random_state=cfg.random_state,
+                legacy_single_view=self.legacy_single_view and cfg.num_views == 1)
         prepared = prepare_cellfm_input(counts, vocabulary)
         utils, model_module = _import_cellfm(cfg)
         try:
@@ -440,21 +453,13 @@ class CellFMFeatureExtractor:
                 f"Expected CellFM embedding width {CELLFM_EMBEDDING_DIMENSION}, got "
                 f"{model_cfg.enc_dims}."
             )
-        torch_state = torch.random.get_rng_state()
-        cuda_states = torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None
-        torch.manual_seed(int(cfg.random_state))
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(int(cfg.random_state))
-        try:
+        from omiclass.utils.reproducibility import random_state_scope
+        with random_state_scope(cfg.random_state, cuda=device.type != 'cpu'):
             model = model_module.Cell_FM(
                 n_gene=len(vocabulary), cfg=model_cfg,
                 ckpt_path=str(cfg.checkpoint_path), device=str(device),
             ).to(device)
             model.load_model(weight=True, moment=False)
-        finally:
-            torch.random.set_rng_state(torch_state)
-            if cuda_states is not None:
-                torch.cuda.set_rng_state_all(cuda_states)
         model.eval()
         model.requires_grad_(False)
 
@@ -476,6 +481,7 @@ class CellFMFeatureExtractor:
             embeddings, retained, seed_strategy, aggregation = _extract_configured_views(
                 cfg=cfg, utils=utils, torch=torch, model=model, prep=prep,
                 prepared=prepared, device=device,
+                legacy_single_view=self.legacy_single_view,
             )
         finally:
             model.net.encode = encode

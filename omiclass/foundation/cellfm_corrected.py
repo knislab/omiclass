@@ -7,17 +7,18 @@ import pandas as pd
 from omiclass.foundation.io import write_json
 
 
-def continuous_expression(counts, cfg):
+def continuous_expression(counts, cfg, *, legacy_single_view=False):
     """Full mapped, capped-count matrix; same float32 normalize as Prepare.normalize.
 
     The denominator includes every mapped capped gene, before view selection.
-    Match the existing multiview canonical order before summing float32 counts.
+    Match sample/view canonical order before summing float32 counts; preserve
+    source order only for explicitly requested historical single-view replay.
     No model/vendor imports are needed in the parent Omiclass interpreter.
     """
     from omiclass.features import cellfm as backend
     vocabulary = backend.load_cellfm_vocabulary(Path(cfg.gene_info_path))
     prepared = backend.prepare_cellfm_input(counts, vocabulary)
-    order = (np.argsort(prepared.gene_ids, kind='stable') if int(cfg.num_views) > 1
+    order = (np.argsort(prepared.gene_ids, kind='stable') if not legacy_single_view or int(cfg.num_views) > 1
              else np.arange(len(prepared.gene_ids)))
     data = prepared.counts[:, order].astype(np.float32)
     read = data.sum(axis=1, dtype=np.float32)
@@ -26,19 +27,30 @@ def continuous_expression(counts, cfg):
                         columns=prepared.sample_ids)
 
 
-def extract_corrected(counts, corrected, cfg, directory, observer=None):
+def extract_corrected(counts, corrected, cfg, directory, observer=None, *, legacy_single_view=False):
+    from omiclass.utils.reproducibility import random_state_scope
+    with random_state_scope(cfg.random_state, cuda=cfg.device != 'cpu'):
+        return _extract_corrected(counts, corrected, cfg, directory, observer,
+                                  legacy_single_view=legacy_single_view)
+
+
+def _extract_corrected(counts, corrected, cfg, directory, observer=None, *, legacy_single_view=False):
     """Reuse core selection/pooling; substitute scalars only on this model instance.
 
-    Replay ALL original samples in original order, including samples not retained
-    by the downstream split, so legacy single-view NumPy draws stay identical.
+    Replay all original samples, including those not retained by the split.
+    New runs use sample/view seeds; explicit legacy replay retains the original
+    cohort traversal so its single-view NumPy draws stay identical.
     Non-target samples keep original values and their embeddings are discarded.
     """
     import torch
     from omiclass.features import cellfm as backend
     backend._validate_resources(cfg)
     vocabulary = backend.load_cellfm_vocabulary(Path(cfg.gene_info_path))
+    if hasattr(observer, 'set_cellfm_vocabulary'):
+        observer.set_cellfm_vocabulary(vocabulary, random_state=cfg.random_state,
+                                      legacy_single_view=legacy_single_view and cfg.num_views == 1)
     prepared = backend.prepare_cellfm_input(counts, vocabulary)
-    original = continuous_expression(counts, cfg)
+    original = continuous_expression(counts, cfg, legacy_single_view=legacy_single_view)
     if not set(corrected.columns).issubset(prepared.sample_ids):
         raise ValueError('Corrected CellFM sample IDs are absent from original counts')
     utils, model_module = backend._import_cellfm(cfg)
@@ -57,25 +69,17 @@ def extract_corrected(counts, corrected, cfg, directory, observer=None):
     if (int(model_cfg.nonz_len), int(model_cfg.enc_dims)) != (2048, 1536):
         raise ValueError('Unsupported CellFM sequence length/embedding width')
     # Verify the locally reproduced full normalization against the vendor function.
-    order = (np.argsort(prepared.gene_ids, kind='stable') if int(cfg.num_views) > 1
+    order = (np.argsort(prepared.gene_ids, kind='stable') if not legacy_single_view or int(cfg.num_views) > 1
              else np.arange(len(prepared.gene_ids)))
     for i, row in enumerate(prepared.counts[:, order].astype(np.float32)):
         normalized, _ = prep.normalize(row, np.asarray(row.sum(), dtype=np.float32))
         if not np.array_equal(normalized, original.iloc[:, i].to_numpy()):
             raise ValueError('Full CellFM normalization differs from existing Prepare.normalize')
-    state = torch.random.get_rng_state()
-    cuda_states = torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None
-    torch.manual_seed(int(cfg.random_state))
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(int(cfg.random_state))
-    try:
+    from omiclass.utils.reproducibility import random_state_scope
+    with random_state_scope(cfg.random_state, cuda=device.type != 'cpu'):
         model = model_module.Cell_FM(n_gene=len(vocabulary), cfg=model_cfg,
             ckpt_path=str(cfg.checkpoint_path), device=str(device)).to(device)
         model.load_model(weight=True, moment=False)
-    finally:
-        torch.random.set_rng_state(state)
-        if cuda_states is not None:
-            torch.cuda.set_rng_state_all(cuda_states)
     model.eval()
     model.requires_grad_(False)
     # The vendor encode ends with a NaN replacement. Fail before that fallback
@@ -149,7 +153,7 @@ def extract_corrected(counts, corrected, cfg, directory, observer=None):
     try:
         embeddings, retained, seed_strategy, aggregation = backend._extract_configured_views(
             cfg=cfg, utils=utils, torch=torch, model=model, prep=prep,
-            prepared=prepared, device=device)
+            prepared=prepared, device=device, legacy_single_view=legacy_single_view)
     finally:
         model.net.encode = encode
         for hook in hooks:

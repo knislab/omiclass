@@ -193,7 +193,7 @@ def test_cellfm_multiview_generates_20_views_and_averages_deterministically(monk
     assert np.allclose(reordered_embeddings[1], embeddings[0])
 
 
-def test_cellfm_num_views_one_routes_to_legacy_implementation(monkeypatch):
+def test_cellfm_num_views_one_can_replay_legacy_implementation(monkeypatch):
     expected = np.ones((2, CELLFM_EMBEDDING_DIMENSION), dtype=np.float32)
     loader = object()
     utils = SimpleNamespace(build_dataset=lambda *args, **kwargs: loader)
@@ -216,6 +216,7 @@ def test_cellfm_num_views_one_routes_to_legacy_implementation(monkeypatch):
         prep=object(),
         prepared=_prepared_for_multiview(),
         device="cpu",
+        legacy_single_view=True,
     )
     assert embeddings is expected
     assert retained == [2048, 2048]

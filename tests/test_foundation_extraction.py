@@ -21,7 +21,7 @@ def test_observer_retains_tokens_masks_and_genes_over_views(tmp_path):
     for view in range(2):
         tokens=np.arange(24,dtype=np.float32).reshape(2,3,4)+view
         masks=np.array([[1,1,0],[1,0,0]],dtype=bool)
-        observer(tokens,masks,np.tile(np.arange(3),(2,1)),['a','b'],view)
+        observer(tokens,masks,np.array([[1,2,0],[1,0,0]]),['a','b'],view)
     observer.finish(['a','b'])
     manifest=json.loads((tmp_path/'tokens/manifest.json').read_text())
     assert len(manifest['records'])==4
@@ -29,9 +29,9 @@ def test_observer_retains_tokens_masks_and_genes_over_views(tmp_path):
         assert set(z.files) == {'tokens', 'mask', 'gene_ids'}
         np.testing.assert_array_equal(z['tokens'],np.arange(12,dtype=np.float32).reshape(3,4))
         np.testing.assert_array_equal(z['mask'],[1,1,0])
-        np.testing.assert_array_equal(z['gene_ids'],np.arange(3))
+        np.testing.assert_array_equal(z['gene_ids'],[1,2,0])
     with pytest.raises(ValueError,match='Duplicated'):
-        observer(tokens,masks,np.tile(np.arange(3),(2,1)),['a','b'],0)
+        observer(tokens,masks,np.array([[1,2,0],[1,0,0]]),['a','b'],0)
 
 
 @pytest.mark.parametrize('model',['bulkformer','cellfm_1view','cellfm_20view','bulkrnabert'])
@@ -140,7 +140,7 @@ def test_cellfm_instance_observer_is_restored(tmp_path,monkeypatch):
     monkeypatch.setattr(cellfm,'prepare_cellfm_input',lambda *a:prepared)
     monkeypatch.setattr(cellfm,'_import_cellfm',lambda c:(utils,SimpleNamespace(Cell_FM=create)))
     def drive(**kw):
-        for i in range(20):kw['model'].net.encode(torch.ones((2,2,2)),torch.ones((2,2),dtype=torch.int64),torch.ones(2,2),torch.ones((2,2),dtype=torch.bool))
+        for i in range(20):kw['model'].net.encode(torch.ones((2,2,2)),torch.tensor([[1,2],[1,2]]),torch.ones(2,2),torch.ones((2,2),dtype=torch.bool))
         return np.ones((2,1536),np.float32),[[2]*20]*2,'stable','mean'
     monkeypatch.setattr(cellfm,'_extract_configured_views',drive)
     observer=extraction.TokenObserver(tmp_path/'tokens','cellfm',20)

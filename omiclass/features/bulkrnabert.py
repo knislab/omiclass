@@ -122,7 +122,8 @@ class BulkRNABertFeatureExtractor:
         cfg = self.cfg
         input_path = workdir / 'input.npz'
         output_path = workdir / 'output.npz'
-        np.savez(input_path, tpm=values, sample_ids=np.asarray(sample_ids, dtype=str))
+        np.savez(input_path, tpm=values, sample_ids=np.asarray(sample_ids, dtype=str),
+                 gene_ids=np.asarray(Path(cfg.vocabulary_path).read_text().splitlines(), dtype=str))
         command = [str(Path(cfg.python_executable).expanduser().resolve()),
                    str(Path(__file__).with_name('bulkrnabert_worker.py').resolve()),
                    '--root-dir', str(Path(cfg.root_dir).resolve()),
@@ -133,6 +134,9 @@ class BulkRNABertFeatureExtractor:
         env = dict(os.environ)
         env.pop('PYTHONPATH', None)
         env['PYTHONNOUSERSITE'] = '1'
+        env['PYTHONDONTWRITEBYTECODE'] = '1'
+        env['JAX_COMPILATION_CACHE_DIR'] = str(workdir / 'jax')
+        env['XDG_CACHE_HOME'] = str(workdir / 'cache')
         env.setdefault('XLA_PYTHON_CLIENT_PREALLOCATE', 'false')
         print('[bulkrnabert] Extracting frozen embeddings in separate Python environment.', flush=True)
         try:
