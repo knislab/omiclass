@@ -95,28 +95,23 @@ class NativeModel:
 
 def fit_native(cfg, X, y, train_ids, out):
     from omiclass.train.trainer import Trainer
-    from omiclass.utils.pipeline import maybe_log1p_expression
+    from omiclass.train.preprocessing import TrainingPreprocessor
     cfg = cfg.model_copy(deep=True)
     cfg.runtime.cv_folds = cfg.runtime.cv_folds or 5
     cfg.runtime.tuning.inner_cv = cfg.runtime.tuning.inner_cv or 3
     cfg.de.geneset_selection = False
-    matrix, did_log, reason = maybe_log1p_expression(X.T, enabled=cfg.runtime.log_transform,
-                                                   already_normalized_or_logged=False)
-    matrix = matrix.T
-    keep = matrix.loc[train_ids].nunique(dropna=False).gt(1)
-    if not keep.any():
-        raise ValueError('No nonconstant training embedding dimensions')
-    matrix = matrix.loc[:, keep]
-    trainer = Trainer(cfg, artifacts_dir=out / 'train_artifacts')
+    matrix = X
+    trainer = Trainer(cfg, artifacts_dir=out / 'train_artifacts', preprocessor=TrainingPreprocessor(cfg))
     result = trainer.run(matrix.loc[train_ids], y.loc[train_ids])
     board = result.metrics
     board.to_csv(out / 'native_leaderboard.csv', index=False)
     joblib.dump(trainer.cv_results, out / 'cv_results.joblib')
     if not result.artifact_paths or ('status' in board and not board.status.eq('ok').all()):
         raise RuntimeError('Native candidate failed; retained diagnostics do not constitute a completed suite')
-    models = {name: NativeModel(joblib.load(path), matrix.columns, did_log) for name, path in result.artifact_paths.items()}
+    models = {name: NativeModel(joblib.load(path), matrix.columns, False) for name, path in result.artifact_paths.items()}
     write_json(out / 'fit_scope.json', dict(protocol='native_omiclass_cv_and_imbalance_dispatch',
-        constant_filter_fit_ids=train_ids, features=matrix.columns.tolist(), did_log=did_log, reason=reason,
+        constant_filter_fit_ids=train_ids, features=matrix.columns.tolist(), did_log=False,
+        preprocessing='partition_fitted_v1', reason='log decision and constants fitted inside each estimator',
         selection='Existing Trainer including calibration, tuning, sampling and stacker is unchanged'))
     return models, board
 

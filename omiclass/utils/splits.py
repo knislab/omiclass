@@ -24,15 +24,17 @@ def holdout_split(
     if hold_out_path is not None:
         hold_out_path = Path(hold_out_path)
         if not hold_out_path.exists():
-            print(f"[holdout] hold_out_path does not exist, falling back to regular split: {hold_out_path}")
+            raise FileNotFoundError(f"Explicit holdout file does not exist: {hold_out_path}")
         else:
             test_ids = load_list(hold_out_path)
+            if len(test_ids) != len(set(test_ids)) or set(test_ids) - set(X.index):
+                raise ValueError('Explicit holdout IDs must be unique and present in the labelled population')
             all_indices = X.index
             Xte_idx = all_indices.intersection(test_ids)
             Xtr_idx = all_indices.difference(Xte_idx)
 
             if Xte_idx.empty:
-                print("Warning: No matching IDs found for the hold-out path.")
+                raise ValueError("No matching IDs in explicit holdout file")
             elif Xtr_idx.empty:
                 raise ValueError(
                     "All data points were assigned to the test set based on hold_out_path. "
@@ -57,6 +59,7 @@ def holdout_split(
                     "train_index": Xtr.index.tolist(),
                     "test_index": Xte.index.tolist(),
                 }
+                validate_split(X, y, split)
                 return Xtr, Xte, ytr, yte, split
 
     # Fallback: standard stratified / random split
@@ -79,7 +82,20 @@ def holdout_split(
         "train_index": Xtr.index.tolist(),
         "test_index": Xte.index.tolist(),
     }
+    validate_split(X, y, split)
     return Xtr, Xte, ytr.loc[Xtr.index], yte.loc[Xte.index], split
+
+
+def validate_split(X, y, split):
+    if not X.index.is_unique or not y.index.is_unique:
+        raise ValueError("Sample IDs must be unique")
+    train, test = split['train_index'], split['test_index']
+    if not train or not test or len(set(train + test)) != len(train + test):
+        raise ValueError("Training and holdout must be nonempty, unique and disjoint")
+    if set(train + test) - set(X.index) or set(train + test) - set(y.dropna().index):
+        raise ValueError("Split samples are absent or lack labels; refusing to change partitions")
+    if set(y.loc[train]) != set(y.loc[train + test]):
+        raise ValueError("Training must contain every evaluation class")
 
 def save_split(split: Split, path: Union[str, Path]) -> None:
     path = Path(path)
@@ -94,6 +110,7 @@ def load_split(path: Union[str, Path]) -> Split:
 def apply_split(
     X: pd.DataFrame, y: pd.Series, split: Split
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]:
+    validate_split(X, y, split)
     tr_idx = split["train_index"]
     te_idx = split["test_index"]
     Xtr = X.loc[tr_idx]

@@ -10,6 +10,7 @@ from omiclass.config.schema import Config
 from omiclass.cli.runtime import RuntimeOptions
 from omiclass.pipeline.runner_result import PipelineRunResult
 from omiclass.pipeline.steps.load_step import LoadInputStep
+from omiclass.pipeline.steps.split_step import SplitStep
 from omiclass.pipeline.steps.bulkformer_step import EmbeddingFeatureExtractionStep
 from omiclass.pipeline.steps.cptac_preprocess_step import CPTACPreprocessingStep
 from omiclass.pipeline.steps.survival_step import SurvivalStep
@@ -67,6 +68,7 @@ class PipelineOrchestrator:
         self.steps: List[PipelineStep] = [
             DefineGeneCodeStep(),
             LoadInputStep(),
+            SplitStep(),
             EmbeddingFeatureExtractionStep(),
             CPTACPreprocessingStep(),
             DEStep(),

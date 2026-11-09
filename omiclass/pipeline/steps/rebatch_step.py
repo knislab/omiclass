@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, Any
 import pandas as pd
 import joblib
+import json
 
 if TYPE_CHECKING:
     from omiclass.pipeline.orchestrator import RunContext
@@ -31,6 +32,11 @@ class RebatchCorrectionStep:
         """
         Run limma batch correction + batch holdout, store result in ctx.cache["X_corrected"].
         """
+        scoped = ctx.out_dir / 'preprocessing/scoped.json'
+        scope = json.loads(scoped.read_text()) if scoped.is_file() else None
+        if scope is not None and not scope.get('correction_transductive', False):
+            ctx.cache['X_recorrected'] = ctx.cache['full_expr']
+            return  # Saved estimators own fitted transforms; never apply twice.
         if ctx.cfg.batch_correction.algorithm in {"frozen_quantile", "reference_ruv", "fsva_exact"}:
             from omiclass.batch.reference_pipeline import transform_reference
             transform_reference(ctx)
@@ -43,6 +49,12 @@ class RebatchCorrectionStep:
             return
         from omiclass.batch.limma_runner import LimmaRunner
         full_expr = ctx.cache["full_expr"]
+        cptac_path = ctx.out_dir / 'preprocessing/cptac_before_limma.joblib'
+        if scoped.is_file() and cptac_path.is_file():
+            prep = joblib.load(cptac_path)
+            full_expr = prep._cptac_transform(full_expr.T).T
+            if ctx.cfg.cptac_ms_preprocessing.log2_transform:
+                ctx.cache['_did_log_transform'] = True
 
         full_expr, did_log, log_reason = maybe_log1p_expression(
             full_expr,
@@ -113,11 +125,14 @@ class RebatchCorrectionStep:
             feature_label_plural=feature_label_plural,
             corrected_matrix_label=corrected_matrix_label,
         )
-        try:
-            split = load_split(ctx.cfg.project.split_data_dir / "split.json")
-        except Exception as e:
-            split = load_split(ctx.out_dir / "split.json")
-        train_idx, test_idx = split["train_index"], split["test_index"]
+        if scope is not None:
+            train_idx, test_idx = scope['train_ids'], scope['test_ids']
+        else:
+            try:
+                split = load_split(ctx.cfg.project.split_data_dir / "split.json")
+            except Exception:
+                split = load_split(ctx.out_dir / "split.json")
+            train_idx, test_idx = split["train_index"], split["test_index"]
         overall_idx = train_idx + test_idx
         X_full_raw = X_full_raw.drop(columns=overall_idx, errors='ignore')
         ctx.cache["X_recorrected"] = X_full_raw

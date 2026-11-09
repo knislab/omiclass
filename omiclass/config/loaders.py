@@ -9,7 +9,7 @@ import re
 import yaml
 from .schema import Config, ProjectCfg
 from omiclass.errors.errors import ConfigError, SchemaValidationError
-from omiclass.config.overrides import normalize_user_overrides
+from omiclass.config.overrides import normalize_user_overrides, RUNTIME_OPTIONS
 from pydantic import ValidationError
 from omiclass.utils.clean_and_pred import has_leaderboard
 
@@ -57,7 +57,8 @@ def load_config(cli_overrides: Optional[Dict[str, Any]] = None) -> Config:
 
         merged = _deep_update(base_data, cli_overrides) if base_data else cli_overrides
 
-        merged.pop("raw_count", None)  # Consumed by CLI runtime routing.
+        for key in RUNTIME_OPTIONS:
+            merged.pop(key, None)
         raw = Config(**merged)
         prediction_only = (raw.foundation.enabled and raw.foundation.mode == "predict") or (
             not raw.foundation.enabled and has_leaderboard(raw.project.out_dir)

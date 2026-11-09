@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Literal, List
+import json
 from omiclass.config.schema import Config
 from omiclass.utils.clean_and_pred import has_leaderboard
 from omiclass.features.embedding_backend import embedding_enabled
@@ -43,14 +44,27 @@ def create_runtime_options_from_path_conf_kwargs(
     """
     Helper to create RuntimeOptions from CLI-like arguments.
     """
-    is_geneset = (kwargs.get("geneset_path", False) or cfg.project.geneset_path is not None)
-    run_de = (kwargs.get("run_de", False) or not is_geneset)
-    run_de = (kwargs.get("raw_count", False) or run_de)
+    kwargs = dict(kwargs)
+    for key in ('raw_count', 'reuse_split', 'run_de', 'run_batch', 'run_geneset_opt', 'run_prediction', 'surface_markers'):
+        if key in kwargs and isinstance(kwargs[key], str):
+            value = kwargs[key].strip().lower()
+            if value not in {'true', 'false', '1', '0'}:
+                raise ValueError(f'{key} must be a boolean')
+            kwargs[key] = value in {'true', '1'}
+    is_geneset = cfg.project.geneset_path is not None or kwargs.get('gene_path') is not None
+    saved_scope = Path(cfg.project.out_dir) / 'preprocessing/scoped.json'
+    if has_leaderboard(cfg.project.out_dir) and saved_scope.is_file():
+        expected_raw = json.loads(saved_scope.read_text()).get('input_mode') == 'raw_counts'
+        if 'raw_count' in kwargs and kwargs['raw_count'] != expected_raw:
+            raise ValueError('Prediction input scale differs from saved preprocessing input mode')
+        kwargs['raw_count'] = expected_raw
     is_raw_count = kwargs.get("raw_count", False)
-    run_batch = kwargs.get("run_batch", False) or (cfg.batch_correction.batch_column is not None) or (cfg.batch_correction.covariates_path is not None) or (cfg.batch_correction.n_pcs is not None)
+    run_de = kwargs.get('run_de', is_raw_count or not is_geneset)
+    run_batch = kwargs.get('run_batch', (cfg.batch_correction.batch_column is not None)
+        or (cfg.batch_correction.covariates_path is not None) or (cfg.batch_correction.n_pcs is not None))
     geneset_opt = kwargs.get("run_geneset_opt", False) or cfg.runtime.feature_selection.enabled is True
     run_prediction = kwargs.get("run_prediction", False) or (cfg.runtime.survival_prediction.enabled is True)
-    is_split = kwargs.get("reuse_split", False) and kwargs.get("split_json", False)
+    is_split = bool(kwargs.get("reuse_split", False))
     project_out_dir = Path(cfg.project.out_dir)
     embeddings_enabled = embedding_enabled(cfg)
 

@@ -10,6 +10,10 @@ from pydantic import BaseModel
 from .schema import Config
 from omiclass.errors.errors import ConfigError
 
+# Existing execution options consumed by cli.runtime rather than Config.
+RUNTIME_OPTIONS = {'raw_count', 'reuse_split', 'split_json', 'run_de', 'run_batch',
+                   'run_geneset_opt', 'run_prediction', 'gene_path', 'surface_markers'}
+
 
 @dataclass(frozen=True)
 class OverrideSpec:
@@ -297,7 +301,7 @@ def _validate_override_paths(values, model_cls=Config, prefix=()):
     leaves = []
     for key, value in values.items():
         path = prefix + (key,)
-        if path == ("raw_count",):
+        if len(path) == 1 and path[0] in RUNTIME_OPTIONS:
             continue  # Existing CLI runtime option, not a Config field.
         field = model_cls.model_fields.get(key)
         if field is None:
@@ -368,7 +372,7 @@ def normalize_user_overrides(user_kwargs: Dict[str, Any], *, strict: bool = True
         # 2) alias
         elif key in SPEC.aliases:
             path = tuple(SPEC.aliases[key].split("."))
-        elif key in Config.model_fields:
+        elif key in Config.model_fields or key in RUNTIME_OPTIONS:
             path = (key,)
         # 3) short key 
         else:
@@ -401,7 +405,7 @@ def normalize_user_overrides(user_kwargs: Dict[str, Any], *, strict: bool = True
                     )
             # Merge leaves so mixed nested/dotted input cannot silently erase
             # another setting. Conflicting values are errors, not order-dependent.
-            for leaf in leaves + ([("raw_count",)] if path == ("raw_count",) else []):
+            for leaf in leaves + ([path] if len(path) == 1 and path[0] in RUNTIME_OPTIONS else []):
                 for length in range(1, len(leaf)):
                     parent = _deep_get(out, list(leaf[:length]))
                     if parent is not None and not isinstance(parent, dict):

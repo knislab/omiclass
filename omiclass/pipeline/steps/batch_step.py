@@ -35,11 +35,29 @@ class BatchCorrectionStep:
         Run limma batch correction + batch holdout, store result in ctx.cache["X_corrected"].
         """
         if ctx.cfg.batch_correction.algorithm in {"frozen_quantile", "reference_ruv", "fsva_exact"}:
+            if 'split' in ctx.cache:
+                ctx.cache['reference_deferred'] = True
+                return
             from omiclass.batch.reference_pipeline import fit_reference
             fit_reference(ctx)
             return
         from omiclass.batch.limma_runner import LimmaRunner
         full_expr = ctx.cache["full_expr"]
+        if ctx.cache.get('cptac_deferred'):
+            # Preserve cohort correction; fit its preparatory transform only on
+            # the declared training partition before applying it to the cohort.
+            from omiclass.train.preprocessing import TrainingPreprocessor
+            prep = TrainingPreprocessor(ctx.cfg, cptac=True, already_logged=True)
+            train_ids = ctx.cache['split']['train_index']
+            prep.fit(full_expr.loc[:, train_ids].T)
+            full_expr = prep._cptac_transform(full_expr.T).T
+            import joblib
+            directory = ctx.out_dir / 'preprocessing'
+            directory.mkdir(parents=True, exist_ok=True)
+            joblib.dump(prep, directory / 'cptac_before_limma.joblib')
+            ctx.cache['cptac_before_transductive_correction'] = True
+            if ctx.cfg.cptac_ms_preprocessing.log2_transform:
+                ctx.cache['_did_log_transform'] = True
 
         full_expr, did_log, log_reason = maybe_log1p_expression(
             full_expr,

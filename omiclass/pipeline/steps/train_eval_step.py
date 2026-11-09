@@ -8,12 +8,15 @@ from typing import Dict, Any
 import joblib
 import numpy as np
 import pandas as pd
+import json
 from typing import TYPE_CHECKING
 
 from omiclass.utils.pipeline import make_or_load_split, maybe_log1p_expression
 from omiclass.data.processor import DataProcessor
 from omiclass.train.trainer import Trainer
 from omiclass.train.selection import rank_candidates
+from omiclass.utils.splits import apply_split
+from omiclass.train.preprocessing import TrainingPreprocessor
 from omiclass.eval.holdout import evaluate_holdout, evaluate_holdout_with_thresholds, write_holdout_csvs
 from omiclass.eval.thresholds import learn_multiclass_thresholds
 from omiclass.reporting.per_model_report import finalize_report_for_model
@@ -67,16 +70,6 @@ class TrainAndEvalStep:
 
         gene_list = ctx.cache["gene_list"]
 
-        X_full_raw, did_log, log_reason = maybe_log1p_expression(
-            X_full_raw,
-            enabled=ctx.cfg.runtime.log_transform is True,
-            already_normalized_or_logged=ctx.cache.get("_did_raw_count_norm", False)
-            or ctx.cache.get("_did_log_transform", False),
-        )
-        if did_log:
-            ctx.cache["_did_log_transform"] = True
-        ctx.cache["_log_transform_reason"] = log_reason
-
         X_full_raw = apply_batch_holdout(
             X=X_full_raw,
             cfg=ctx.cfg,
@@ -87,21 +80,45 @@ class TrainAndEvalStep:
         X, y = dp.build_xy_from_corrected(
             X_full_raw=X_full_raw,
             gene_list=gene_list,
+            drop_constant_cols=False,
+            clean_finite=False,
         )
-        resolve_cv_folds(ctx.cfg, y)
+        y = ctx.cache['labels'].reindex(X.index)
+        if y.isna().any():
+            raise ValueError('Training population differs from the resolved labelled population')
 
         # Train/test split
-        Xtr, Xte, ytr, yte, split_path, created = make_or_load_split(
-            X=X,
-            y=y,
-            split_dir=ctx.split_out,
-            cfg=ctx.cfg,
-            reuse_split=ctx.opts.reuse_split,
-        )
+        Xtr, Xte, ytr, yte = apply_split(X, y, ctx.cache['split'])
+        split_path = ctx.cache['split_json']
+        resolve_cv_folds(ctx.cfg, ytr)
+        # Retain fit-time raw counts and covariates only for training IDs.
+        meta = ctx.cache.get('de_metadata')
+        if ctx.cache.get('reference_deferred'):
+            from omiclass.utils.io import load_matrix
+            meta = load_matrix(ctx.cfg.project.meta_path, numeric=False)
+            numeric_outcome = pd.api.types.is_numeric_dtype(meta[ctx.cfg.project.cluster_column])
+            meta = meta.drop(columns=[ctx.cfg.project.cluster_column], errors='ignore')
+            meta.attrs['outcome_numeric'] = numeric_outcome
+            meta.attrs['outcome_values'] = {value: key for key, value in ctx.cache['label_mapping'].items()}
+        raw = ctx.cache.get('raw_expression', X_full_raw).loc[:, Xtr.index]
+        prep = TrainingPreprocessor(ctx.cfg, raw_expression=raw,
+            metadata=meta.loc[Xtr.index] if meta is not None else None,
+            de=ctx.cache.get('de_enabled', False), covariates=ctx.cache.get('de_covariates'),
+            already_logged=using_batch_corrected_matrix or ctx.cache.get('_did_raw_count_norm', False),
+            cptac=ctx.cache.get('cptac_deferred', False) and not using_batch_corrected_matrix,
+            reference=ctx.cache.get('reference_deferred', False),
+            work_dir=ctx.out_dir / 'preprocessing/fit-tmp')
         # Train on training set
         train_dir = ctx.out_dir / "train_artifacts"
-        trainer = Trainer(ctx.cfg, artifacts_dir=train_dir)
+        trainer = Trainer(ctx.cfg, artifacts_dir=train_dir, preprocessor=prep)
         summary = trainer.run(Xtr, ytr)
+        preprocessing_dir = ctx.out_dir / 'preprocessing'
+        preprocessing_dir.mkdir(exist_ok=True)
+        (preprocessing_dir / 'scoped.json').write_text(json.dumps(dict(
+            version=1, train_ids=Xtr.index.tolist(), test_ids=Xte.index.tolist(),
+            input_mode=ctx.opts.input_mode,
+            fitted_inside_estimators=True, de=prep.de, cptac=prep.cptac, reference=prep.reference,
+            correction_transductive=using_batch_corrected_matrix)))
         # 4) Save leaderboard
         leaderboard_csv = ctx.out_dir / "leaderboard.csv"
         summary.metrics.to_csv(leaderboard_csv, index=False)

@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 import json
 import os
-import rpy2.robjects as ro
 from typing import Optional, Sequence, Union, Tuple
 from pathlib import Path
 import tempfile, shutil
@@ -15,12 +14,16 @@ from omiclass.errors.errors import RBackendError, GCError
 from omiclass.reporting.de_report import write_de_geneset_report_html
 from omiclass.utils.debug import debug_volcano_plot_from_limma
 from omiclass.utils.toolbox import get_class_display_name
-try:
-    # rpy2 >= 3.5
-    from rpy2.rinterface_lib.embedded import RRuntimeError
-except Exception:
-    # rpy2 <= 3.4 fallback
-    from rpy2.rinterface import RRuntimeError
+def _r_runtime():
+    try:
+        import rpy2.robjects as ro
+        try:
+            from rpy2.rinterface_lib.embedded import RRuntimeError
+        except ImportError:
+            from rpy2.rinterface import RRuntimeError
+        return ro, RRuntimeError
+    except Exception as exc:
+        raise RBackendError('DE requires a compatible R/rpy2 runtime; no environment changes were attempted') from exc
 class LimmaVoomRunner:
     def __init__(self, de_cfg, cfg):
         self.r_loaded = False
@@ -164,6 +167,7 @@ class LimmaVoomRunner:
                        min_samples_frac: float = 0.5, 
                        gene_list: Optional[Sequence[str]] = None,
                        surface_markers: bool = False,
+                       report: bool = True,
             ) -> dict:
         return self._run_limma_backend(
             expr_df=raw_counts_df,
@@ -177,6 +181,7 @@ class LimmaVoomRunner:
             min_samples_frac=min_samples_frac,
             gene_list=gene_list,
             surface_markers=surface_markers,
+            report=report,
             backend="voom",
             analysis_label="Differential Expression",
             feature_label_singular="gene",
@@ -199,6 +204,7 @@ class LimmaVoomRunner:
             analysis_label: str = "Differential Protein Abundance",
             feature_label_singular: str = "protein",
             feature_label_plural: str = "proteins",
+            report: bool = True,
     ) -> dict:
         return self._run_limma_backend(
             expr_df=expr_df,
@@ -212,6 +218,7 @@ class LimmaVoomRunner:
             min_samples_frac=min_samples_frac,
             gene_list=gene_list,
             surface_markers=surface_markers,
+            report=report,
             backend="limma",
             analysis_label=analysis_label,
             feature_label_singular=feature_label_singular,
@@ -235,8 +242,8 @@ class LimmaVoomRunner:
             analysis_label: str,
             feature_label_singular: str,
             feature_label_plural: str,
+            report: bool = True,
     ) -> dict:
-        min_count = self.rt_cfg.min_features if self.rt_cfg.min_features is not None else min_count
         min_samples_frac = self.de_cfg.min_samples_frac if self.de_cfg.min_samples_frac is not None else min_samples_frac
 
         
@@ -244,6 +251,9 @@ class LimmaVoomRunner:
         _assert_unique(meta_df, "meta_df")
 
         X, M = _align_samples(expr_df, meta_df, required_meta_cols=[design_col] + (covariates if covariates else []))
+        if set(X.columns) != set(expr_df.columns):
+            raise ValueError('DE covariates would remove fitting samples; refusing a partition change')
+        ro, RRuntimeError = _r_runtime()
         
         if design_col not in M.columns:
             raise ValueError(f"design_col '{design_col}' not in meta_df")
@@ -261,7 +271,7 @@ class LimmaVoomRunner:
         else:
             r_script_path = Path(r_script_path)
         
-        temp_dir = Path(tempfile.mkdtemp())
+        temp_dir = Path(tempfile.mkdtemp(prefix='limma-', dir=output_dir))
                 
         try:
             expr_filepath = temp_dir / "counts_data.csv"
@@ -415,120 +425,128 @@ class LimmaVoomRunner:
                 gene_list_path = output_dir / "limma_voom_selected_genes.txt"
                 gene_list_path.write_text("\n".join(gene_list))
 
-            volcano_svgs = []
-            fdr_thresh = self.de_cfg.fdr_thresh if self.de_cfg.fdr_thresh is not None else 0.05
-            logfc_thresh = self.de_cfg.logfc_thresh if self.de_cfg.logfc_thresh is not None else 1.0
-            report_k = len(gene_list) if gene_list is not None else (
-                compute_target_gene_count(
-                    n_classes=M[design_col].nunique(),
-                    min_genes=self.cfg.de_gene_selection.min_genes,
-                    max_genes_per_class=self.cfg.de_gene_selection.max_genes_per_class,
-                    max_genes=self.cfg.de_gene_selection.max_genes,
-                )
-            )
-
-            contrast_values = []
-            # if Contrast came from R, it should exist
-            if "Contrast" in df.columns.tolist():
-                df2 = df.dropna(subset=["Contrast"])
-                contrast_values = df2["Contrast"].astype(str).drop_duplicates().tolist()
-                for contrast_name, sub in df2.groupby("Contrast"):
-                    display_name = get_class_display_name(
-                        contrast_name,
-                        cfg=self.cfg,
-                        class_values=contrast_values,
-                    )
-                    # write a temp CSV for this contrast
-                    safe = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in str(contrast_name))
-                    safe = safe.split("_")[0] + "_vs_all"
-                    sub_path = plot_output_filepath / f"limma_voom_de_{safe}.csv"
-                    sub.to_csv(sub_path, index=True)
-
-                    svg = plot_volcano_from_limma(
-                        de_results=sub_path,
-                        fdr_thresh=fdr_thresh,
-                        logfc_thresh=logfc_thresh,
-                        title=f"{analysis_label}: {display_name}",
-                        markers=gene_list if gene_list is not None else [],
-                    )
-                    # remove temp sub csv and plot directory
-                    if sub_path.exists():
-                        os.remove(sub_path)
-
-                    volcano_svgs.append((display_name, svg))
-            else:
-                # fallback: original single volcano
-                svg = plot_volcano_from_limma(
-                    de_results=output_filepath,
-                    fdr_thresh=fdr_thresh,
-                    logfc_thresh=logfc_thresh,
-                    title=f"{analysis_label} Results",
-                    markers=gene_list if gene_list is not None else [],
-                )
-                volcano_svgs.append(("Volcano", svg))
-
-            if not pairwise_df.empty and "Contrast" in pairwise_df.columns:
-                pairwise_contrasts = (
-                    summary.pairwise_contrast_order
-                    if summary is not None
-                    else pairwise_df["Contrast"].dropna().astype(str).drop_duplicates().tolist()
-                )
-                pairwise_markers = summary.pairwise_by_contrast if summary is not None else {}
-                for contrast_name in pairwise_contrasts:
-                    sub = pairwise_df[pairwise_df["Contrast"].astype(str) == str(contrast_name)]
-                    if sub.empty:
-                        continue
-                    display_name = get_class_display_name(
-                        contrast_name,
-                        cfg=self.cfg,
-                        class_values=contrast_values,
-                    )
-                    safe = "".join(
-                        ch if ch.isalnum() or ch in "._-" else "_"
-                        for ch in str(contrast_name)
-                    )
-                    sub_path = plot_output_filepath / f"limma_voom_de_pairwise_{safe}.csv"
-                    sub.to_csv(sub_path, index=True)
-                    svg = plot_volcano_from_limma(
-                        de_results=sub_path,
-                        fdr_thresh=fdr_thresh,
-                        logfc_thresh=logfc_thresh,
-                        title=f"{analysis_label} close-class pairwise: {display_name}",
-                        markers=pairwise_markers.get(str(contrast_name), []),
-                    )
-                    if sub_path.exists():
-                        os.remove(sub_path)
-                    volcano_svgs.append((f"Close-class pairwise: {display_name}", svg))
-
-            write_de_geneset_report_html(
-                output_dir=base_output_dir,
-                de_results_csv=output_filepath,
-                volcano_svgs=volcano_svgs,
-                design_col=design_col,
-                n_classes=M[design_col].nunique(),
-                K=report_k,
-                fdr_thresh=fdr_thresh,
-                logfc_thresh=logfc_thresh,
-                min_count=min_count,
-                min_samples_frac=min_samples_frac,
-                geneset_summary=summary.__dict__ if summary is not None else None,
-                combined_genes=gene_list,
-                covariates=covariates,
-                cfg=self.cfg,
-                analysis_label=analysis_label,
-                feature_label_singular=feature_label_singular,
-                feature_label_plural=feature_label_plural,
-            )
-
+            if report:
+                self._render_report(df, pairwise_df, summary, gene_list, M, design_col,
+                    min_count, min_samples_frac, output_dir, base_output_dir, output_filepath,
+                    covariates, analysis_label, feature_label_singular, feature_label_plural)
 
             # return gene_list in r_result_dict
             r_result_dict['selected_genes'] = gene_list
             r_result_dict['selected_features'] = gene_list
 
             return r_result_dict
-    
+
         except Exception as e:
             raise GCError(f"LimmaRunner failed: {e}") from e
         finally:
             if temp_dir.exists():
                 shutil.rmtree(temp_dir)
+
+    def _render_report(self, df, pairwise_df, summary, gene_list, M, design_col,
+                       min_count, min_samples_frac, output_dir, base_output_dir, output_filepath,
+                       covariates, analysis_label, feature_label_singular, feature_label_plural):
+        """Render completed training-only DE results; never select or fit markers."""
+        volcano_svgs = []
+        fdr_thresh = self.de_cfg.fdr_thresh if self.de_cfg.fdr_thresh is not None else 0.05
+        logfc_thresh = self.de_cfg.logfc_thresh if self.de_cfg.logfc_thresh is not None else 1.0
+        report_k = len(gene_list) if gene_list is not None else (
+            compute_target_gene_count(
+                n_classes=M[design_col].nunique(),
+                min_genes=self.cfg.de_gene_selection.min_genes,
+                max_genes_per_class=self.cfg.de_gene_selection.max_genes_per_class,
+                max_genes=self.cfg.de_gene_selection.max_genes,
+            )
+        )
+
+        contrast_values = []
+        # if Contrast came from R, it should exist
+        if "Contrast" in df.columns.tolist():
+            df2 = df.dropna(subset=["Contrast"])
+            contrast_values = df2["Contrast"].astype(str).drop_duplicates().tolist()
+            for contrast_name, sub in df2.groupby("Contrast"):
+                display_name = get_class_display_name(
+                    contrast_name,
+                    cfg=self.cfg,
+                    class_values=contrast_values,
+                )
+                # write a temp CSV for this contrast
+                safe = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in str(contrast_name))
+                safe = safe.split("_")[0] + "_vs_all"
+                sub_path = plot_output_filepath / f"limma_voom_de_{safe}.csv"
+                sub.to_csv(sub_path, index=True)
+
+                svg = plot_volcano_from_limma(
+                    de_results=sub_path,
+                    fdr_thresh=fdr_thresh,
+                    logfc_thresh=logfc_thresh,
+                    title=f"{analysis_label}: {display_name}",
+                    markers=gene_list if gene_list is not None else [],
+                )
+                # remove temp sub csv and plot directory
+                if sub_path.exists():
+                    os.remove(sub_path)
+
+                volcano_svgs.append((display_name, svg))
+        else:
+            # fallback: original single volcano
+            svg = plot_volcano_from_limma(
+                de_results=output_filepath,
+                fdr_thresh=fdr_thresh,
+                logfc_thresh=logfc_thresh,
+                title=f"{analysis_label} Results",
+                markers=gene_list if gene_list is not None else [],
+            )
+            volcano_svgs.append(("Volcano", svg))
+
+        if not pairwise_df.empty and "Contrast" in pairwise_df.columns:
+            pairwise_contrasts = (
+                summary.pairwise_contrast_order
+                if summary is not None
+                else pairwise_df["Contrast"].dropna().astype(str).drop_duplicates().tolist()
+            )
+            pairwise_markers = summary.pairwise_by_contrast if summary is not None else {}
+            for contrast_name in pairwise_contrasts:
+                sub = pairwise_df[pairwise_df["Contrast"].astype(str) == str(contrast_name)]
+                if sub.empty:
+                    continue
+                display_name = get_class_display_name(
+                    contrast_name,
+                    cfg=self.cfg,
+                    class_values=contrast_values,
+                )
+                safe = "".join(
+                    ch if ch.isalnum() or ch in "._-" else "_"
+                    for ch in str(contrast_name)
+                )
+                sub_path = plot_output_filepath / f"limma_voom_de_pairwise_{safe}.csv"
+                sub.to_csv(sub_path, index=True)
+                svg = plot_volcano_from_limma(
+                    de_results=sub_path,
+                    fdr_thresh=fdr_thresh,
+                    logfc_thresh=logfc_thresh,
+                    title=f"{analysis_label} close-class pairwise: {display_name}",
+                    markers=pairwise_markers.get(str(contrast_name), []),
+                )
+                if sub_path.exists():
+                    os.remove(sub_path)
+                volcano_svgs.append((f"Close-class pairwise: {display_name}", svg))
+
+        write_de_geneset_report_html(
+            output_dir=base_output_dir,
+            de_results_csv=output_filepath,
+            volcano_svgs=volcano_svgs,
+            design_col=design_col,
+            n_classes=M[design_col].nunique(),
+            K=report_k,
+            fdr_thresh=fdr_thresh,
+            logfc_thresh=logfc_thresh,
+            min_count=min_count,
+            min_samples_frac=min_samples_frac,
+            geneset_summary=summary.__dict__ if summary is not None else None,
+            combined_genes=gene_list,
+            covariates=covariates,
+            cfg=self.cfg,
+            analysis_label=analysis_label,
+            feature_label_singular=feature_label_singular,
+            feature_label_plural=feature_label_plural,
+        )

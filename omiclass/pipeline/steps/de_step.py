@@ -5,10 +5,10 @@ from pathlib import Path
 
 if TYPE_CHECKING:
     from omiclass.pipeline.orchestrator import RunContext
-from omiclass.utils.io import load_matrix
+from omiclass.utils.io import load_matrix, encode_meta_matrix
 from omiclass.data.processor import DataProcessor
 from omiclass.de.limma_voom_runner import LimmaVoomRunner
-from omiclass.utils.pipeline import make_or_load_split
+from omiclass.utils.splits import apply_split
 
 
 class DEStep:
@@ -40,14 +40,10 @@ class DEStep:
         full_expr = full_expr[common_index]
         meta_df = meta_df.loc[common_index, :] 
         y = y.loc[common_index]
+        y = ctx.cache.get('labels', y).loc[common_index]
+        meta_df[design_col] = y
 
-        Xtr, Xte, ytr, yte, split_path, created = make_or_load_split(
-            X=full_expr.T,
-            y=y,
-            split_dir=ctx.split_out,
-            cfg=ctx.cfg,
-            reuse_split=ctx.opts.reuse_split,
-        )
+        Xtr, Xte, ytr, yte = apply_split(full_expr.T, y, ctx.cache['split'])
         de_cfg = ctx.cfg.de
         bc_cfg = ctx.cfg.batch_correction
 
@@ -80,9 +76,18 @@ class DEStep:
                             de_covariates_seen.add(col)
 
         limma = LimmaVoomRunner(de_cfg=de_cfg, cfg=ctx.cfg)
-        min_count = getattr(de_cfg, 'min_count', 10)
+        min_count = de_cfg.min_count if de_cfg.min_count is not None else 10
+        # Preserve the existing encoding rule while fitting categorical codes
+        # locally; global codes can depend on validation-only covariate levels.
+        covariate_values = meta_df.loc[:, de_covariates].copy()
+        raw_meta = load_matrix(ctx.cfg.project.meta_path, numeric=False)
+        for column in de_covariates:
+            if column in raw_meta:
+                covariate_values[column] = raw_meta[column].reindex(meta_df.index)
+        reporting_meta = encode_meta_matrix(covariate_values.loc[Xtr.index])
+        reporting_meta[design_col] = y.loc[Xtr.index]
         common_kwargs = dict(
-            meta_df=meta_df,
+            meta_df=reporting_meta,
             output_dir=ctx.out_dir,
             design_col=design_col,
             covariates=de_covariates if de_covariates else None,
@@ -91,9 +96,10 @@ class DEStep:
         )
 
         if modality == "cptac_ms":
+            report_expression, _ = dp.preprocess_cptac_ms(Xtr.T)
             # CPTAC path: limma on log2-normalized protein abundance, no voom.
             res_dict = limma.run_limma(
-                expr_df=Xtr.T,
+                expr_df=report_expression,
                 out_csv="limma_protein_de_results.csv",
                 min_count=0,
                 analysis_label="Differential Protein Abundance",
@@ -109,7 +115,8 @@ class DEStep:
                 **common_kwargs,
             )
 
-        selected_features = res_dict.get('selected_features', res_dict.get('selected_genes', []))
-        ctx.cache["feature_list"] = selected_features
-        # Backward compatibility for existing training/batch flows.
-        ctx.cache["gene_list"] = selected_features
+        ctx.cache['de_enabled'] = bool(ctx.cfg.de.geneset_selection)
+        ctx.cache['de_covariates'] = de_covariates
+        ctx.cache['de_metadata'] = covariate_values
+        ctx.cache['de_report_features'] = res_dict.get('selected_features', res_dict.get('selected_genes', []))
+        # Reporting selection must not restrict the matrix entering inner/outer CV.

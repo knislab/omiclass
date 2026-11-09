@@ -341,6 +341,8 @@ class DataProcessor:
         self,
         X_full_raw: pd.DataFrame,
         gene_list: list[str],
+        drop_constant_cols: bool = True,
+        clean_finite: bool = True,
     ) -> Tuple[pd.DataFrame, pd.Series]:
         """
         Given a limma-corrected expression matrix (genes x samples) and a gene list,
@@ -388,9 +390,10 @@ class DataProcessor:
             na_y="drop",
             coerce_object=True,
             drop_all_nan_rows=False,
-            drop_constant_cols=True,
+            drop_constant_cols=drop_constant_cols,
         )
-        X_clean = ensure_dense_finite(X_clean)
+        if clean_finite:
+            X_clean = ensure_dense_finite(X_clean)
 
         if len(X_clean) == 0:
             raise DataShapeError("After cleaning, no samples remain (X is empty).")

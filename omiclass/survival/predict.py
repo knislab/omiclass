@@ -101,7 +101,10 @@ def run_survival_prediction(X: Union[pd.DataFrame, Path, str],
     )
     if expected_features is None:
         expected_features = getattr(model, "_feature_names_in", None)
-    if representation is not None:
+    from omiclass.train.scoped import fitted_partitions
+    if fitted_partitions(model):
+        pass  # The saved preprocessing state owns schema checks and imputation.
+    elif representation is not None:
         missing = [feature for feature in expected_features if feature not in X_df.columns]
         extra = [feature for feature in X_df.columns if feature not in set(expected_features)]
         strict_extra = getattr(representation, "strategy", "full") != "full"

@@ -25,6 +25,7 @@ def _bulkformer_representation_from_model(model):
     for candidate in candidates:
         if candidate is None:
             continue
+        candidate = getattr(candidate, 'estimator_', candidate)
         named = getattr(candidate, "named_steps", {})
         representation = named.get("bulkformer_representation")
         if representation is not None:
@@ -225,6 +226,7 @@ def inner_select_recipe(
     seed: int,
     n_jobs: int,
     feature_cfg: Any,
+    fit_kwargs: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Optional[List[str]], Dict[str, Any], Optional[float], Optional[str]]:
     inner_cv = _safe_stratified_kfold(ytr, desired_splits=int(tune_inner_cv), seed=int(seed))
     if inner_cv == 0 or int(tune_iter) <= 0:
@@ -233,6 +235,23 @@ def inner_select_recipe(
     splits = list(inner_cv.split(Xtr, ytr))
 
     fs_enabled = bool(getattr(feature_cfg, "enabled", False)) if feature_cfg is not None else False
+    from omiclass.train.scoped import PartitionClassifier
+    if fs_enabled and isinstance(model_builder(), PartitionClassifier):
+        # Keep the same fraction candidates/search spaces, but fit each ranking
+        # using only the training rows provided by that particular inner fit.
+        best_score, best_params = -np.inf, {}
+        fractions = [f for f in feature_cfg.subset_fracs if float(f) > 0] or [1.0]
+        rank_settings = dict(rank_space={key.removeprefix('estimator__'): value for key, value in tune_space.items()},
+                             rank_iterations=max(5, min(10, int(tune_iter))), scoring=tune_scoring)
+        for fraction in fractions:
+            base = model_builder().set_params(subset_fraction=float(fraction), **rank_settings)
+            search = BayesSearchCV(base, tune_space, n_iter=int(tune_iter), scoring=tune_scoring,
+                cv=splits, n_jobs=1, random_state=int(seed), refit=False, error_score='raise')
+            search.fit(Xtr, ytr, **(fit_kwargs or {}))
+            if float(search.best_score_) > best_score:
+                best_score = float(search.best_score_)
+                best_params = dict(search.best_params_, subset_fraction=float(fraction), **rank_settings)
+        return None, best_params, best_score, tune_scoring
     if not fs_enabled:
         # Tune directly on all features
         base = model_builder()
@@ -490,6 +509,12 @@ def nested_oof_cv(
             "fs_best_score": fs_best_score,
             "fs_scoring": fs_scoring,
         }
+        from omiclass.train.scoped import fitted_partitions
+        partitions = fitted_partitions(model)
+        if partitions:
+            selected = list(dict.fromkeys(g for part in partitions for g in part.selected_features_))
+            m.update(selected_features=selected, n_features=len(selected),
+                     preprocessing_fit_ids=[part.fit_ids_ for part in partitions])
         representation = _bulkformer_representation_from_model(model)
         if representation is not None:
             m["bulkformer_reduction_strategy"] = representation.strategy

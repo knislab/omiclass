@@ -1,6 +1,6 @@
 # Foundation models through api.py
 
-The opt-in `foundation` block exposes the recovered manuscript protocols. Existing marker and legacy embedding calls remain on their original route. [Step 3 Stage 1](step3-stage1-report.md) adds configuration, selection and artifact reliability fixes. The remaining methodological boundaries are identified below.
+The opt-in `foundation` block exposes the recovered manuscript protocols. Existing marker and legacy embedding calls remain on their original route. [Step 3 Stage 1](step3-stage1-report.md) adds configuration, selection and artifact reliability fixes; [Stage 2](step3-stage2-report.md) corrects split and preprocessing scopes. The remaining methodological boundaries are identified below.
 
 ## Evidence and complete configuration set
 
@@ -139,7 +139,7 @@ prediction = api.predict(
 print(prediction.artifacts['predictions'])
 ```
 
-For BERT TPM mode, supply an external **unlogged TPM** CSV. When training used a separate `bulkrnabert_tpm_input_path`, prediction does not inherit that cohort file: provide a new `bulkrnabert_tpm_input_path` explicitly, or supply counts with the saved verified gene-length normalization. Prediction reloads the saved config and every fitted model, verifies model/configuration checksums, encoder asset digests and configuration compatibility, extracts frozen features, and reuses fitted transforms/scalers and class order. It never tunes, resamples or fits heads. Native log/constant-column decisions are persisted for consistent inference. New prediction outputs must be outside the saved training run.
+For BERT TPM mode, supply an external **unlogged TPM** CSV. When training used a separate `bulkrnabert_tpm_input_path`, prediction does not inherit that cohort file: provide a new `bulkrnabert_tpm_input_path` explicitly, or supply counts with the saved verified gene-length normalization. Prediction reloads the saved config and every fitted model, verifies model/configuration checksums, encoder asset digests and configuration compatibility, extracts frozen features, and reuses fitted transforms/scalers and class order. It never tunes, resamples or fits heads. New native models fit logging decisions and constant-column filters inside each estimator's training partition and persist that state. Historical native artifacts retain their saved outer preprocessing wrapper. New prediction outputs must be outside the saved training run.
 
 New bundles use artifact format 2, including checkpoint contents and upstream Python/vendor implementation identities. Existing format-1 bundles remain readable with their original file checks; their missing source/checkpoint-directory identities cannot be reconstructed retrospectively. `prediction.json` records which verification was available. Saved training bundles are never rewritten.
 

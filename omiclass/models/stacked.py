@@ -38,7 +38,9 @@ class HonestStackingClassifier(StackingClassifier):
 
         Z_df = pd.DataFrame(Z_oof, index=X.index, columns=extended_names)
         
-        Z_final = pd.concat([Z_df, X], axis=1) if self.passthrough else Z_df
+        prep = getattr(self, 'passthrough_preprocessor_', None)
+        X_pass = prep.transform(X) if prep is not None else X
+        Z_final = pd.concat([Z_df, X_pass], axis=1) if self.passthrough else Z_df
 
         self.final_estimator_ = clone(self.final_estimator)
         self.final_estimator_.fit(Z_final, y)
@@ -68,7 +70,7 @@ class HonestStackingClassifier(StackingClassifier):
                 self._base_features_in_[name] = feats
 
         if self.passthrough and hasattr(X, "columns"):
-            self._passthrough_features_in_ = list(X.columns)
+            self._passthrough_features_in_ = list(X_pass.columns)
 
 
         return self
@@ -134,10 +136,11 @@ class HonestStackingClassifier(StackingClassifier):
         Z = np.hstack(preds)
 
         if self.passthrough:
-            Xp = X
+            prep = getattr(self, 'passthrough_preprocessor_', None)
+            Xp = prep.transform(X) if prep is not None else X
             feats_p = getattr(self, "_passthrough_features_in_", None)
             if feats_p is not None:
-                Xp = X.reindex(columns=feats_p, fill_value=0.0)
+                Xp = Xp.reindex(columns=feats_p, fill_value=0.0)
 
             Z = np.hstack([Z, Xp.to_numpy()])
 

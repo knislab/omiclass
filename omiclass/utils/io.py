@@ -44,6 +44,12 @@ def load_meta_matrix(
     df = df[~df.index.duplicated(keep="first")]
     df = df.loc[:, ~df.columns.duplicated(keep="first")]
 
+    return encode_meta_matrix(df, cluster_col, return_category_maps)
+
+
+def encode_meta_matrix(df, cluster_col=None, return_category_maps=False):
+    """Apply the existing numeric/category encoding within a fitting scope."""
+    cluster_categories = None
     out = pd.DataFrame(index=df.index)
     category_maps = {}
 

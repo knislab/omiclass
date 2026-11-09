@@ -43,6 +43,22 @@ def read_ids(path):
     return ids
 
 
+def make_reference(cfg):
+    """Construct the existing reference algorithm for a single fitting scope."""
+    bc = cfg.batch_correction
+    if bc.algorithm == 'frozen_quantile':
+        return FrozenQuantile(input_scale=bc.input_scale)
+    columns = list(dict.fromkeys([cfg.project.cluster_column] + (bc.design_columns or [])))
+    if bc.algorithm == 'fsva_exact':
+        from omiclass.batch.fsva import FrozenSVA
+        return FrozenSVA(columns, bc.n_factors, bc.input_scale,
+                         bc.rscript_path, bc.r_library_path, bc.reference_random_state)
+    if bc.control_genes_path is None:
+        raise ValueError('reference_ruv requires explicit control genes')
+    return ReferenceRUV(read_ids(bc.control_genes_path), bc.control_justification,
+                        bc.n_factors, columns, bc.input_scale)
+
+
 def fit_reference(ctx):
     bc = ctx.cfg.batch_correction
     if ctx.opts.input_mode == "raw_counts":

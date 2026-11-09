@@ -77,16 +77,18 @@ def test_native_preprocessing_is_persisted_and_training_only(tmp_path,monkeypatc
     from omiclass.train.trainer import Trainer,TrainSummary
     X,y=vectors();X=(X.abs()*100).round();X['constant']=1;seen=[]
     def train(self,values,labels):
-        seen.append(values.copy());model=RandomForestClassifier(n_estimators=2,random_state=0).fit(values,labels)
+        model=self._with_bulkformer_reduction(lambda:RandomForestClassifier(n_estimators=2,random_state=0))().fit(values,labels)
+        seen.append(model.prepare(values).copy())
         path=self.artifacts_dir/'rf.joblib';joblib.dump(model,path)
         return TrainSummary(pd.DataFrame([dict(model='rf',status='ok',f1_macro_mean=.5)]),{'rf':path})
     monkeypatch.setattr(Trainer,'run',train)
     cfg=configuration(tmp_path,'omiclass',representation='full');out=tmp_path/'native';out.mkdir()
     models,_=heads.fit_native(cfg,X,y,X.index[:24].tolist(),out)
-    wrapper=models['rf'];assert wrapper.did_log
-    assert 'constant' not in wrapper.columns
-    np.testing.assert_allclose(seen[0],np.log1p(X.iloc[:24][wrapper.columns]))
-    np.testing.assert_allclose(wrapper.prepare(X.iloc[24:]),np.log1p(X.iloc[24:][wrapper.columns]))
+    wrapper=models['rf'];assert not wrapper.did_log
+    prep=wrapper.model.preprocessor_
+    assert prep.did_log_ and 'constant' not in prep.selected_features_
+    np.testing.assert_allclose(seen[0],np.log1p(X.iloc[:24][prep.selected_features_]))
+    np.testing.assert_allclose(wrapper.model.prepare(X.iloc[24:]),np.log1p(X.iloc[24:][prep.selected_features_]))
 
 
 def test_token_reader_rejects_path_escape(tmp_path):

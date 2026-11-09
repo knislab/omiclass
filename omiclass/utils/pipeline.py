@@ -57,15 +57,21 @@ def make_or_load_split(
     split_dir: Path,
     cfg: Config,
     reuse_split: bool,
+    split_json: Optional[Path] = None,
 ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, Path, bool]:
     """
     Shared helper for creating or reusing a train/test split.
     Returns Xtr, Xte, ytr, yte, split_path, created_flag.
     """
     split_path = split_dir / "split.json"
-    if reuse_split and split_path.exists():
-        split = load_split(split_path)
+    source = Path(split_json) if split_json is not None else split_path
+    if split_json is not None or reuse_split:
+        if not source.is_file():
+            raise FileNotFoundError(f"Requested split does not exist: {source}")
+        split = load_split(source)
         Xtr, Xte, ytr, yte = apply_split(X, y, split)
+        if source.resolve() != split_path.resolve():
+            save_split(split, split_path)
         created = False
     else:
         cfg_runtime = cfg.runtime
@@ -73,9 +79,7 @@ def make_or_load_split(
         raw_hold_out = getattr(cfg.project, "hold_out_path", None)
         hold_out_path: Optional[Path] = None
         if raw_hold_out:
-            p = Path(raw_hold_out)
-            if p.exists():
-                hold_out_path = p
+            hold_out_path = Path(raw_hold_out)
 
         Xtr, Xte, ytr, yte, split = holdout_split(
             X,
@@ -108,9 +112,10 @@ def apply_batch_holdout(
     y_patient = {pat for pat in y_patient if pd.notna(pat)}
     missing_patient = [pat for pat in X.columns if pat not in y_patient]
 
-    X = X[common_col]
+    # Keep unlabeled samples available for external prediction; never index them
+    # after they have already been removed from the matrix.
     if not missing_patient:
-        return X
+        return X.loc[:, common_col]
     
     # if missing hold_out_ids in X.columns, ignore
     hold_out_ids = [hid for hid in missing_patient if hid in X.columns]

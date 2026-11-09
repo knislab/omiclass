@@ -47,8 +47,9 @@ class TrainSummary:
     artifact_paths: dict[str, Path]  # model_key -> saved model path
 
 class Trainer:
-    def __init__(self, cfg: Config, artifacts_dir: Union[str, Path]):
+    def __init__(self, cfg: Config, artifacts_dir: Union[str, Path], preprocessor=None):
         self.cfg = cfg
+        self.preprocessor = preprocessor
         self.class_name_map = None
         self.artifacts_dir = Path(artifacts_dir)
         self.artifacts_dir.mkdir(parents=True, exist_ok=True)
@@ -60,29 +61,33 @@ class Trainer:
         return embedding_enabled(self.cfg)
 
     def _with_bulkformer_reduction(self, builder):
-        if not self._bulkformer_reduction_active():
-            return builder
-
         def wrapped_builder():
-            backend = embedding_backend(self.cfg)
-            return SkPipeline([
-                ("bulkformer_representation", build_embedding_representation(
-                    embedding_config(self.cfg), int(self.cfg.runtime.random_state), backend
-                )),
-                ("classifier", builder()),
-            ])
+            estimator = builder()
+            if self._bulkformer_reduction_active():
+                backend = embedding_backend(self.cfg)
+                estimator = SkPipeline([
+                    ('bulkformer_representation', build_embedding_representation(
+                        embedding_config(self.cfg), int(self.cfg.runtime.random_state), backend)),
+                    ('classifier', estimator)])
+            if self._partition_active():
+                from omiclass.train.scoped import PartitionClassifier
+                estimator = PartitionClassifier(estimator, getattr(self, 'preprocessor', None),
+                    self.cfg.runtime.feature_selection, seed=int(self.cfg.runtime.random_state),
+                    inner_cv=int(self.cfg.runtime.tuning.inner_cv or 3))
+            return estimator
         return wrapped_builder
 
+    def _partition_active(self):
+        return getattr(self, 'preprocessor', None) is not None or self.cfg.runtime.feature_selection.enabled
+
     def _reduction_space(self, space: dict) -> dict:
-        if not self._bulkformer_reduction_active():
-            return space
-        return {f"classifier__{key}": value for key, value in space.items()}
+        prefix = ('estimator__' if self._partition_active() else '') + ('classifier__' if self._bulkformer_reduction_active() else '')
+        return {prefix + key: value for key, value in space.items()}
 
     def _reduction_fit_kwargs(self, fit_kwargs: dict | None) -> dict:
         values = dict(fit_kwargs or {})
-        if not self._bulkformer_reduction_active():
-            return values
-        return {f"classifier__{key}": value for key, value in values.items()}
+        prefix = ('estimator__' if self._partition_active() else '') + ('classifier__' if self._bulkformer_reduction_active() else '')
+        return {prefix + key: value for key, value in values.items()}
 
     # Internal helpers
     def _safe_inner_cv(self, y: pd.Series, cv: int, seed: int):
@@ -116,6 +121,13 @@ class Trainer:
         if inner == 0:
             # Cannot split safely; skip tuning
             return {}
+        if self._partition_active() and runt.feature_selection.enabled:
+            from omiclass.train.cv_engine import inner_select_recipe
+            _, params, _, _ = inner_select_recipe(model_builder=base_builder, Xtr=X, ytr=y,
+                tune_space=space, tune_iter=self._tune_iterations(), tune_scoring=runt.scoring,
+                tune_inner_cv=int(tun.inner_cv or 3), seed=int(runt.random_state),
+                n_jobs=int(runt.n_jobs), feature_cfg=runt.feature_selection, fit_kwargs=fit_kwargs)
+            return params
             
         try:
             model = base_builder()
@@ -404,7 +416,7 @@ class Trainer:
             cvres, consensus_genes, full_info = self._save_genesets_from_cvres(
                 model_key=key, cvres=cvres, feature_selection_cfg=fs
             )
-            if consensus_genes:
+            if consensus_genes and not self._partition_active():
                 X = X.loc[:, consensus_genes]
 
         self.cv_results[key] = cvres
@@ -587,7 +599,7 @@ class Trainer:
         )
         if fs is not None and bool(getattr(fs, "enabled", False)):
             cvres, consensus_genes, full_info = self._save_genesets_from_cvres(model_key=key, cvres=cvres, feature_selection_cfg=fs)
-            if consensus_genes and len(consensus_genes) > 0:
+            if consensus_genes and len(consensus_genes) > 0 and not self._partition_active():
                 X = X.loc[:, consensus_genes]
 
         self.cv_results[key] = cvres
@@ -621,6 +633,8 @@ class Trainer:
         per_fold_best = [m.get("best_rounds") for m in cvres.per_fold_metrics]
         cap = None
         estimator_key = "classifier__n_estimators" if self._bulkformer_reduction_active() else "n_estimators"
+        if self._partition_active():
+            estimator_key = 'estimator__' + estimator_key
         if best_params and estimator_key in best_params:
             cap = int(best_params[estimator_key])
         
@@ -788,10 +802,13 @@ class Trainer:
             xgb_key=xgb_key,
             lgbm_key=lgbm_key,
         )()
+        if getattr(self, 'preprocessor', None) is not None and final_stack.passthrough:
+            from sklearn.base import clone
+            final_stack.passthrough_preprocessor_ = clone(self.preprocessor).fit(X, y)
         if fs is not None and bool(getattr(fs, "enabled", False)):
             rf_cvres = self.cv_results.get(rf_key)
             consensus = getattr(rf_cvres, "geneset_consensus_genes", None) if rf_cvres is not None else None
-            if consensus:
+            if consensus and not self._partition_active():
                 X = X.loc[:, list(consensus)]
 
 

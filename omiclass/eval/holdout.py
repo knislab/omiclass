@@ -14,6 +14,9 @@ def _match_features_to_model(X: pd.DataFrame, model) -> pd.DataFrame:
     Ensures that X has the features expected by the model,
     reordering columns as needed and adding missing columns with zeros.
     """
+    from omiclass.train.scoped import fitted_partitions
+    if fitted_partitions(model):
+        return X  # New fitted preprocessors validate and order their own inputs.
     representation = _bulkformer_representation_from_model(model)
     if representation is not None:
         expected = list(representation.feature_names_in_)
