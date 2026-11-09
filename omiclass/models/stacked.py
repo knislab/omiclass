@@ -6,99 +6,96 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.utils.validation import check_is_fitted
 from sklearn.preprocessing import LabelEncoder
+from sklearn.utils import Bunch
 import pandas as pd
 import numpy as np
+
+
+def probability_columns(names, classes):
+    # Retain both columns for binary classification, as in the existing stack.
+    return [f"{name}_prob_{label}" for name in names for label in classes]
+
+
+def aligned_base_probabilities(estimators, X, classes):
+    """One probability layout for OOF generation and deployed stack inference."""
+    from omiclass.train.scoped import fitted_partitions
+    if not estimators:
+        raise ValueError("Stack probability layout requires fitted base estimators")
+    blocks = []
+    for name, estimator in estimators:
+        features = HonestStackingClassifier._get_est_feature_names(estimator)
+        Xi = X
+        if features is not None and not fitted_partitions(estimator):
+            missing = [feature for feature in features if feature not in X.columns]
+            if missing:
+                raise ValueError(f"Stack base '{name}' lacks fitted input features: {missing[:5]}")
+            Xi = X.loc[:, features]
+        fitted_classes = list(estimator.classes_)
+        if len(fitted_classes) != len(classes) or set(fitted_classes) != set(classes):
+            raise ValueError(f"Stack base '{name}' has incompatible fitted classes")
+        proba = np.asarray(estimator.predict_proba(Xi), dtype=float)
+        if proba.shape != (len(X), len(fitted_classes)) or not np.isfinite(proba).all():
+            raise ValueError(f"Stack base '{name}' returned invalid probabilities")
+        blocks.append(proba[:, [fitted_classes.index(label) for label in classes]])
+    return pd.DataFrame(np.concatenate(blocks, axis=1), index=X.index,
+                        columns=probability_columns([name for name, _ in estimators], classes))
+
 
 # Helper stacked wrapper 
 class HonestStackingClassifier(StackingClassifier):
     def fit_honest(self, X, y, Z_oof):
-        # 1. Setup fitted state
+        if not isinstance(X, pd.DataFrame) or not X.index.is_unique or not X.columns.is_unique:
+            raise ValueError("Stack fitting requires unique DataFrame sample IDs and feature names")
+        if isinstance(y, pd.Series) and not y.index.equals(X.index):
+            raise ValueError("Stack labels must follow the input sample index")
+        self._label_encoder = LabelEncoder().fit(y)
+        self.classes_ = self._label_encoder.classes_
+        if len(self.classes_) < 2:
+            raise ValueError("Stack fitting requires at least two classes")
+        names = [name for name, _ in self.estimators]
+        if not names or len(names) != len(set(names)):
+            raise ValueError("Stack base names must be nonempty and unique")
         self.estimators_ = [est for _, est in self.estimators]
-        first_est = self.estimators_[0]
-        if hasattr(first_est, "classes_"):
-            actual_labels = first_est.classes_
-        elif hasattr(first_est, "estimator") and hasattr(first_est.estimator, "classes_"):
-            actual_labels = first_est.estimator.classes_
-        else:
-            actual_labels = np.unique(y)
-
-        n_classes = len(actual_labels)
-        
-        extended_names = []
-        for name, _ in self.estimators:
-            for lbl in actual_labels:
-                extended_names.append(f"{name}_prob_{lbl}")
-
-        if Z_oof.shape[1] != len(extended_names):
-            raise ValueError(
-                f"Dimension Mismatch: Z_oof has {Z_oof.shape[1]} columns, "
-                f"but we expected {len(extended_names)} based on "
-                f"{len(self.estimators)} models and {n_classes} classes."
-            )
-
-        Z_df = pd.DataFrame(Z_oof, index=X.index, columns=extended_names)
-        
+        for estimator in self.estimators_:
+            check_is_fitted(estimator)
+            if set(estimator.classes_) != set(self.classes_):
+                raise ValueError("Stack base classes must match the training classes")
+        self.named_estimators_ = Bunch(**dict(self.estimators))
+        self.probability_columns_ = probability_columns(names, self.classes_)
+        if isinstance(Z_oof, pd.DataFrame):
+            if not Z_oof.index.equals(X.index) or list(Z_oof.columns) != self.probability_columns_:
+                raise ValueError("Stack OOF sample index or probability-column layout mismatch")
+        values = np.asarray(Z_oof, dtype=float)
+        if values.shape != (len(X), len(self.probability_columns_)) or not np.isfinite(values).all():
+            raise ValueError("Stack OOF probabilities have invalid shape or nonfinite values")
+        Z_df = pd.DataFrame(values, index=X.index, columns=self.probability_columns_)
         prep = getattr(self, 'passthrough_preprocessor_', None)
-        X_pass = prep.transform(X) if prep is not None else X
-        Z_final = pd.concat([Z_df, X_pass], axis=1) if self.passthrough else Z_df
-
-        self.final_estimator_ = clone(self.final_estimator)
-        self.final_estimator_.fit(Z_final, y)
-        
-        self.classes_ = actual_labels
-        self.stack_method_ = [self.stack_method] * len(self.estimators_)
-
-        self._label_encoder = LabelEncoder()
-        self._label_encoder.fit(y)
-        
-        self._n_features_in = X.shape[1]
-        if hasattr(X, "columns"):
-            self._feature_names_in = np.array(X.columns, dtype=object)
-            
-        # Also try to set the public ones with a try-except just in case
-        try:
-            self.n_features_in_ = X.shape[1]
-            if hasattr(X, "columns"):
-                self.feature_names_in_ = np.array(X.columns, dtype=object)
-        except AttributeError:
-            pass
-
-        self._base_features_in_ = {}
-        for (name, est) in self.estimators:
-            feats = self._get_est_feature_names(est)
-            if feats is not None:
-                self._base_features_in_[name] = feats
-
-        if self.passthrough and hasattr(X, "columns"):
+        if self.passthrough:
+            X_pass = prep.transform(X) if prep is not None else X
             self._passthrough_features_in_ = list(X_pass.columns)
-
-
+            self.passthrough_columns_ = [f"passthrough_{i}_{name}" for i, name in enumerate(X_pass.columns)]
+            Z_df = pd.concat([Z_df, X_pass.set_axis(self.passthrough_columns_, axis=1)], axis=1)
+        self.meta_feature_columns_ = list(Z_df.columns)
+        self.final_estimator_ = clone(self.final_estimator)
+        self.final_estimator_.fit(Z_df, self._label_encoder.transform(y))
+        self.stack_method_ = ['predict_proba'] * len(self.estimators_)
+        self._n_features_in = X.shape[1]
+        self.feature_names_in_ = self._feature_names_in = np.asarray(X.columns, dtype=object)
+        self._base_features_in_ = {name: self._get_est_feature_names(est) for name, est in self.estimators}
+        self._stack_schema_version_ = 1
         return self
     
     def fit(self, X, y, sample_weight=None):
-        if not hasattr(self, "estimators_"):
-            self.estimators_ = [est for _, est in self.estimators]
+        raise ValueError("Stack fitting requires training-only OOF probabilities; use Trainer or fit_honest")
 
-        Z = self._transform(X)
-        
-        from sklearn.base import clone
-        self.final_estimator_ = clone(self.final_estimator)
-        self.final_estimator_.fit(Z, y)
-        
-        self.classes_ = np.unique(y)
-        if not hasattr(self, "_label_encoder"):
-            self._label_encoder = LabelEncoder().fit(y)
-            
-        self.stack_method_ = [self.stack_method] * len(self.estimators_)
-        self._n_features_in = X.shape[1]
-        self.n_features_in_ = X.shape[1]
-        if hasattr(X, "columns"):
-            self.feature_names_in_ = np.array(X.columns, dtype=object)
-            self._feature_names_in = np.array(X.columns, dtype=object)
-        
-        return self
+    @property
+    def n_features_in_(self):
+        if getattr(self, '_stack_schema_version_', None) == 1:
+            return self._n_features_in
+        return super().n_features_in_
     
-    def _get_est_feature_names(self, est):
+    @staticmethod
+    def _get_est_feature_names(est):
         # 1) sklearn-style
         fn = getattr(est, "feature_names_in_", None)
         if fn is not None:
@@ -116,6 +113,23 @@ class HonestStackingClassifier(StackingClassifier):
         return None
     
     def _transform(self, X):
+        if getattr(self, '_stack_schema_version_', None) != 1:
+            return self._legacy_transform(X)
+        if not isinstance(X, pd.DataFrame) or not X.columns.is_unique:
+            raise ValueError("Stack prediction requires a DataFrame with unique feature names")
+        Z = aligned_base_probabilities(self.estimators, X, self.classes_)
+        if self.passthrough:
+            prep = getattr(self, 'passthrough_preprocessor_', None)
+            current = prep.transform(X) if prep is not None else X
+            missing = set(self._passthrough_features_in_) - set(current.columns)
+            if missing:
+                raise ValueError(f"Stack passthrough lacks fitted features: {sorted(missing, key=str)[:5]}")
+            current = current.loc[:, self._passthrough_features_in_]
+            Z = pd.concat([Z, current.set_axis(self.passthrough_columns_, axis=1)], axis=1)
+        return Z.loc[:, self.meta_feature_columns_]
+
+    def _legacy_transform(self, X):
+        # Historical saved models retain their original ordering/zero-fill path.
         if not hasattr(X, "reindex"):
             raise ValueError("HonestStackingClassifier requires pandas DataFrame for feature alignment.")
 

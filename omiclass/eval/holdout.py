@@ -15,6 +15,8 @@ def _match_features_to_model(X: pd.DataFrame, model) -> pd.DataFrame:
     reordering columns as needed and adding missing columns with zeros.
     """
     from omiclass.train.scoped import fitted_partitions
+    if getattr(model, '_stack_schema_version_', None) == 1:
+        return X  # Each stack base and passthrough validates its own fitted schema.
     if fitted_partitions(model):
         return X  # New fitted preprocessors validate and order their own inputs.
     representation = _bulkformer_representation_from_model(model)

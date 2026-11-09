@@ -303,6 +303,105 @@ class Trainer:
         joblib.dump(export_model, path)
         return path
 
+    def _candidate_setup(self, key, X, y, model_conf=None):
+        """Shared native candidate recipe, also used inside stacking partitions."""
+        r = self.cfg.runtime
+        is_rf = key.endswith('random_forest')
+        if model_conf is None:
+            model_conf = (self.cfg.models.random_forest.defaults if is_rf else
+                          self.cfg.models.xgboost if 'xgboost' in key else self.cfg.models.light_gbm)
+        raw = self._compose_raw_params(model_key=key, model_conf=model_conf)
+        if is_rf:
+            variant = getattr(self.cfg.models.random_forest.variants, key)
+            if variant.class_weight is not None:
+                raw['class_weight'] = variant.class_weight
+        else:
+            raw = apply_auto_config(key, raw, y)
+            if key == 'weighted_light_gbm':
+                raw['class_weight'] = 'balanced'
+        init_params, fit_kwargs = split_init_and_fit_kwargs(key, raw)
+        if 'xgboost' in key:
+            init_params.update(random_state=int(r.random_state), seed=int(r.random_state), n_jobs=1, nthread=1)
+        elif 'light_gbm' in key:
+            init_params.update(random_state=int(r.random_state), seed=int(r.random_state),
+                feature_fraction_seed=int(r.random_state), bagging_seed=int(r.random_state),
+                data_random_seed=int(r.random_state), drop_seed=int(r.random_state),
+                deterministic=True, force_col_wise=True, n_jobs=1)
+        fit_kwargs.pop('early_stopping_rounds', None)
+        fit_kwargs.pop('early_stopping', None)
+
+        def builder():
+            estimator = get_builder(key, random_state=int(r.random_state),
+                n_jobs=int(r.n_jobs), override_params=init_params)()
+            if not is_rf and 'n_jobs' in estimator.get_params(deep=False):
+                estimator.set_params(n_jobs=1)
+            return estimator
+
+        if is_rf:
+            prefix = '' if key in ('plain_random_forest', 'weighted_random_forest') else 'rf__'
+            space = build_rf_search_space(X, model_conf.search_space, prefix=prefix)
+        elif 'xgboost' in key:
+            space = build_xgb_param_grid(X, model_conf.param_grid)
+        else:
+            space = build_lgbm_param_grid(X, model_conf.param_grid)
+        return (self._with_bulkformer_reduction(builder), self._reduction_space(space),
+                self._reduction_fit_kwargs(fit_kwargs), getattr(model_conf, 'calibration', None))
+
+    def _fit_stacking_bases(self, X, y):
+        """Select/refit the original three base families using this fit's labels."""
+        r = self.cfg.runtime
+        scoring = str(getattr(r.tuning, 'scoring_override', None) or r.scoring)
+        allowed = self._model_keys_for_labels(y)
+        families = dict(rf=[key for key in allowed if key.endswith('random_forest')],
+                        xgb=[key for key in allowed if 'xgboost' in key],
+                        lgbm=[key for key in allowed if 'light_gbm' in key])
+        estimators, details = [], {}
+        for family, keys in families.items():
+            recipes, rows, failures = {}, [], {}
+            for key in keys:
+                try:
+                    builder, space, kwargs, cal = self._candidate_setup(key, X, y)
+                    recipes[key] = (builder, kwargs, cal)
+                    # A single eligible variant has no model-selection decision.
+                    score = {}
+                    if len(keys) > 1:
+                        cvres = nested_oof_cv(model_builder=builder, X=X, y=y,
+                            outer_splits=int(r.cv_folds), seed=int(r.random_state),
+                            tune_space=space, tune_iter=self._tune_iterations(), tune_scoring=scoring,
+                            tune_inner_cv=int(r.tuning.inner_cv or 3), n_jobs=int(r.n_jobs),
+                            feature_cfg=r.feature_selection,
+                            eval_calibrated_in_cv=bool(getattr(cal, 'calibrate', False)),
+                            calib_method=str(getattr(cal, 'method', 'sigmoid')), calib_cv=int(r.cv_folds),
+                            calibration_ensemble=bool(getattr(cal, 'ensemble', False)), fit_kwargs=kwargs)
+                        score = selection_summary(cvres.per_fold_metrics, scoring)
+                    rows.append(dict(model=key, status='ok', **score))
+                except Exception as error:
+                    failures[key] = f'{type(error).__name__}: {error}'
+            if not rows:
+                raise ValueError(f"No completed stacking candidates for {family}: {failures}")
+            ordered = ([rows[0]['model']] if len(keys) == 1 else
+                       rank_candidates(pd.DataFrame(rows), recipes, scoring)[0].model.tolist())
+            for key in ordered:
+                try:
+                    builder, kwargs, cal = recipes[key]
+                    params = self._tune_full(key, builder, X, y, fit_kwargs=kwargs)
+                    def tuned_builder():
+                        return builder().set_params(**params)
+                    estimator = self._fit_final(tuned_builder, X, y,
+                        calibrate=bool(getattr(cal, 'calibrate', False)),
+                        method=str(getattr(cal, 'method', 'sigmoid')), cv=int(r.cv_folds),
+                        seed=int(r.random_state), fit_kwargs=kwargs,
+                        ensemble=bool(getattr(cal, 'ensemble', False)))
+                    estimators.append((family, estimator))
+                    details[family] = dict(selected_key=key, fit_ids=X.index.tolist(),
+                        best_params=params, candidate_scores=rows, failures=failures)
+                    break
+                except Exception as error:
+                    failures[key] = f'{type(error).__name__}: {error}'
+            else:
+                raise ValueError(f"No fitted stacking candidates for {family}: {failures}")
+        return estimators, details
+
     def _write_bulkformer_reduction_artifacts(self, model, cvres: CVResult, model_key: str) -> None:
         representation = _bulkformer_representation_from_model(model)
         if representation is None:
@@ -354,6 +453,43 @@ class Trainer:
             }).to_csv(out / "pca_explained_variance.csv", index=False)
     
 
+    def _model_keys_for_labels(self, y):
+        model_imbalance_ = self.cfg.runtime.imbalance
+        info = assess_imbalance(y, mild_threshold=model_imbalance_.mild_threshold, severe_threshold=model_imbalance_.severe_threshold)
+        sev = info["severity"]
+        model_keys_by_severity = {
+            Severity.BALANCED: (
+                "plain_random_forest",
+                "light_gbm",
+                "xgboost",
+                "stacked_ensemble",
+            ),
+            Severity.MILD: (
+                "plain_random_forest",
+                "weighted_random_forest",
+                "light_gbm",
+                "weighted_light_gbm",
+                "xgboost",
+                "weighted_xgboost",
+                "stacked_ensemble",
+            ),
+            Severity.SEVERE: (
+                "plain_random_forest",
+                "weighted_random_forest",
+                "smote_random_forest",
+                "adasyn_random_forest",
+                "svm_smote_random_forest",
+                "bl_smote_random_forest",
+                "light_gbm",
+                "weighted_light_gbm",
+                "xgboost",
+                "weighted_xgboost",
+                "stacked_ensemble",
+            ),
+        }
+        return model_keys_by_severity[sev]
+
+
     # ----- per-variant -----
     def run_rf_variant(self, key: str, X: pd.DataFrame, y: pd.Series, filename_for_artifact: str) -> tuple[dict, Path]:
         r = self.cfg.runtime
@@ -363,21 +499,8 @@ class Trainer:
         cvs = r.cv_folds
 
 
-        raw = self._compose_raw_params(model_key=key, model_conf=rf_cfg.defaults)
-
-        variant_cfg = getattr(rf_cfg.variants, key)
-        if getattr(variant_cfg, "class_weight", None) is not None:
-            raw["class_weight"] = variant_cfg.class_weight
-
-        init_params, fit_kwargs = split_init_and_fit_kwargs(key, raw)
-
-        base_builder = get_builder(key, random_state=int(r.random_state), n_jobs=int(r.n_jobs), override_params=init_params,)
-        base_builder = self._with_bulkformer_reduction(base_builder)
+        base_builder, space, fit_kwargs, cal = self._candidate_setup(key, X, y)
         self.builders[key] = base_builder
-
-        prefix = "" if key in ("plain_random_forest", "weighted_random_forest") else "rf__"
-        space = self._reduction_space(build_rf_search_space(X, rf_cfg.defaults.search_space, prefix=prefix))
-
 
         fs = getattr(r, "feature_selection", None)
         tun = getattr(r, "tuning", None)
@@ -400,7 +523,7 @@ class Trainer:
             calib_method=str(cal.method),
             calib_cv=cvs,
             calibration_ensemble=bool(cal.ensemble),
-            fit_kwargs=self._reduction_fit_kwargs(fit_kwargs),
+            fit_kwargs=fit_kwargs,
         )
 
         if fs is not None and bool(getattr(fs, "enabled", False)):
@@ -471,7 +594,7 @@ class Trainer:
             method=cal.method,
             cv=int(cvs),
             seed=int(r.random_state),
-            fit_kwargs=self._reduction_fit_kwargs(fit_kwargs),
+            fit_kwargs=fit_kwargs,
             ensemble=bool(cal.ensemble),
         )
 
@@ -486,72 +609,14 @@ class Trainer:
     def run_boosting(self, key, X: pd.DataFrame, y: pd.Series, filename_for_artifact: str, model_conf: Config) -> tuple[dict, Path]:
         r = self.cfg.runtime
 
-        raw = self._compose_raw_params(model_key=key, model_conf=model_conf)
-        raw = apply_auto_config(key, raw, y)
-
         if self.class_name_map is None:
             self.class_name_map = _build_class_name_map(y, self.cfg)
-
-
-        if key == "weighted_light_gbm":
-            raw["class_weight"] = "balanced"
-
-        init_params, fit_kwargs = split_init_and_fit_kwargs(key, raw)
-        if "xgboost" in key:
-            init_params.update(
-                random_state=int(r.random_state),
-                seed=int(r.random_state),
-                n_jobs=1,
-                nthread=1,
-            )
-        elif "light_gbm" in key:
-            init_params.update(
-                random_state=int(r.random_state),
-                seed=int(r.random_state),
-                feature_fraction_seed=int(r.random_state),
-                bagging_seed=int(r.random_state),
-                data_random_seed=int(r.random_state),
-                drop_seed=int(r.random_state),
-                deterministic=True,
-                force_col_wise=True,
-                n_jobs=1,
-            )
-        if key == "weighted_light_gbm":
-            tmp_builder = get_builder(
-                key,
-                random_state=int(r.random_state),
-                n_jobs=int(r.n_jobs),
-                override_params=init_params,
-            )
-            tmp_est = tmp_builder()
-
-        fit_kwargs.pop("early_stopping_rounds", None)
-        fit_kwargs.pop("early_stopping", None)
-
-        def unwrapped_builder():
-            est_builder = get_builder(
-                key,
-                random_state=int(r.random_state),
-                n_jobs=int(r.n_jobs),
-                override_params=init_params,
-            )
-            est = est_builder()
-            if hasattr(est, "get_params") and "n_jobs" in est.get_params(deep=False):
-                est.set_params(n_jobs=1)
-            return est
-
-        base_builder = self._with_bulkformer_reduction(unwrapped_builder)
-            
-        if "xgboost" in key:
-            space = self._reduction_space(build_xgb_param_grid(X, model_conf.param_grid))
-        else:
-            space = self._reduction_space(build_lgbm_param_grid(X, model_conf.param_grid))
+        base_builder, space, fit_kwargs, cal = self._candidate_setup(key, X, y, model_conf=model_conf)
 
         fs = getattr(r, "feature_selection", None)
         tun = getattr(r, "tuning", None)
         scoring = str(getattr(tun, "scoring_override", None) or r.scoring)
 
-        cal = getattr(model_conf, "calibration", None)
         eval_calibrated_in_cv = bool(getattr(cal, "calibrate", False))
         cal_method = str(getattr(cal, "method", "sigmoid")) if cal is not None else "sigmoid"
         cvs = r.cv_folds
@@ -573,7 +638,7 @@ class Trainer:
             calib_method=cal_method,
             calib_cv=cvs,
             calibration_ensemble=bool(getattr(cal, "ensemble", False)),
-            fit_kwargs=self._reduction_fit_kwargs(fit_kwargs),
+            fit_kwargs=fit_kwargs,
         )
         if fs is not None and bool(getattr(fs, "enabled", False)):
             cvres, consensus_genes, full_info = self._save_genesets_from_cvres(model_key=key, cvres=cvres, feature_selection_cfg=fs)
@@ -605,7 +670,6 @@ class Trainer:
             )
         
         # Final production model on ALL data (calibrated if YAML says so)
-        fit_kwargs = self._reduction_fit_kwargs(fit_kwargs)
         best_params = self._tune_full(key, base_builder, X, y, fit_kwargs=fit_kwargs)
 
         per_fold_best = [m.get("best_rounds") for m in cvres.per_fold_metrics]
@@ -710,21 +774,10 @@ class Trainer:
         xgb_key = self.best_boosting_key_from_cv(["xgboost", "weighted_xgboost"])
         lgbm_key = self.best_boosting_key_from_cv(["light_gbm", "weighted_light_gbm"])
 
-        rf_cfg = self.cfg.models.random_forest
-        prefix = "" if rf_key in ("plain_random_forest", "weighted_random_forest") else "rf__"
-        rf_space = self._reduction_space(build_rf_search_space(X, rf_cfg.defaults.search_space, prefix=prefix))
-        xgb_space = self._reduction_space(build_xgb_param_grid(X, self.cfg.models.xgboost.param_grid))
-        lgbm_space = self._reduction_space(build_lgbm_param_grid(X, self.cfg.models.light_gbm.param_grid))
-
         fs = getattr(r, "feature_selection", None)
         tun = getattr(r, "tuning", None)
         scoring = str(getattr(tun, "scoring_override", None) or r.scoring)
 
-        base_specs = [
-            (rf_key, self.builders[rf_key], rf_space),
-            (xgb_key,  self.builders[xgb_key], xgb_space),
-            (lgbm_key,  self.builders[lgbm_key], lgbm_space),
-        ]
         # --- meta builder ---
         def meta_builder():
             return LogisticRegression(
@@ -734,7 +787,7 @@ class Trainer:
             )
 
         stack_cvres, _Z_oof = train_oof_stacker(
-            base_specs=base_specs,
+            base_specs=[],
             X=X,
             y=y,
             outer_splits=int(r.cv_folds),
@@ -745,11 +798,9 @@ class Trainer:
             n_jobs=int(r.n_jobs),
             feature_cfg=fs,
             meta_builder=meta_builder,
-            base_calibration={rf_key: dict(
-                calibrate=bool(rf_cfg.defaults.calibration.calibrate),
-                method=str(rf_cfg.defaults.calibration.method),
-                ensemble=bool(rf_cfg.defaults.calibration.ensemble),
-            )},
+            fit_bases=self._fit_stacking_bases,
+            passthrough=bool(stack_cfg.passthrough),
+            passthrough_preprocessor=getattr(self, 'preprocessor', None),
         )
 
         self.cv_results[key] = stack_cvres
@@ -765,11 +816,6 @@ class Trainer:
         row.update(selection_summary(stack_cvres.per_fold_metrics, scoring))
         if self._bulkformer_reduction_active():
             row["bulkformer_reduction_strategy"] = embedding_config(self.cfg).reduction.strategy
-        from sklearn.utils.validation import check_is_fitted
-        try:
-            check_is_fitted(self.final_models[rf_key])
-        except Exception as e:
-            pass
         final_stack = get_builder(
             "stacked_ensemble",
             random_state=int(r.random_state),
@@ -788,20 +834,21 @@ class Trainer:
         if getattr(self, 'preprocessor', None) is not None and final_stack.passthrough:
             from sklearn.base import clone
             final_stack.passthrough_preprocessor_ = clone(self.preprocessor).fit(X, y)
-        if fs is not None and bool(getattr(fs, "enabled", False)):
-            rf_cvres = self.cv_results.get(rf_key)
-            consensus = getattr(rf_cvres, "geneset_consensus_genes", None) if rf_cvres is not None else None
-            if consensus and not self._partition_active():
-                X = X.loc[:, list(consensus)]
-
-
-        if hasattr(final_stack, "fit_honest"):
-            final_stack.fit_honest(X, y, Z_oof=_Z_oof)         # preferred (OOF meta)
-        else:
-            final_stack.fit(X, y)                              # fallback (non-OOF meta)
+        # Each base receives its own fitted schema. RF consensus must never
+        # truncate the common input needed by the other bases or passthrough.
+        final_stack.fit_honest(X, y, Z_oof=pd.DataFrame(_Z_oof, index=X.index,
+            columns=stack_cvres.stacking_probability_columns))
 
         saved_path = self._save_model(final_stack, filename_for_artifact)
         self.final_models[key] = final_stack
+        scope = dict(outer_folds=stack_cvres.per_fold_metrics,
+            final_oof_scopes=stack_cvres.stacking_final_oof_scopes,
+            final_base_models=dict(rf=rf_key, xgb=xgb_key, lgbm=lgbm_key),
+            probability_columns=final_stack.probability_columns_,
+            meta_feature_columns=final_stack.meta_feature_columns_,
+            input_features=list(final_stack.feature_names_in_))
+        (self.artifacts_dir / 'stacking_fit_scope.json').write_text(
+            json.dumps(scope, indent=2, default=str), encoding='utf-8')
 
         # Report
         class_name_map = _build_class_name_map(y, self.cfg)
@@ -816,7 +863,7 @@ class Trainer:
             cfg_short={
                 "cv_folds": int(r.cv_folds),
                 "scoring": scoring,
-                "base_models": [rf_key, "xgboost", "light_gbm"],
+                "base_models": [rf_key, xgb_key, lgbm_key],
                 "meta": f"logreg(solver={logr.solver}, max_iter={logr.max_iter})",
                 "passthrough": bool(getattr(stack_cfg, "passthrough", True)),
             },
@@ -838,46 +885,13 @@ class Trainer:
         self.builders.clear()
         self._failed_keys = set()
         rf_var = self.cfg.models.random_forest.variants
-        model_imbalance_ = self.cfg.runtime.imbalance
-        info = assess_imbalance(y, mild_threshold=model_imbalance_.mild_threshold, severe_threshold=model_imbalance_.severe_threshold)
-        sev = info["severity"]
+        selected_model_keys = self._model_keys_for_labels(y)
         lgbm_file_name = self.cfg.models.light_gbm.filename
         xgboost_file_name = self.cfg.models.xgboost.filename
         stacked_file_name = self.cfg.models.stacked_ensemble.filename
         lgbm_cw_file_name = self.cfg.models.light_gbm.weighted_filename
         xgb_cw_file_name = self.cfg.models.xgboost.weighted_filename
 
-        model_keys_by_severity = {
-            Severity.BALANCED: (
-                "plain_random_forest",
-                "light_gbm",
-                "xgboost",
-                "stacked_ensemble",
-            ),
-            Severity.MILD: (
-                "plain_random_forest",
-                "weighted_random_forest",
-                "light_gbm",
-                "weighted_light_gbm",
-                "xgboost",
-                "weighted_xgboost",
-                "stacked_ensemble",
-            ),
-            Severity.SEVERE: (
-                "plain_random_forest",
-                "weighted_random_forest",
-                "smote_random_forest",
-                "adasyn_random_forest",
-                "svm_smote_random_forest",
-                "bl_smote_random_forest",
-                "light_gbm",
-                "weighted_light_gbm",
-                "xgboost",
-                "weighted_xgboost",
-                "stacked_ensemble",
-            ),
-        }
-        selected_model_keys = model_keys_by_severity[sev]
 
         if self.cfg.surface_markers.enabled and not embedding_enabled(self.cfg):
             sm_genes = apply_surface_marker_filter_with_min(X.columns.tolist(), min_features=self.cfg.runtime.min_features)

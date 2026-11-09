@@ -268,7 +268,9 @@ def test_stacking_base_fits_are_weighted_and_rf_calibration_is_reused(weight_spy
     expected = nested_oof_cv(**rf_kwargs)
     np.testing.assert_allclose(Z[:, :3], expected.oof_proba)
     assert np.isfinite(result.oof_proba).all()
-    assert len(weight_spy) == 3
+    # Nested stack evaluation now refits bases within each outer training set,
+    # in addition to generating the full-training OOF used by the final meta fit.
+    assert len(weight_spy) > 3
     assert_local_weights(weight_spy)
 
 
