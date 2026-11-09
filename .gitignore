@@ -36,6 +36,7 @@ final_results_runs/
 comparison_tools/
 experiments/
 thesis_plots/
+!/data01/private/projects/omiclass/experiments/reference_preprocessing
 
 # Version only the additive BulkRNABert launchers; keep all run data ignored.
 examples/results/Docker_results/de_results/limma_voom_selected_genes.txt
@@ -50,7 +51,8 @@ examples/results/Bash_results/train_artifacts/genesets/**
 BulkFormer/**
 CellFM/**
 BulkFormer/**
-
+manuscript_figures/**
+manuscript_statistics/
 # Local CellFM runtime assets and generated embeddings
 CellFM/CellFM-torch/
 CellFM/weights/
@@ -76,12 +78,5 @@ CellFM/vendor/
 !examples/results/**/*.html
 
 # Keep the projection experiment implementation; generated inputs/results stay local.
-!experiments/
-experiments/*
-!experiments/reference_preprocessing/
-experiments/reference_preprocessing/*
-!experiments/reference_preprocessing/*.py
-!experiments/reference_preprocessing/*.R
-!experiments/reference_preprocessing/*.sh
-!experiments/reference_preprocessing/*.md
-!experiments/reference_preprocessing/.gitignore
+
+
