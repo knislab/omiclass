@@ -50,6 +50,8 @@ examples/results/Bash_results/train_artifacts/genesets/**
 BulkFormer/**
 CellFM/**
 BulkFormer/**
+manuscript_figures/**
+manuscript_statistics/**
 
 # Local CellFM runtime assets and generated embeddings
 CellFM/CellFM-torch/
