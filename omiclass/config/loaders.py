@@ -41,6 +41,17 @@ def load_config(cli_overrides: Optional[Dict[str, Any]] = None) -> Config:
                 with open(config_full_path, "r", encoding="utf-8") as f:
                     base_data = yaml.safe_load(f) or {}
 
+        foundation = cli_overrides.get("foundation", {})
+        if foundation.get("enabled") and foundation.get("mode") == "predict":
+            run_dir = foundation.get("run_dir")
+            if run_dir is None:
+                raise ValueError("Prediction requires foundation.run_dir")
+            saved_path = Path(run_dir) / "config.freeze.yaml"
+            with saved_path.open(encoding="utf-8") as stream:
+                base_data = yaml.safe_load(stream) or {}
+            if not base_data.get("foundation", {}).get("enabled"):
+                raise ValueError("Saved run is not a foundation API run")
+
         merged = _deep_update(base_data, cli_overrides) if base_data else cli_overrides
 
         raw = Config(**merged)

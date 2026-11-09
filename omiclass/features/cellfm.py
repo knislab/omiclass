@@ -401,8 +401,9 @@ def _extract_configured_views(*, cfg: CellFMCfg, utils, torch, model, prep,
 class CellFMFeatureExtractor:
     """Generate frozen, valid-gene mean-pooled embeddings for bulk RNA-seq samples."""
 
-    def __init__(self, cfg: CellFMCfg):
+    def __init__(self, cfg: CellFMCfg, *, observer=None):
         self.cfg = cfg
+        self.observer = observer
 
     def extract(self, counts: pd.DataFrame) -> CellFMExtractionResult:
         cfg = self.cfg
@@ -458,15 +459,26 @@ class CellFMFeatureExtractor:
         model.requires_grad_(False)
 
         num_views = int(cfg.num_views)
-        embeddings, retained, seed_strategy, aggregation = _extract_configured_views(
-            cfg=cfg,
-            utils=utils,
-            torch=torch,
-            model=model,
-            prep=prep,
-            prepared=prepared,
-            device=device,
-        )
+        encode = model.net.encode
+        position = 0
+        if self.observer is not None:
+            def observed(expression, genes, st_features, valid):
+                nonlocal position
+                encoded, extra = encode(expression, genes, st_features, valid)
+                view, start = divmod(position, len(prepared.sample_ids))
+                size = len(expression)
+                self.observer(encoded[:, 3:], valid, genes,
+                              prepared.sample_ids[start:start+size], view, encoded[:, 0])
+                position += size
+                return encoded, extra
+            model.net.encode = observed
+        try:
+            embeddings, retained, seed_strategy, aggregation = _extract_configured_views(
+                cfg=cfg, utils=utils, torch=torch, model=model, prep=prep,
+                prepared=prepared, device=device,
+            )
+        finally:
+            model.net.encode = encode
         retained_by_view = None
         if num_views == 1:
             retained_per_sample = list(map(int, retained))

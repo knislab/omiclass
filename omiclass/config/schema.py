@@ -637,9 +637,90 @@ class ModelsCfg(BaseModel):
     xgboost: XGBoostCfg = Field(default_factory=XGBoostCfg)
     stacked_ensemble: logisticRegressionCfg = Field(default_factory=logisticRegressionCfg)
 
+class ArticleHeadCfg(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    epochs: int = Field(default=50, gt=0)
+    batch_size: int = Field(default=8, gt=0)
+    hidden_dims: List[int] = Field(default_factory=lambda: [64])
+    token_dim: int = Field(default=8, gt=0)
+    dropout: float = Field(default=0.2, ge=0, lt=1)
+    learning_rate: float = Field(default=0.001, gt=0)
+    weight_decay: float = Field(default=0.0001, ge=0)
+    smote_k_neighbors: int = Field(default=5, gt=0)
+
+    @field_validator("hidden_dims")
+    @classmethod
+    def _positive_widths(cls, values):
+        if not values or any(v <= 0 for v in values):
+            raise ValueError("hidden_dims must contain positive widths")
+        return values
+
+
+class BertHeadCfg(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    learning_rate: float = Field(default=0.001, gt=0)
+    batch_size: int = Field(default=32, gt=0)
+    max_epochs: int = Field(default=200, gt=0)
+    patience: int = Field(default=20, gt=0)
+    validation_fraction: float = Field(default=0.2, gt=0, lt=1)
+    min_delta: float = Field(default=0.0, ge=0)
+    threads: int = Field(default=1, gt=0)
+    smote_k_neighbors: int = Field(default=5, gt=0)
+
+
+class FoundationCfg(BaseModel):
+    """Opt-in manuscript protocols; legacy API calls remain on their original route."""
+    model_config = ConfigDict(extra="forbid")
+    enabled: bool = False
+    model: Literal["bulkformer", "cellfm", "cellfm_1view", "cellfm_20view", "bulkrnabert"] = "bulkformer"
+    classifier: Literal["omiclass", "foundation_classifier", "lr", "svm", "mlp", "mlp_smote"] = "omiclass"
+    representation: Literal["full", "supervised", "pca", "supervised_pca", "tokens", "cls"] = "full"
+    pooling: Literal["mean", "max_mean_median", "max", "median"] = "mean"
+    extraction_seed: int = 0
+    input_scale: Literal["counts", "tpm"] = "counts"
+    correction: Literal["none", "limma"] = "none"
+    allow_transductive_correction: bool = False
+    mode: Literal["train", "predict"] = "train"
+    prediction_scope: Literal["external", "all"] = "external"
+    run_dir: Optional[Path] = None
+    split_path: Optional[Path] = None
+    article_head: ArticleHeadCfg = Field(default_factory=ArticleHeadCfg)
+    bert_head: BertHeadCfg = Field(default_factory=BertHeadCfg)
+    lr_c_values: List[float] = Field(default_factory=lambda: [0.01, 0.1, 1.0, 10.0, 100.0])
+
+    @field_validator("lr_c_values")
+    @classmethod
+    def _positive_c(cls, values):
+        if not values or any(v <= 0 for v in values):
+            raise ValueError("LR C values must be positive")
+        return values
+
+    @model_validator(mode="after")
+    def _compatible(self):
+        if not self.enabled:
+            return self
+        backend = "cellfm" if self.model.startswith("cellfm") else self.model
+        if self.pooling != "mean" and backend != "bulkformer":
+            raise ValueError("Only BulkFormer supports alternative pooling")
+        if self.representation == "tokens" and self.classifier != "mlp":
+            raise ValueError("Full tokens support the article MLP only; no token SVM/SMOTE/LR/Omiclass protocol")
+        if self.representation == "cls" and (backend != "cellfm" or self.classifier not in {"mlp", "mlp_smote", "svm"}):
+            raise ValueError("CLS supports only CellFM diagnostic MLP, MLP+SMOTE, or SVM")
+        if self.representation in {"tokens", "cls"} and self.pooling != "mean":
+            raise ValueError("Token/CLS representations do not take a pooled-vector aggregation")
+        if self.input_scale == "tpm" and backend != "bulkrnabert":
+            raise ValueError("TPM input is supported only for BulkRNABert; BulkFormer/CellFM require counts")
+        if self.correction == "limma" and not self.allow_transductive_correction:
+            raise ValueError("Historical limma fits the supplied cohort before splitting; explicitly set allow_transductive_correction=True")
+        if self.mode == "predict" and self.run_dir is None:
+            raise ValueError("Prediction requires foundation.run_dir")
+        return self
+
+
 # ---------- top-level Config ----------
 class Config(BaseModel):
     PDF: bool = False
+    foundation: FoundationCfg = Field(default_factory=FoundationCfg)
     project: ProjectCfg = Field(default_factory=ProjectCfg)
     bulkformer: BulkFormerCfg = Field(default_factory=BulkFormerCfg)
     cellfm: CellFMCfg = Field(default_factory=CellFMCfg)
@@ -654,16 +735,73 @@ class Config(BaseModel):
     surface_markers: SurfaceMarkerCfg = Field(default_factory=SurfaceMarkerCfg)
     plots: PlotsCfg = Field(default_factory=PlotsCfg)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _connect_foundation(cls, values):
+        if not isinstance(values, dict):
+            return values
+        import copy
+        data = copy.deepcopy(values)
+        f = data.get("foundation", {})
+        if isinstance(f, FoundationCfg):
+            f = f.model_dump()
+        if not isinstance(f, dict) or not f.get("enabled", False):
+            return data
+        settings = FoundationCfg(**f)
+        if not settings.enabled:
+            return data
+        backend = "cellfm" if settings.model.startswith("cellfm") else settings.model
+        enabled = [name for name in ("bulkformer", "cellfm", "bulkrnabert")
+                   if data.get(name, {}).get("enabled", False)]
+        if any(name != backend for name in enabled):
+            raise ValueError("foundation.model conflicts with another enabled backend")
+        encoder = data.setdefault(backend, {})
+        encoder["enabled"] = True
+        if backend == "cellfm":
+            encoder.setdefault("batch_size", 4)
+        if settings.model in {"cellfm_1view", "cellfm_20view"}:
+            views = 1 if settings.model == "cellfm_1view" else 20
+            if "num_views" in encoder and encoder["num_views"] != views:
+                raise ValueError("CellFM model alias conflicts with num_views")
+            encoder["num_views"] = views
+        strategy = settings.representation if settings.representation not in {"tokens", "cls"} else "full"
+        reduction = encoder.setdefault("reduction", {})
+        if "strategy" in reduction and reduction["strategy"] != strategy:
+            raise ValueError("foundation.representation conflicts with backend reduction strategy")
+        reduction["strategy"] = strategy
+        if backend == "bulkformer":
+            aggregate = "all" if settings.pooling == "max_mean_median" else settings.pooling
+            if "aggregate_type" in encoder and encoder["aggregate_type"] != aggregate:
+                raise ValueError("foundation.pooling conflicts with bulkformer.aggregate_type")
+            encoder["aggregate_type"] = aggregate
+        runtime = data.setdefault("runtime", {})
+        fs = runtime.setdefault("feature_selection", {})
+        if fs.get("enabled", False):
+            raise ValueError("The manuscript foundation protocols require runtime.feature_selection.enabled=False")
+        fs["enabled"] = False
+        return data
+
     @model_serializer(mode="wrap")
     def _serialize_optional_bulkrnabert(self, handler):
         # Keep frozen configs/output structure identical for existing runs.
         data = handler(self)
         if not self.bulkrnabert.enabled:
             data.pop("bulkrnabert", None)
+        if not self.foundation.enabled:
+            data.pop("foundation", None)
         return data
 
     @model_validator(mode="after")
     def _final_checks(self):
+        if self.foundation.enabled:
+            if self.project.modality != "rnaseq":
+                raise ValueError("Foundation protocols require RNA-seq")
+            if self.foundation.correction == "limma":
+                bc = self.batch_correction
+                if bc.algorithm != "limma" or not bc.batch_column or bc.covariates_path or bc.n_pcs:
+                    raise ValueError("Foundation correction requires observed cohort limma with a batch column, no covariate matrix/PC removal")
+                if self.project.cluster_column in [bc.batch_column, *(bc.design_columns or [])]:
+                    raise ValueError("Outcome labels cannot be correction covariates")
         if self.batch_correction.algorithm in {"frozen_quantile", "reference_ruv", "fsva_exact"}:
             if self.project.modality != "rnaseq" or self.bulkformer.enabled or self.cellfm.enabled or self.bulkrnabert.enabled:
                 raise ValueError("Frozen expression references currently require rnaseq without embedding backends")
@@ -672,7 +810,7 @@ class Config(BaseModel):
                 raise ValueError("BulkRNABert is an alternative embedding backend; enable only one.")
             if self.project.modality != "rnaseq":
                 raise ValueError("bulkrnabert.enabled requires project.modality='rnaseq'.")
-            if self.bulkrnabert.tpm_input_path is None:
+            if self.bulkrnabert.tpm_input_path is None and not self.foundation.enabled:
                 raise ValueError("bulkrnabert.tpm_input_path must identify unlogged TPM input.")
             if self.bulkrnabert.reduction.strategy != "full" and self.runtime.feature_selection.enabled:
                 raise ValueError("runtime.feature_selection.enabled must be false when using a non-full embedding reduction strategy.")

@@ -256,3 +256,7 @@ run(
 `feature_selection_enabled` must be false for every non-`full` embedding
 strategy. The Python environment running Omiclass must also provide CellFM's
 PyTorch and MindSpore dependencies.
+
+## Manuscript foundation-model API
+
+The opt-in `foundation` configuration exposes pooled, token and diagnostic CLS representations with their distinct manuscript head protocols through `api.py`. See [configuration matrix, training protocols and saved prediction](docs/foundation-api.md). Existing marker-based calls retain their original route.

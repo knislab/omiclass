@@ -19,6 +19,16 @@ class OverrideSpec:
 
 SPEC = OverrideSpec(
     aliases={
+        "foundation": "foundation",
+        "foundation_enabled": "foundation.enabled",
+        "foundation_model": "foundation.model",
+        "foundation_classifier": "foundation.classifier",
+        "foundation_representation": "foundation.representation",
+        "foundation_pooling": "foundation.pooling",
+        "foundation_correction": "foundation.correction",
+        "foundation_mode": "foundation.mode",
+        "foundation_run_dir": "foundation.run_dir",
+        "foundation_split_path": "foundation.split_path",
         "PDF": "PDF",
         "pdf": "PDF",
 

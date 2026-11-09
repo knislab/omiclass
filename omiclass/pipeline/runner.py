@@ -6,8 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from omiclass.config.loaders import load_config
-from omiclass.cli.runtime import create_runtime_options_from_path_conf_kwargs
-from omiclass.pipeline.orchestrator import PipelineOrchestrator
 from omiclass.pipeline.runner_result import PipelineRunResult
 from omiclass.utils.clean_and_pred import has_leaderboard
 
@@ -16,6 +14,12 @@ def run_pipeline(
     **kwargs: Any,
 ) -> PipelineRunResult:
     cfg = load_config(kwargs)
+    if cfg.foundation.enabled:
+        from omiclass.foundation.runner import run_foundation
+        return run_foundation(expression_file, cfg)
+
+    from omiclass.cli.runtime import create_runtime_options_from_path_conf_kwargs
+    from omiclass.pipeline.orchestrator import PipelineOrchestrator
 
     project_out_dir = Path(cfg.project.out_dir)
     rebatch_info = None

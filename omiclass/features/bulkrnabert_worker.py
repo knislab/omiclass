@@ -17,6 +17,8 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--device', choices=['auto', 'cpu', 'gpu'], default='auto')
+    parser.add_argument('--input-scale', choices=['tpm', 'log10_tpm'], default='tpm')
+    parser.add_argument('--token-dir', type=Path)
     parser.add_argument('--shape-only', action='store_true', help='Load weights and trace output shape without allocating attention tensors.')
     args = parser.parse_args()
     if args.batch_size < 1:
@@ -56,13 +58,16 @@ def main():
         result = forward.apply(parameters, key, tokens)['embeddings_4']
         if result.shape != (tokens.shape[0], 19062, 256):
             raise ValueError(f'Unexpected embeddings_4 shape: {result.shape}')
-        return result.mean(axis=1)
+        return (result, result.mean(axis=1)) if args.token_dir is not None else result.mean(axis=1)
 
     infer = jax.jit(pooled)
     embeddings = []
+    records = []
+    if args.token_dir is not None:
+        args.token_dir.mkdir(parents=True, exist_ok=False)
     for start in range(0, len(ids), args.batch_size):
         batch = tpm[start:start + args.batch_size].copy()
-        normalized = preprocess_omic(pd.DataFrame(batch), config)
+        normalized = preprocess_omic(pd.DataFrame(batch), config) if args.input_scale == "tpm" else batch
         tokens = tokenizer.batch_tokenize(normalized)
         if tokens.min() < 0 or tokens.max() >= config.n_expressions_bins:
             raise ValueError('TPM exceeds checkpoint tokenizer bins; do not clip silently. Check input scale/checkpoint.')
@@ -71,7 +76,15 @@ def main():
             shape = jax.eval_shape(lambda x: forward.apply(parameters, key, x)['embeddings_4'], tokens).shape
             print(json.dumps({'embeddings_4_shape': list(shape), 'jax': jax.__version__}), flush=True)
             return
-        embeddings.append(np.asarray(infer(tokens), dtype=np.float32))
+        inferred = infer(tokens)
+        if args.token_dir is not None:
+            contextual, pooled_values = inferred
+            for offset, values in enumerate(np.asarray(contextual, dtype=np.float32)):
+                filename = f"record_{len(records):08d}.npy"
+                np.save(args.token_dir / filename, values, allow_pickle=False)
+                records.append(dict(sample_id=str(ids[start+offset]), view=0, file=filename))
+            inferred = pooled_values
+        embeddings.append(np.asarray(inferred, dtype=np.float32))
         print(f'[bulkrnabert] Extracted {min(start + args.batch_size, len(ids))}/{len(ids)} samples', flush=True)
     embeddings = np.concatenate(embeddings)
     if embeddings.shape != (len(ids), 256) or not np.isfinite(embeddings).all():
@@ -80,6 +93,9 @@ def main():
                 'pool_axis': 1, 'normalization_factor': float(config.normalization_factor),
                 'jax': jax.__version__, 'haiku': hk.__version__, 'numpy': np.__version__,
                 'devices': [str(d) for d in jax.devices()]}
+    if args.token_dir is not None:
+        manifest = dict(format_version=1, backend="bulkrnabert", metadata=dict(num_views=1), records=records)
+        (args.token_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))
     np.savez_compressed(args.output, embeddings=embeddings, sample_ids=ids,
                         metadata=json.dumps(metadata, sort_keys=True))
 

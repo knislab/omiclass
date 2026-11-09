@@ -308,13 +308,16 @@ def _extract_sample_embeddings(
 
 
 class BulkFormerFeatureExtractor:
-    def __init__(self, cfg: BulkFormerCfg) -> None:
+    def __init__(self, cfg: BulkFormerCfg, *, observer=None, continuous=False) -> None:
         self.cfg = cfg
+        self.observer = observer
+        self.continuous = continuous
 
     def extract(self, counts: pd.DataFrame) -> BulkFormerExtractionResult:
         cfg = self.cfg
         _validate_bulkformer_resources(cfg)
-        prepared = prepare_bulkformer_input_from_counts(counts, cfg)
+        prepared = (align_to_bulkformer_vocabulary(counts, load_bulkformer_gene_list(cfg.gene_info_path))
+                    if self.continuous else prepare_bulkformer_input_from_counts(counts, cfg))
 
         torch = _import_required("torch", "Install torch in the BulkFormer environment to enable extraction.")
         device = _resolve_device(cfg.device)
@@ -322,8 +325,23 @@ class BulkFormerFeatureExtractor:
         interested_gene_idx = _to_numpy_indices(
             torch.load(Path(cfg.interested_gene_path), map_location="cpu", weights_only=False)
         )
+        forward = model
+        if self.observer is not None:
+            position = 0
+            gene_ids = np.asarray(prepared.gene_list)
+            if interested_gene_idx is not None:
+                gene_ids = gene_ids[interested_gene_idx]
+            def forward(*args, **kwargs):
+                nonlocal position
+                encoded = model(*args, **kwargs)
+                tokens = encoded if interested_gene_idx is None else encoded[:, interested_gene_idx, :]
+                size = len(tokens)
+                self.observer(tokens, torch.ones(tokens.shape[:2], dtype=torch.bool, device=tokens.device),
+                              np.tile(gene_ids, (size, 1)), prepared.input_df.index[position:position+size], 0, None)
+                position += size
+                return encoded
         embeddings = _extract_sample_embeddings(
-            model=model,
+            model=forward,
             expr_array=prepared.input_df.to_numpy(dtype=np.float32),
             interested_gene_idx=interested_gene_idx,
             aggregate_type=str(cfg.aggregate_type),
