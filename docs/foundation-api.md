@@ -1,6 +1,6 @@
 # Foundation models through api.py
 
-The opt-in `foundation` block exposes the recovered manuscript protocols. Existing marker and legacy embedding calls remain on their original route. [Step 3 Stage 1](step3-stage1-report.md) adds configuration, selection and artifact reliability fixes; [Stage 2](step3-stage2-report.md) corrects split and preprocessing scopes. The remaining methodological boundaries are identified below.
+The opt-in `foundation` block exposes the recovered manuscript protocols. Existing marker and legacy embedding calls remain on their original route. [Step 3 Stage 1](step3-stage1-report.md) adds configuration, selection and artifact reliability fixes; [Stage 2](step3-stage2-report.md) corrects split and preprocessing scopes; [Stage 3](step3-stage3-report.md) corrects fit-local weighting, RF calibration consistency and infeasible CV handling. The remaining methodological boundaries are identified below.
 
 ## Evidence and complete configuration set
 
@@ -89,7 +89,7 @@ python api.py \
 
 | Classifier | Protocol, final fitting and selection |
 |---|---|
-| `omiclass` (`foundation_classifier` alias) | Existing native algorithms: nested CV/tuning, calibration, imbalance dispatch and stacker. Every applicable candidate is saved and evaluated on holdout; selection uses the requested `runtime.scoring` training-CV score (default macro-F1), with the historical alphabetical tie break. Calibration/stacking methodological corrections remain pending. |
+| `omiclass` (`foundation_classifier` alias) | Existing native algorithms: nested CV/tuning, calibration, imbalance dispatch and stacker. Every completed applicable candidate is saved and evaluated on holdout; selection uses the requested `runtime.scoring` training-CV score (default macro-F1), with the historical alphabetical tie break. RF outer CV and stacking base probabilities use its configured calibration. Weighted XGBoost calculates weights within each fit. Infeasible CV/calibration fails explicitly. Nested stacking evaluation corrections remain pending. |
 | `lr` | Original L2/lbfgs LR, max_iter 5000; scaler and representation inside each inner/outer fit. Grid C = .01, .1, 1, 10, 100 and class_weight None/balanced; five outer/three inner folds by default, safely limited by class counts. Final grid search refits on all outer training data. `foundation.lr_c_values` supports small test grids. |
 | `svm` | Fixed RBF SVC, C=1, gamma=scale, no class weights, probability=True, ovr decision function. Representation and scaler fit only on outer training data; libsvm's probability calibration remains training-only. No fabricated outer CV score or hyperparameter search. Decision predictions are preserved even when they differ from probability argmax. |
 | BulkFormer/CellFM `mlp`, `mlp_smote` | Original article head: LayerNorm, [64] GELU/dropout .2, 50 fixed epochs, batch size 8, AdamW lr .001/weight_decay .0001. Pooled reduction fits on outer training; optional SMOTE sees that training set only. No holdout-based epoch selection or CV score. |
@@ -104,7 +104,7 @@ Omiclass's original applicable candidate sets are preserved:
 - Mild imbalance: add weighted RF, weighted LightGBM and weighted XGBoost.
 - Severe imbalance: also add SMOTE, ADASYN, SVM-SMOTE and borderline-SMOTE RF.
 
-The existing severity thresholds, native selection, calibration and fitting logic are unchanged; this integration does not force inapplicable resamplers onto balanced data. `runtime.feature_selection.enabled` must be false for this opt-in protocol, as in the manuscript adapters; representation selection/PCA is the separately fitted backend transformer. Existing marker-based feature selection remains available on the legacy route.
+The existing severity thresholds, candidate sets, search spaces and calibration choices are preserved. Stage 3 makes their application consistent across native candidate fitting and evaluation. `runtime.feature_selection.enabled` must be false for this opt-in protocol, as in the manuscript adapters; representation selection/PCA is the separately fitted backend transformer. Existing marker-based feature selection remains available on the legacy route.
 
 ## Historical correction before extraction
 
@@ -153,6 +153,6 @@ Original marker calls through `api.run(expression, markers_path=..., ...)` retai
 
 Unsupported: token SVM/LR/SMOTE/native suites; CellFM/BERT max/median pooling; non-RNA-seq modalities; outcome-dependent correction; correction methods without an observed adapter; unsupported checkpoint shapes/layers; GPU head training. Missing local vendor/checkpoint/JAX/R dependencies produce errors rather than downloads, silent fallback, or modified scientific settings.
 
-The following require a separate Step 3 decision and are retained here: pre-split/transductive correction and external re-correction; BERT corrected-value clipping; BulkFormer all-pooling sum; positional flattening of CellFM token sequences; native calibration/stacking/imbalance and selection choices; fixed heads without outer CV; and the BERT early-stopping model without all-training refit. Historical repeated seeds on fixed splits measure a different source of variability from newly generated splits.
+The following remain for subsequent approved stages or explicit discussion: external re-correction; BERT corrected-value clipping; BulkFormer all-pooling sum; positional alignment of CellFM token sequences; and native stacking evaluation/fitting consistency. Explicitly transductive limma correction, existing imbalance thresholds, fixed heads without outer CV and BERT early stopping without all-training refit retain their intended protocols. Historical repeated seeds on fixed splits measure a different source of variability from newly generated splits.
 
 No CPOP, RankTreeEnsemble, Multi-class Pairs, MINT or other external comparison-tool logic is incorporated.

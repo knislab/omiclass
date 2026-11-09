@@ -4,7 +4,7 @@ from typing import Callable, Dict, Union
 from .rf import build_rf_plain, build_rf_class_weighted
 from .rf_smote import build_rf_smote, build_rf_adasyn, build_rf_svm_smote, build_rf_bl_smote
 from .lgbm import build_lgbm_plain
-from .xgboost import build_xgboost_plain
+from .xgboost import build_xgboost_plain, build_xgboost_weighted
 from .stacked import build_stacked_ensemble
 
 REGISTRY: Dict[str, Callable[..., object]] = {
@@ -19,7 +19,7 @@ REGISTRY: Dict[str, Callable[..., object]] = {
     "weighted_light_gbm": build_lgbm_plain,
 
     "xgboost": build_xgboost_plain, 
-    "weighted_xgboost": build_xgboost_plain,
+    "weighted_xgboost": build_xgboost_weighted,
     
     "stacked_ensemble": build_stacked_ensemble,
 }

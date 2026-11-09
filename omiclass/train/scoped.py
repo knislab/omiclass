@@ -45,7 +45,8 @@ class PartitionClassifier(ClassifierMixin, BaseEstimator):
                     rank_estimator.set_params(**{key.removeprefix('estimator__'): value
                                                  for key, value in search.best_params_.items()})
                 ranking = _feature_rank_by_importance(lambda: clone(rank_estimator), current, y, {},
-                    list(cv.split(current, y)), reduce_sampler_pipelines=self.feature_cfg.reduce_sampler_pipelines)
+                    list(cv.split(current, y)), reduce_sampler_pipelines=self.feature_cfg.reduce_sampler_pipelines,
+                    fit_kwargs={k.removeprefix('estimator__'): v for k, v in fit_kwargs.items()})
                 if ranking is not None:
                     cfg = self.feature_cfg.model_copy(update={'subset_fracs': [self.subset_fraction]})
                     size = _candidate_feature_sizes(cfg, current.shape[1])[0]

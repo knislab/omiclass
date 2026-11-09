@@ -5,18 +5,15 @@ from pathlib import Path
 import json
 import pandas as pd
 import joblib
-from sklearn.model_selection import StratifiedKFold
-from sklearn.calibration import CalibratedClassifierCV
 import traceback
 from skopt import BayesSearchCV
 from collections import Counter
 from typing import Any, Dict, List, Optional, Tuple, Union
 from sklearn.linear_model import LogisticRegression
-from sklearn.utils.class_weight import compute_sample_weight
 
 from ..config.schema import Config
 from ..models.registry import get_builder
-from .cv_engine import nested_oof_cv, CVResult
+from .cv_engine import nested_oof_cv, CVResult, calibrate_within_training, _safe_stratified_kfold
 from .stacking_engine import train_oof_stacker
 from .selection import rank_candidates, selection_summary
 from .tune import build_rf_search_space, build_lgbm_param_grid, build_xgb_param_grid
@@ -91,10 +88,7 @@ class Trainer:
 
     # Internal helpers
     def _safe_inner_cv(self, y: pd.Series, cv: int, seed: int):
-        min_count = int(pd.Series(y).value_counts().min())
-        if min_count < 2:
-            return 0  # signal: cannot calibrate safely
-        return StratifiedKFold(n_splits=max(2, min(cv, min_count)), shuffle=True, random_state=seed)
+        return _safe_stratified_kfold(y, cv, seed)
     
     def _tune_full(self, key: str, base_builder, X: pd.DataFrame, y: pd.Series, fit_kwargs: dict | None = None) -> dict:
         """Run BayesSearchCV on ALL data to get best_params_ for the FINAL model only."""
@@ -297,14 +291,10 @@ class Trainer:
         base = builder()
         if not calibrate:
             return self._final_fit_with_kwargs(base, X, y, fit_kwargs=fit_kwargs)
-        inner = self._safe_inner_cv(y, cv=cv, seed=seed)
-        if inner == 0:
-            base.fit(X, y)
-            return base
-        wrapped = CalibratedClassifierCV(
-            base, method=method, cv=inner, ensemble=bool(ensemble)
+        return calibrate_within_training(
+            fitted_or_builder=base, Xtr_used=X, ytr=y, method=method,
+            cv=cv, seed=seed, ensemble=ensemble, fit_kwargs=fit_kwargs,
         )
-        return self._final_fit_with_kwargs(wrapped, X, y, fit_kwargs=fit_kwargs)
 
     def _save_model(self, model, filename: str) -> Path:
         export_model = unwrap_for_export(model)
@@ -392,7 +382,7 @@ class Trainer:
         fs = getattr(r, "feature_selection", None)
         tun = getattr(r, "tuning", None)
         scoring = str(getattr(tun, "scoring_override", None) or r.scoring)
-        eval_calibrated_in_cv = bool(getattr(self.cfg.runtime, "eval_calibrated_in_cv", False))
+        eval_calibrated_in_cv = bool(cal.calibrate)
 
         cvres = nested_oof_cv(
             model_builder=base_builder,
@@ -407,9 +397,10 @@ class Trainer:
             n_jobs=int(r.n_jobs),
             feature_cfg=fs,
             eval_calibrated_in_cv= eval_calibrated_in_cv,
-            calib_method="sigmoid",
+            calib_method=str(cal.method),
             calib_cv=cvs,
             calibration_ensemble=bool(cal.ensemble),
+            fit_kwargs=self._reduction_fit_kwargs(fit_kwargs),
         )
 
         if fs is not None and bool(getattr(fs, "enabled", False)):
@@ -498,20 +489,12 @@ class Trainer:
         raw = self._compose_raw_params(model_key=key, model_conf=model_conf)
         raw = apply_auto_config(key, raw, y)
 
-        weighted_xgb_multiclass = False
         if self.class_name_map is None:
             self.class_name_map = _build_class_name_map(y, self.cfg)
 
 
         if key == "weighted_light_gbm":
             raw["class_weight"] = "balanced"
-
-        if key == "weighted_xgboost":
-            counts = pd.Series(y).value_counts()
-            if len(counts) == 2:
-                raw["scale_pos_weight"] = float(counts.max() / counts.min())
-            else:
-                weighted_xgb_multiclass = True
 
         init_params, fit_kwargs = split_init_and_fit_kwargs(key, raw)
         if "xgboost" in key:
@@ -545,10 +528,6 @@ class Trainer:
         fit_kwargs.pop("early_stopping_rounds", None)
         fit_kwargs.pop("early_stopping", None)
 
-        if weighted_xgb_multiclass:
-            sw = compute_sample_weight("balanced", y)
-            fit_kwargs["sample_weight"] = sw
-            
         def unwrapped_builder():
             est_builder = get_builder(
                 key,
@@ -572,9 +551,8 @@ class Trainer:
         tun = getattr(r, "tuning", None)
         scoring = str(getattr(tun, "scoring_override", None) or r.scoring)
 
-        eval_calibrated_in_cv = bool(getattr(self.cfg.runtime, "eval_calibrated_in_cv", False))
-
         cal = getattr(model_conf, "calibration", None)
+        eval_calibrated_in_cv = bool(getattr(cal, "calibrate", False))
         cal_method = str(getattr(cal, "method", "sigmoid")) if cal is not None else "sigmoid"
         cvs = r.cv_folds
         self.builders[key] = base_builder
@@ -767,6 +745,11 @@ class Trainer:
             n_jobs=int(r.n_jobs),
             feature_cfg=fs,
             meta_builder=meta_builder,
+            base_calibration={rf_key: dict(
+                calibrate=bool(rf_cfg.defaults.calibration.calibrate),
+                method=str(rf_cfg.defaults.calibration.method),
+                ensemble=bool(rf_cfg.defaults.calibration.ensemble),
+            )},
         )
 
         self.cv_results[key] = stack_cvres

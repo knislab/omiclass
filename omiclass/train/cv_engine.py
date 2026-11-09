@@ -14,6 +14,7 @@ from sklearn.metrics import get_scorer
 
 from skopt import BayesSearchCV
 from omiclass.train.selection import fold_selection_score
+from omiclass.errors.errors import CVError
 
 
 def _bulkformer_representation_from_model(model):
@@ -57,11 +58,32 @@ class CVResult:
 
 def _safe_stratified_kfold(y: Union[pd.Series, np.ndarray], desired_splits: int, seed: int) -> Union[StratifiedKFold, int]:
     y = pd.Series(y)
-    min_count = int(y.value_counts().min())
-    if min_count < 2:
+    counts = y.value_counts()
+    if len(counts) < 2 or counts.min() < 2:
         return 0
+    min_count = int(counts.min())
     n_splits = max(2, min(int(desired_splits), min_count))
     return StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=int(seed))
+
+
+def require_stratified_cv(y, desired_splits: int, seed: int, *, context: str):
+    cv = _safe_stratified_kfold(y, desired_splits, seed)
+    if int(desired_splits) < 2 or cv == 0:
+        counts = pd.Series(y).value_counts().to_dict()
+        raise CVError(
+            f"{context} requires at least two classes, two folds and two samples per class; "
+            f"requested_splits={desired_splits}, training_class_counts={counts}. "
+            "No in-sample predictions or uncalibrated fallback will be used."
+        )
+    return cv
+
+
+def _partition_fit_kwargs(fit_kwargs, indices):
+    values = dict(fit_kwargs or {})
+    for key in values:
+        if key.endswith("sample_weight"):
+            values[key] = np.asarray(values[key])[indices]
+    return values
 
 
 def _normalize_proba_rows(p: np.ndarray, eps: float = 1e-15) -> np.ndarray:
@@ -140,6 +162,7 @@ def _feature_rank_by_importance(
     tuned_params: Dict[str, Any],
     inner_splits: List[Tuple[np.ndarray, np.ndarray]],
     reduce_sampler_pipelines: bool = True,
+    fit_kwargs: Optional[Dict[str, Any]] = None,
 ) -> Optional[np.ndarray]:
     # Rank features using mean feature_importances_ across inner folds (fold-train only).
     imps: List[np.ndarray] = []
@@ -164,7 +187,7 @@ def _feature_rank_by_importance(
             except Exception:
                 return None
 
-        est.fit(Xtr, ytr)
+        est.fit(Xtr, ytr, **_partition_fit_kwargs(fit_kwargs, tr_idx))
 
         importance_estimator = est
         # Walk through sklearn/imblearn pipelines to the fitted classifier.
@@ -267,7 +290,7 @@ def inner_select_recipe(
             verbose=0,
             error_score="raise",
         )
-        search.fit(Xtr, ytr)
+        search.fit(Xtr, ytr, **(fit_kwargs or {}))
         return None, dict(search.best_params_ or {}), float(search.best_score_), tune_scoring
 
     n_total = Xtr.shape[1]
@@ -286,7 +309,7 @@ def inner_select_recipe(
         verbose=0,
         error_score="raise",
     )
-    search0.fit(Xtr, ytr)
+    search0.fit(Xtr, ytr, **(fit_kwargs or {}))
     tuned_for_rank = dict(search0.best_params_ or {})
 
     ranked_idx = _feature_rank_by_importance(
@@ -298,6 +321,7 @@ def inner_select_recipe(
         reduce_sampler_pipelines=bool(
             getattr(feature_cfg, "reduce_sampler_pipelines", True)
         ),
+        fit_kwargs=fit_kwargs,
     )
     if ranked_idx is None:
         # If no importances exist, fallback: tune on all features
@@ -314,7 +338,7 @@ def inner_select_recipe(
             verbose=0,
             error_score="raise",
         )
-        search.fit(Xtr, ytr)
+        search.fit(Xtr, ytr, **(fit_kwargs or {}))
         return None, dict(search.best_params_ or {}), float(search.best_score_), tune_scoring
 
     ranked_cols = Xtr.columns.to_numpy()[ranked_idx]
@@ -340,7 +364,7 @@ def inner_select_recipe(
             verbose=0,
             error_score="raise",
         )
-        search.fit(Xk, ytr)
+        search.fit(Xk, ytr, **(fit_kwargs or {}))
 
         score_k = float(search.best_score_)
         if score_k > best_score:
@@ -377,23 +401,18 @@ def calibrate_within_training(
     seed: int,
     use_prefit: bool = False,
     ensemble: bool = False,
+    fit_kwargs: Optional[Dict[str, Any]] = None,
 ) -> Any:
-    inner = _safe_stratified_kfold(ytr, desired_splits=int(cv), seed=int(seed))
-    if inner == 0:
-        if use_prefit:
-            return fitted_or_builder
-        fitted_or_builder.fit(Xtr_used, ytr)
-        return fitted_or_builder
-
     if use_prefit:
         cal = CalibratedClassifierCV(fitted_or_builder, method=str(method), cv="prefit")
-        cal.fit(Xtr_used, ytr)
+        cal.fit(Xtr_used, ytr, **(fit_kwargs or {}))
         return cal
 
+    inner = require_stratified_cv(ytr, int(cv), int(seed), context="Calibration")
     cal = CalibratedClassifierCV(
         fitted_or_builder, method=str(method), cv=inner, ensemble=bool(ensemble)
     )
-    cal.fit(Xtr_used, ytr)
+    cal.fit(Xtr_used, ytr, **(fit_kwargs or {}))
     return cal
 
 # ---------- overall CV engine ----------
@@ -417,19 +436,7 @@ def nested_oof_cv(
     calibration_ensemble: bool = False,
     fit_kwargs: Optional[Dict[str, Any]] = None,
 ) -> CVResult:
-    outer = _safe_stratified_kfold(y, desired_splits=int(outer_splits), seed=int(seed))
-    if outer == 0:
-        est = model_builder()
-        est.fit(X, y, **(fit_kwargs or {}))
-        pred = est.predict(X)
-        proba = est.predict_proba(X) if hasattr(est, "predict_proba") else None
-        return CVResult(
-            oof_true=y.to_numpy(),
-            oof_pred=np.asarray(pred),
-            oof_proba=np.asarray(proba) if proba is not None else None,
-            per_fold_metrics=[],
-            fold_recipes=[],
-        )
+    outer = require_stratified_cv(y, int(outer_splits), int(seed), context="OOF evaluation")
 
     canonical = np.array(sorted(pd.unique(y)))
     n = len(y)
@@ -442,6 +449,7 @@ def nested_oof_cv(
     for fold_idx, (tr_idx, va_idx) in enumerate(outer.split(X, y), start=1):
         Xtr, Xva = X.iloc[tr_idx], X.iloc[va_idx]
         ytr, yva = y.iloc[tr_idx], y.iloc[va_idx]
+        fold_fit_kwargs = _partition_fit_kwargs(fit_kwargs, tr_idx)
 
         selected_cols, best_params, fs_best_score, fs_scoring = inner_select_recipe(
             model_builder=model_builder,
@@ -454,6 +462,7 @@ def nested_oof_cv(
             seed=int(seed),
             n_jobs=int(n_jobs),
             feature_cfg=feature_cfg,
+            fit_kwargs=fold_fit_kwargs,
         )
 
         if selected_cols is not None:
@@ -476,12 +485,9 @@ def nested_oof_cv(
                 seed=int(seed),
                 use_prefit=False,
                 ensemble=bool(calibration_ensemble),
+                fit_kwargs=fold_fit_kwargs,
             )
         else:
-            fold_fit_kwargs = dict(fit_kwargs or {})
-            for weight_key in [key for key in fold_fit_kwargs if key.endswith("sample_weight")]:
-                fold_fit_kwargs[weight_key] = np.asarray(fold_fit_kwargs[weight_key])[tr_idx]
-
             model = fit_fold_model(
                 model_builder=model_builder,
                 Xtr_used=Xtr_used,

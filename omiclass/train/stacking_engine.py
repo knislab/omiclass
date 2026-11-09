@@ -13,7 +13,7 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.metrics import get_scorer
 
 from skopt import BayesSearchCV
-from omiclass.train.cv_engine import nested_oof_cv, CVResult, _safe_stratified_kfold
+from omiclass.train.cv_engine import nested_oof_cv, CVResult, require_stratified_cv
 from omiclass.train.selection import fold_selection_score
 
 def train_oof_stacker(
@@ -29,16 +29,19 @@ def train_oof_stacker(
     n_jobs: int,
     feature_cfg: Any,
     meta_builder: Callable[[], Any],
+    base_calibration: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Tuple[CVResult, np.ndarray]:
     """
     Returns:
       - CVResult for the meta-learner evaluated via OOF stacking
       - Z_oof: the meta features (concatenated base OOF probas) aligned to TRAIN rows
     """
+    outer = require_stratified_cv(y, int(outer_splits), int(seed), context="Stacking OOF evaluation")
     base_oof_probas: List[np.ndarray] = []
     base_fold_logs: Dict[str, CVResult] = {}
 
     for name, builder, space in base_specs:
+        calibration = (base_calibration or {}).get(name, {})
         cvres = nested_oof_cv(
             model_builder=builder,
             X=X,
@@ -51,10 +54,10 @@ def train_oof_stacker(
             tune_inner_cv=tune_inner_cv,
             n_jobs=n_jobs,
             feature_cfg=feature_cfg,
-            eval_calibrated_in_cv=False,
-            calib_method="",
-            calib_cv=0,
-            calibration_ensemble=False,
+            eval_calibrated_in_cv=bool(calibration.get("calibrate", False)),
+            calib_method=calibration.get("method", "sigmoid"),
+            calib_cv=int(outer_splits),
+            calibration_ensemble=bool(calibration.get("ensemble", False)),
         )
         base_fold_logs[name] = cvres
         if cvres.oof_proba is None:
@@ -64,23 +67,6 @@ def train_oof_stacker(
     Z_oof = np.concatenate(base_oof_probas, axis=1)
 
     # Now evaluate meta-learner with outer CV using Z_oof as fixed features 
-    outer = _safe_stratified_kfold(y, desired_splits=int(outer_splits), seed=int(seed))
-    if outer == 0:
-        meta = meta_builder()
-        meta.fit(Z_oof, y)
-        pred = meta.predict(Z_oof)
-        proba = meta.predict_proba(Z_oof) if hasattr(meta, "predict_proba") else None
-        return (
-            CVResult(
-                oof_true=y.to_numpy(),
-                oof_pred=np.asarray(pred),
-                oof_proba=np.asarray(proba) if proba is not None else None,
-                per_fold_metrics=[],
-                fold_recipes=[],
-            ),
-            Z_oof,
-        )
-
     n = len(y)
     oof_pred = np.full(n, -1, dtype=int)
     oof_proba = None
