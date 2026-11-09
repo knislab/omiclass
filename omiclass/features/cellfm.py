@@ -468,7 +468,7 @@ class CellFMFeatureExtractor:
                 view, start = divmod(position, len(prepared.sample_ids))
                 size = len(expression)
                 self.observer(encoded[:, 3:], valid, genes,
-                              prepared.sample_ids[start:start+size], view, encoded[:, 0])
+                              prepared.sample_ids[start:start+size], view)
                 position += size
                 return encoded, extra
             model.net.encode = observed

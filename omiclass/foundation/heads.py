@@ -21,7 +21,7 @@ from omiclass.foundation.io import token_record, write_json
 def representation(cfg):
     backend = backend_name(cfg)
     reduction = getattr(cfg, backend).reduction.model_dump()
-    reduction['strategy'] = 'full' if cfg.foundation.representation == 'cls' else cfg.foundation.representation
+    reduction['strategy'] = cfg.foundation.representation
     if reduction['random_state'] is None:
         reduction['random_state'] = cfg.runtime.random_state
     return EmbeddingRepresentation(**reduction)

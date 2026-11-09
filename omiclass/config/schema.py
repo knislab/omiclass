@@ -674,7 +674,7 @@ class FoundationCfg(BaseModel):
     enabled: bool = False
     model: Literal["bulkformer", "cellfm", "cellfm_1view", "cellfm_20view", "bulkrnabert"] = "bulkformer"
     classifier: Literal["omiclass", "foundation_classifier", "lr", "svm", "mlp", "mlp_smote"] = "omiclass"
-    representation: Literal["full", "supervised", "pca", "supervised_pca", "tokens", "cls"] = "full"
+    representation: Literal["full", "supervised", "pca", "supervised_pca", "tokens"] = "full"
     pooling: Literal["mean", "max_mean_median", "max", "median"] = "mean"
     extraction_seed: int = 0
     input_scale: Literal["counts", "tpm"] = "counts"
@@ -704,10 +704,8 @@ class FoundationCfg(BaseModel):
             raise ValueError("Only BulkFormer supports alternative pooling")
         if self.representation == "tokens" and self.classifier != "mlp":
             raise ValueError("Full tokens support the article MLP only; no token SVM/SMOTE/LR/Omiclass protocol")
-        if self.representation == "cls" and (backend != "cellfm" or self.classifier not in {"mlp", "mlp_smote", "svm"}):
-            raise ValueError("CLS supports only CellFM diagnostic MLP, MLP+SMOTE, or SVM")
-        if self.representation in {"tokens", "cls"} and self.pooling != "mean":
-            raise ValueError("Token/CLS representations do not take a pooled-vector aggregation")
+        if self.representation == "tokens" and self.pooling != "mean":
+            raise ValueError("Token representations do not take a pooled-vector aggregation")
         if self.input_scale == "tpm" and backend != "bulkrnabert":
             raise ValueError("TPM input is supported only for BulkRNABert; BulkFormer/CellFM require counts")
         if self.correction == "limma" and not self.allow_transductive_correction:
@@ -764,7 +762,7 @@ class Config(BaseModel):
             if "num_views" in encoder and encoder["num_views"] != views:
                 raise ValueError("CellFM model alias conflicts with num_views")
             encoder["num_views"] = views
-        strategy = settings.representation if settings.representation not in {"tokens", "cls"} else "full"
+        strategy = settings.representation if settings.representation != "tokens" else "full"
         reduction = encoder.setdefault("reduction", {})
         if "strategy" in reduction and reduction["strategy"] != strategy:
             raise ValueError("foundation.representation conflicts with backend reduction strategy")

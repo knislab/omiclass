@@ -16,20 +16,22 @@ def cfg(tmp_path,model='bulkformer',**settings):
         foundation=dict(enabled=True,model=model,classifier='mlp',**settings)))
 
 
-def test_observer_retains_masks_and_mean_cls_over_views(tmp_path):
-    observer=extraction.TokenObserver(tmp_path/'tokens','cellfm',2,True)
+def test_observer_retains_tokens_masks_and_genes_over_views(tmp_path):
+    observer=extraction.TokenObserver(tmp_path/'tokens','cellfm',2)
     for view in range(2):
         tokens=np.arange(24,dtype=np.float32).reshape(2,3,4)+view
         masks=np.array([[1,1,0],[1,0,0]],dtype=bool)
-        observer(tokens,masks,np.tile(np.arange(3),(2,1)),['a','b'],view,np.ones((2,4))*view)
+        observer(tokens,masks,np.tile(np.arange(3),(2,1)),['a','b'],view)
     observer.finish(['a','b'])
     manifest=json.loads((tmp_path/'tokens/manifest.json').read_text())
     assert len(manifest['records'])==4
     with np.load(tmp_path/'tokens'/manifest['records'][0]['file']) as z:
+        assert set(z.files) == {'tokens', 'mask', 'gene_ids'}
+        np.testing.assert_array_equal(z['tokens'],np.arange(12,dtype=np.float32).reshape(3,4))
         np.testing.assert_array_equal(z['mask'],[1,1,0])
-    np.testing.assert_array_equal(np.mean(observer.cls['a'],axis=0),np.ones(4)*.5)
+        np.testing.assert_array_equal(z['gene_ids'],np.arange(3))
     with pytest.raises(ValueError,match='Duplicated'):
-        observer(tokens,masks,np.tile(np.arange(3),(2,1)),['a','b'],0,np.ones((2,4)))
+        observer(tokens,masks,np.tile(np.arange(3),(2,1)),['a','b'],0)
 
 
 @pytest.mark.parametrize('model',['bulkformer','cellfm_1view','cellfm_20view','bulkrnabert'])
@@ -141,7 +143,7 @@ def test_cellfm_instance_observer_is_restored(tmp_path,monkeypatch):
         for i in range(20):kw['model'].net.encode(torch.ones((2,2,2)),torch.ones((2,2),dtype=torch.int64),torch.ones(2,2),torch.ones((2,2),dtype=torch.bool))
         return np.ones((2,1536),np.float32),[[2]*20]*2,'stable','mean'
     monkeypatch.setattr(cellfm,'_extract_configured_views',drive)
-    observer=extraction.TokenObserver(tmp_path/'tokens','cellfm',20,True)
+    observer=extraction.TokenObserver(tmp_path/'tokens','cellfm',20)
     result=cellfm.CellFMFeatureExtractor(c.cellfm,observer=observer).extract(counts)
     observer.finish(['a','b'])
     assert result.features.shape==(1536,2)

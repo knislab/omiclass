@@ -259,4 +259,4 @@ PyTorch and MindSpore dependencies.
 
 ## Manuscript foundation-model API
 
-The opt-in `foundation` configuration exposes pooled, token and diagnostic CLS representations with their distinct manuscript head protocols through `api.py`. See [configuration matrix, training protocols and saved prediction](docs/foundation-api.md). Existing marker-based calls retain their original route.
+The opt-in `foundation` configuration exposes pooled and token representations with their distinct manuscript head protocols through `api.py`. See [configuration matrix, training protocols and saved prediction](docs/foundation-api.md). Existing marker-based calls retain their original route.

@@ -250,7 +250,7 @@ def run_foundation(expression_file, cfg):
         model=cfg.foundation.model, representation=cfg.foundation.representation, pooling=cfg.foundation.pooling,
         classifier=cfg.foundation.classifier, classes=classes, split=split, source_ids=counts.columns.tolist(),
         raw_features=extracted.features.columns.tolist(), selected_model=selected, models=paths,
-        diagnostic=cfg.foundation.representation == 'cls',
+        diagnostic=False,
         evidence=('validated experimental protocol; no completed full-scale manuscript fits'
             if cfg.foundation.model == 'bulkrnabert' and cfg.foundation.representation == 'tokens'
             else 'implemented framework extension; outside recovered matched manuscript configurations'

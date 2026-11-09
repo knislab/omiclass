@@ -337,7 +337,7 @@ class BulkFormerFeatureExtractor:
                 tokens = encoded if interested_gene_idx is None else encoded[:, interested_gene_idx, :]
                 size = len(tokens)
                 self.observer(tokens, torch.ones(tokens.shape[:2], dtype=torch.bool, device=tokens.device),
-                              np.tile(gene_ids, (size, 1)), prepared.input_df.index[position:position+size], 0, None)
+                              np.tile(gene_ids, (size, 1)), prepared.input_df.index[position:position+size], 0)
                 position += size
                 return encoded
         embeddings = _extract_sample_embeddings(

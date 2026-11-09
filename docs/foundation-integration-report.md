@@ -1,12 +1,14 @@
 # Step 2 integration report
 
+This records the original Step 2 implementation session. The configuration matrix and current verification below reflect the reduced public catalogue.
+
 Implemented only in `/data01/home/ls/katzm/omiclass-public`, on `public-release`, with HEAD still `5a64f41f619b1daf76c580460c8433bcc58673ee`. Changes are uncommitted. No original checkout files or experiment processes were modified by this work; no branches or shared Git refs were moved. No Step 3 fixes or publication cleanup were performed.
 
 ## Integrated configurations and invocation
 
 [The complete invocation guide](foundation-api.md) supplies Python/CLI commands, backend resource options, correction/prediction examples and protocol defaults. [The pre-implementation plan](foundation-integration-plan.md) records stages and source evidence.
 
-Use `api.run(expression, foundation={...}, meta_path=..., classification_column=..., output_dir=..., backend_resource_options...)`. Each row below expands only the listed combinations; `api.foundation_configurations()` returns the full 110-entry catalogue, including one separately validated experimental BERT-token entry.
+Use `api.run(expression, foundation={...}, meta_path=..., classification_column=..., output_dir=..., backend_resource_options...)`. Each row below expands only the listed combinations; `api.foundation_configurations()` returns the full 104-entry catalogue, including one separately validated experimental BERT-token entry.
 
 | Model | Pooling | Representation | Classifier |
 |---|---|---|---|
@@ -14,7 +16,6 @@ Use `api.run(expression, foundation={...}, meta_path=..., classification_column=
 | CellFM (`cellfm_1view`, `cellfm_20view`) | `mean` | Same four pooled representations | Same five heads |
 | BulkRNABert (`bulkrnabert`) | `mean` | Same four pooled representations | Same five heads |
 | BulkFormer and both CellFM settings | `mean` | `tokens` | `mlp` |
-| Both CellFM settings | `mean` | `cls` | `svm`, `mlp`, `mlp_smote`, marked diagnostic |
 | BulkRNABert | `mean` | `tokens` | `mlp`, marked experimentally validated without completed full-scale manuscript fits |
 
 `max_mean_median` preserves the original elementwise sum. Existing BulkFormer `max`/`median` pooling and arbitrary positive CellFM view counts are retained as implemented extensions rather than matched manuscript evidence. Both uncorrected and explicitly acknowledged historical limma-before-extraction workflows are available. Use `foundation.correction='limma'`, `allow_transductive_correction=True` and explicit batch/design metadata for the latter.
@@ -25,7 +26,6 @@ Every run saves configuration, split, training-scope records, holdout results, c
 
 ## Unsupported configurations
 
-- Non-CellFM CLS, or CLS with LR/Omiclass: no observed compatible protocol.
 - Full-token SVM, LR, SMOTE or native suites: no matched aligned-token training protocol.
 - CellFM/BERT max/median pooling, alternative BERT layers/checkpoint shapes: not recovered supported extraction protocols. Only the observed gtex/encode BERT checkpoint is claimed here.
 - Covariate-matrix/PC correction or frozen-reference correction on foundation features: not represented by the observed pre-extraction adapters.
@@ -37,9 +37,11 @@ No external benchmark tools (CPOP, RankTreeEnsemble, Multi-class Pairs, MINT, et
 
 ## Tests and evidence
 
-Final combined run: **222 passed, 1 skipped**, with existing pandas/SciPy warnings. The skip is `tests/test_fsva_reference.py:25`, requiring `OMICLASS_TEST_SVA_LIB` for native sva R integration. No checkpoint downloads, real encoder inference or full manuscript experiments ran.
+Public catalogue reduction verification: **228 passed, 1 skipped**, including training/save/load/prediction checks for all 104 remaining entries with mocked encoders. The 12-module run includes the modules in the historical command below plus `tests/test_foundation_heads_smote.py`, now testing the public head directly. All 104 retained catalogue entries match the previous commit exactly, including their order and metadata. Test outputs and caches used separate `/tmp/omiclass-remove-cls-*` paths; no checkpoints were downloaded. The optional native sva R test remains skipped.
 
-The combined run covered three new modules (167 tests) and eight self-contained existing modules (55 passed, one skipped):
+Historical Step 2 combined run (before the public catalogue reduction): **222 passed, 1 skipped**, with existing pandas/SciPy warnings. The skip is `tests/test_fsva_reference.py:25`, requiring `OMICLASS_TEST_SVA_LIB` for native sva R integration. No checkpoint downloads, real encoder inference or full manuscript experiments ran.
+
+That historical run covered three new modules (167 tests) and eight self-contained existing modules (55 passed, one skipped):
 
 ```bash
 /tmp/omiclass-public-step2-venv/bin/python -B -m pytest \
@@ -53,7 +55,7 @@ The combined run covered three new modules (167 tests) and eight self-contained 
 
 The process environment disabled bytecode and CUDA, limited BLAS/OpenMP threads to one, and redirected matplotlib/XDG caches to separate `/tmp` paths. The separate venv inherited existing packages read-only; no package in viz_env was installed or upgraded.
 
-New tests exercise all 110 catalogue entries through training, saving, loading and external prediction with mocked encoders and shortened synthetic neural fits; binary/multiclass class ordering; schema and CLI dispatch; invalid combinations; inner/outer CV scope; SMOTE scope; saved model/config/asset checks; corrected-input ordering and external re-correction requirements; token masks/view coverage; instance-local callbacks; and marker-route compatibility. Native full-suite tests use lightweight trainer-method stand-ins to validate integration/dispatch. Six actual RF/resampling pipelines additionally fit within synthetic CV and reproduce predictions after joblib reload. Full-size native boosting/stacking is not claimed as tested.
+The current API tests exercise all 104 catalogue entries through training, saving, loading and external prediction with mocked encoders and shortened synthetic neural fits; binary/multiclass class ordering; schema and CLI dispatch; invalid combinations; inner/outer CV scope; SMOTE scope; saved model/config/asset checks; corrected-input ordering and external re-correction requirements; token masks/view coverage; instance-local callbacks; and marker-route compatibility. Native full-suite tests use lightweight trainer-method stand-ins to validate integration/dispatch. Six actual RF/resampling pipelines additionally fit within synthetic CV and reproduce predictions after joblib reload. Full-size native boosting/stacking is not claimed as tested.
 
 Nine additional read-only historical parity checks passed: all four representation strategies yielded bitwise-identical numerical matrices; original and promoted BERT MLP/SMOTE loops produced bitwise-identical weights and training metadata; original and promoted article vector/SMOTE/token loops produced bitwise-identical weights and predictions. All parity inputs and outputs were synthetic and temporary.
 
@@ -69,11 +71,11 @@ Test logs: `/tmp/omiclass-step2-final-combined-tests.log`; parity evidence: `/tm
 - Shared existing representation code replaces the standalone representation copy. Numerical outputs matched bitwise in parity checks; PCA column names use the existing core prefix rather than the standalone prefix.
 - Portable neural model serialization, canonical probability-column alignment, encoder-asset identities and immutable saved-prediction inputs are new API contracts. Native adapter log decisions and constant-column lists are persisted for consistent prediction.
 - New CellFM foundation calls select the saved batch size 4 by default; explicitly disabled/legacy foundation calls retain their prior defaults. Fixed/head-specific protocols remain separate; no extra training, CV or refit is added.
-- No intentional algorithmic change to the source head loops, selector/PCA, original Trainer, correction semantics, clipping, token architecture, CLS values or scientific defaults.
+- No intentional algorithmic change to the source head loops, selector/PCA, original Trainer, correction semantics, clipping, token architecture or scientific defaults.
 
 ## Remaining Step 3 issues
 
-Review transductive/pre-split correction and external re-correction; BERT corrected-input zero flooring; interpretation of BulkFormer's pooled sum; positional token alignment; nearly constant CellFM CLS diagnostics; native calibration/stacking/imbalance and configuration-selection choices; and distinctions between fixed-head, nested-CV and inner-validation protocols. Fixed-partition repeated head seeds must not be confused with repeated cohort splits. None of these methodological questions was silently resolved here.
+Review transductive/pre-split correction and external re-correction; BERT corrected-input zero flooring; interpretation of BulkFormer's pooled sum; positional token alignment; native calibration/stacking/imbalance and configuration-selection choices; and distinctions between fixed-head, nested-CV and inner-validation protocols. Fixed-partition repeated head seeds must not be confused with repeated cohort splits. None of these methodological questions was silently resolved here.
 
 ## Isolation verification and running experiments
 

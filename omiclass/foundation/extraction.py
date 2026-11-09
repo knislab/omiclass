@@ -106,24 +106,21 @@ def correct_input(frame, cfg, out, metadata):
 
 class TokenObserver:
     """Stream existing forward results; never recompute or alter a model forward."""
-    def __init__(self, directory, backend, num_views, capture_tokens):
+    def __init__(self, directory, backend, num_views):
         self.directory = directory
         self.backend = backend
         self.num_views = num_views
-        self.capture_tokens = capture_tokens
-        self.records, self.cls = [], {}
+        self.records = []
         self.coordinates = set()
-        if capture_tokens:
-            directory.mkdir(exist_ok=False)
+        directory.mkdir(exist_ok=False)
 
-    def __call__(self, tokens, valid, genes, ids, view, cls):
+    def __call__(self, tokens, valid, genes, ids, view):
         def array(value, floating=False):
             if hasattr(value, "detach"):
                 value = value.detach().float() if floating else value.detach()
                 return value.cpu().numpy()
             return np.asarray(value, dtype=np.float32) if floating else np.asarray(value)
         values, masks, gene_ids = array(tokens, True), array(valid).astype(bool), array(genes)
-        class_vectors = None if cls is None else array(cls, True)
         if values.ndim != 3 or masks.shape != values.shape[:2] or len(ids) != len(values):
             raise ValueError("Token/mask/sample shape mismatch")
         for i, sid in enumerate(ids):
@@ -132,23 +129,16 @@ class TokenObserver:
             if coordinate in self.coordinates or not masks[i].any() or not np.isfinite(values[i]).all():
                 raise ValueError("Duplicated or invalid sample/view token record")
             self.coordinates.add(coordinate)
-            if class_vectors is not None:
-                if not np.isfinite(class_vectors[i]).all():
-                    raise ValueError("Nonfinite CLS")
-                self.cls.setdefault(sid, []).append(class_vectors[i])
-            if self.capture_tokens:
-                filename = f"record_{len(self.records):08d}.npz"
-                extra = {} if class_vectors is None else {"cls": class_vectors[i]}
-                np.savez(self.directory / filename, tokens=values[i], mask=masks[i], gene_ids=gene_ids[i], **extra)
-                self.records.append(dict(sample_id=sid, view=int(view), file=filename))
+            filename = f"record_{len(self.records):08d}.npz"
+            np.savez(self.directory / filename, tokens=values[i], mask=masks[i], gene_ids=gene_ids[i])
+            self.records.append(dict(sample_id=sid, view=int(view), file=filename))
 
     def finish(self, sample_ids):
         expected = {(str(s), v) for s in sample_ids for v in range(self.num_views)}
         if self.coordinates != expected:
-            raise ValueError("Incomplete token/CLS view traversal")
-        if self.capture_tokens:
-            write_json(self.directory / "manifest.json", dict(format_version=1, backend=self.backend,
-                metadata=dict(num_views=self.num_views), records=self.records))
+            raise ValueError("Incomplete token view traversal")
+        write_json(self.directory / "manifest.json", dict(format_version=1, backend=self.backend,
+            metadata=dict(num_views=self.num_views), records=self.records))
 
 
 def extract_bert(frame, cfg, out, tokens):
@@ -185,7 +175,6 @@ def extract(counts, cfg, out, metadata=None):
     if cfg.foundation.correction == "limma":
         frame = correct_input(frame, cfg, out, metadata)
     tokens = cfg.foundation.representation == "tokens"
-    cls = cfg.foundation.representation == "cls"
     if backend == "bulkrnabert":
         result = extract_bert(frame, cfg, out, tokens)
     else:
@@ -197,7 +186,7 @@ def extract(counts, cfg, out, metadata=None):
         torch.manual_seed(seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(seed)
-        observer = TokenObserver(out / "tokens", backend, cfg.cellfm.num_views if backend == "cellfm" else 1, tokens) if tokens or cls else None
+        observer = TokenObserver(out / "tokens", backend, cfg.cellfm.num_views if backend == "cellfm" else 1) if tokens else None
         if backend == "bulkformer":
             from omiclass.features.bulkformer import BulkFormerFeatureExtractor
             if (frame.to_numpy() == -10).any():
@@ -214,11 +203,6 @@ def extract(counts, cfg, out, metadata=None):
             result = Extraction(encoded.features.T, encoded.metadata, out / "tokens" if tokens else None)
         if observer is not None:
             observer.finish(counts.columns)
-        if cls:
-            features = pd.DataFrame([np.mean(observer.cls[str(s)], axis=0, dtype=np.float64) for s in frame.columns], index=frame.columns).astype(np.float32)
-            features.columns = [f"cls_feature_{i:04d}" for i in range(features.shape[1])]
-            result.features = features
-            result.metadata["diagnostic_cls"] = True
     if result.features.index.has_duplicates or not np.isfinite(result.features.to_numpy()).all():
         raise ValueError("Invalid extracted sample embeddings")
     write_json(out / "extraction.json", dict(backend=backend, representation=cfg.foundation.representation,

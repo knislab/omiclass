@@ -77,7 +77,7 @@ def make_head(width, token_count, hidden_dims, token_dim, dropout, n_classes):
 
 def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--variant', choices=['full', 'cls', 'mean'], required=True)
+    p.add_argument('--variant', choices=['full', 'mean'], required=True)
     p.add_argument('--cache', type=Path, help='Directory produced by extract.py')
     p.add_argument('--features', type=Path, help='Existing feature-by-sample CSV, for mean only')
     p.add_argument('--labels', type=Path, required=True, help='CSV containing sample ID and label columns')
@@ -100,10 +100,12 @@ def parse_args():
 
 
 def train(args):
+    if args.variant not in {'full', 'mean'}:
+        raise ValueError('Variant must be full or mean')
     if args.smote_k_neighbors < 1:
         raise ValueError('SMOTE k-neighbors must be positive')
     if args.resampling == 'smote' and args.variant == 'full':
-        raise ValueError('SMOTE supports mean and CLS sample vectors, not full tokens')
+        raise ValueError('SMOTE supports mean sample vectors, not full tokens')
     if args.out.exists():
         raise FileExistsError(f'Output already exists: {args.out}')
     if min(args.hidden_dims + [args.token_dim, args.epochs, args.batch_size]) <= 0:
@@ -158,8 +160,6 @@ def train(args):
         manifest = json.loads((args.cache / 'manifest.json').read_text())
         if manifest['format_version'] != 1:
             raise ValueError('Unsupported cache format')
-        if args.variant == 'cls' and manifest['backend'] != 'cellfm':
-            raise ValueError('CLS variant requires CellFM')
         for record in manifest['records']:
             sid = str(record['sample_id'])
             grouped.setdefault(sid, []).append(record)
@@ -175,14 +175,6 @@ def train(args):
     if args.variant == 'full':
         with token_record(args.cache, grouped[all_ids[0]][0]) as z:
             token_count, width = z['tokens'].shape
-    elif args.variant == 'cls':
-        for sid in all_ids:
-            values = []
-            for r in grouped[sid]:
-                with token_record(args.cache, r) as z:
-                    values.append(z['cls'])
-            vectors[sid] = np.mean(values, axis=0, dtype=np.float64).astype(np.float32)
-        width = len(vectors[all_ids[0]])
     else:
         feature_path = args.features or args.cache / 'mean_features.csv'
         frame = pd.read_csv(feature_path, index_col=0)
@@ -306,7 +298,7 @@ def train(args):
                       script_sha256=digest(__file__),
                       versions=dict(torch=torch.__version__, numpy=np.__version__, sklearn=sklearn.__version__),
                       selection='fixed epochs; evaluation partitions never used for fitting or model selection',
-                      view_handling='full: equal per-view training loss, mean view probabilities at evaluation; cls/mean: mean view embeddings')
+                      view_handling='full: equal per-view training loss, mean view probabilities at evaluation; mean: mean view embeddings')
     (args.out / 'run.json').write_text(json.dumps(provenance, indent=2))
     torch.save({'state_dict': model.cpu().state_dict(), 'run': provenance}, args.out / 'head.pt')
 

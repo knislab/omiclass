@@ -45,11 +45,11 @@ def mock_encoders(monkeypatch):
         if cfg.foundation.representation == 'tokens':
             token_cache = out / 'tokens'
             observer = extraction.TokenObserver(token_cache, extraction.backend_name(cfg),
-                cfg.cellfm.num_views if cfg.foundation.model.startswith('cellfm') else 1, True)
+                cfg.cellfm.num_views if cfg.foundation.model.startswith('cellfm') else 1)
             for view in range(observer.num_views):
                 tokens = np.repeat(values.to_numpy()[:, None, :], 4, axis=1) + np.arange(4)[None, :, None]*0.01 + view*0.001
                 observer(tokens.astype(np.float32), np.ones(tokens.shape[:2], bool),
-                    np.tile(np.arange(4), (len(values), 1)), values.index, view, None)
+                    np.tile(np.arange(4), (len(values), 1)), values.index, view)
             observer.finish(values.index)
         return extraction.Extraction(values, {'mocked_encoder': True}, token_cache)
     monkeypatch.setattr(extraction, 'extract', extract)
@@ -71,6 +71,21 @@ def tiny_native(monkeypatch):
 CASES = [(r['model'], r['representation'], r['classifier'], r['pooling']) for r in api.foundation_configurations()]
 
 
+def test_public_catalogue():
+    from collections import Counter
+    assert len(CASES) == len(set(CASES)) == 104
+    assert Counter(row[0] for row in CASES) == {
+        'bulkformer': 41, 'cellfm_1view': 21, 'cellfm_20view': 21, 'bulkrnabert': 21}
+    assert {row[1] for row in CASES} == {'full', 'supervised', 'pca', 'supervised_pca', 'tokens'}
+
+
+@pytest.mark.parametrize('model', ['cellfm_1view', 'cellfm_20view'])
+@pytest.mark.parametrize('classifier', ['svm', 'mlp', 'mlp_smote'])
+def test_removed_representation_rejected(model, classifier):
+    with pytest.raises(ValueError, match='representation'):
+        FoundationCfg(enabled=True, model=model, classifier=classifier, representation='cls')
+
+
 @pytest.mark.parametrize('model,representation,classifier,pooling', CASES)
 def test_api_train_save_load_and_external_prediction(tmp_path, dataset, mock_encoders, tiny_native,
                                                        model, representation, classifier, pooling):
@@ -87,7 +102,7 @@ def test_api_train_save_load_and_external_prediction(tmp_path, dataset, mock_enc
     assert manifest['status'] == 'complete'
     assert set(manifest['split']['train_index']).isdisjoint(manifest['split']['test_index'])
     assert manifest['representation'] == representation
-    assert manifest['diagnostic'] == (representation == 'cls')
+    assert manifest['diagnostic'] is False
     scope = json.loads((result.out_dir/'training/fit_scope.json').read_text())
     fit_ids = scope.get('representation_fit_ids', scope.get('constant_filter_fit_ids', scope.get('final_fit_ids', [])))
     assert set(fit_ids) <= set(counts.columns[:24])
@@ -110,13 +125,10 @@ def test_api_train_save_load_and_external_prediction(tmp_path, dataset, mock_enc
 
 
 @pytest.mark.parametrize('settings', [
-    dict(model='bulkrnabert', representation='cls', classifier='svm'),
-    dict(model='bulkformer', representation='cls', classifier='mlp'),
     dict(model='cellfm', pooling='max'),
     dict(model='cellfm', representation='tokens', classifier='mlp_smote'),
     dict(model='bulkformer', representation='tokens', classifier='lr'),
     dict(model='bulkrnabert', representation='tokens', classifier='svm'),
-    dict(model='cellfm', representation='cls', classifier='omiclass'),
     dict(model='cellfm', input_scale='tpm'),
     dict(correction='limma'),
     dict(mode='predict'),
@@ -227,7 +239,7 @@ def test_existing_bulkformer_extra_pooling_is_explicit(pooling):
 
 @pytest.mark.parametrize('model,representation,classifier',[
     ('bulkformer','supervised_pca','lr'),('bulkformer','full','omiclass'),
-    ('cellfm_1view','cls','mlp_smote'),('cellfm_20view','tokens','mlp'),
+    ('cellfm_1view','supervised_pca','mlp_smote'),('cellfm_20view','tokens','mlp'),
     ('bulkrnabert','supervised_pca','mlp'),('bulkrnabert','full','svm'),('bulkrnabert','tokens','mlp')])
 def test_multiclass_canonical_order_and_roundtrip(tmp_path,dataset,mock_encoders,tiny_native,model,representation,classifier):
     counts,expression,metadata,split=dataset

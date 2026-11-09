@@ -11,7 +11,4 @@ def configurations():
                              evidence="saved manuscript protocol", diagnostic=False))
         rows.append(dict(model=model, pooling="mean", representation="tokens", classifier="mlp",
                          evidence="validated experimental protocol; no completed full-scale fits" if model == "bulkrnabert" else "saved manuscript protocol", diagnostic=False))
-        if model.startswith("cellfm"):
-            rows.extend(dict(model=model, pooling="mean", representation="cls", classifier=head,
-                             evidence="saved diagnostic protocol", diagnostic=True) for head in ["mlp", "mlp_smote", "svm"])
     return rows

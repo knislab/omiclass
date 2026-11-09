@@ -142,7 +142,7 @@ def extract_corrected(counts, corrected, cfg, directory, observer=None):
         encoded, extra = encode(torch.from_numpy(after).to(device=expression.device,
                       dtype=expression.dtype), genes, st_features, valid)
         if observer is not None:
-            observer(encoded[:, 3:], valid, genes, ids, view, encoded[:, 0])
+            observer(encoded[:, 3:], valid, genes, ids, view)
         return encoded, extra
 
     model.net.encode = fixed_view_encode

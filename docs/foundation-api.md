@@ -12,10 +12,9 @@ The saved cancer/non-cancer protocol graph and classification/extraction adapter
 | `cellfm_1view`, `cellfm_20view` | `mean` | Same four pooled representations | Same five classifiers |
 | `bulkrnabert` | `mean` | Same four pooled representations | Same five classifiers |
 | `bulkformer`, `cellfm_1view`, `cellfm_20view` | `mean` (ignored as an aggregation for tokens) | `tokens` | `mlp` |
-| `cellfm_1view`, `cellfm_20view` | `mean` | `cls` | `svm`, `mlp`, `mlp_smote` — diagnostic |
 | `bulkrnabert` | `mean` | `tokens` | `mlp` — experimentally validated; no completed full-scale manuscript fits |
 
-This is 110 explicit entries, enumerable without loading models:
+This is 104 explicit entries, enumerable without loading models:
 
 ```python
 import api
@@ -23,7 +22,7 @@ for configuration in api.foundation_configurations():
     print(configuration)
 ```
 
-CellFM `mean` is valid-gene pooling within each view, then the mean of view embeddings. `cls` averages view CLS vectors and preserves their original degeneracy. Full-token heads train each view with equal loss weight and average **probabilities** over views at evaluation; they do not flatten all views into one sample.
+CellFM `mean` is valid-gene pooling within each view, then the mean of view embeddings. Full-token heads train each view with equal loss weight and average **probabilities** over views at evaluation; they do not flatten all views into one sample.
 
 BulkFormer `max_mean_median` maps to the historical `aggregate_type='all'`: **max + mean + median elementwise sum**, not concatenation. Existing max-only and median-only pooling remain available as `foundation.pooling='max'/'median'`, explicitly marked framework extensions. The `cellfm` model name accepts the existing positive `cellfm_num_views`; counts other than 1/20 are implemented extensions, not claims of matched manuscript evidence.
 
@@ -150,8 +149,8 @@ Original marker calls through `api.run(expression, markers_path=..., ...)` retai
 
 ## Unsupported configurations and Step 3 boundaries
 
-Unsupported: non-CellFM CLS; CLS LR/Omiclass; token SVM/LR/SMOTE/native suites; CellFM/BERT max/median pooling; non-RNA-seq modalities; outcome-dependent correction; correction methods without an observed adapter; unsupported checkpoint shapes/layers; GPU head training. Missing local vendor/checkpoint/JAX/R dependencies produce errors rather than downloads, silent fallback, or modified scientific settings.
+Unsupported: token SVM/LR/SMOTE/native suites; CellFM/BERT max/median pooling; non-RNA-seq modalities; outcome-dependent correction; correction methods without an observed adapter; unsupported checkpoint shapes/layers; GPU head training. Missing local vendor/checkpoint/JAX/R dependencies produce errors rather than downloads, silent fallback, or modified scientific settings.
 
-The following require a separate Step 3 decision and are retained here: pre-split/transductive correction and external re-correction; BERT corrected-value clipping; BulkFormer all-pooling sum; positional flattening of CellFM token sequences; nearly constant CLS vectors; native calibration/stacking/imbalance and selection choices; fixed heads without outer CV; and the BERT early-stopping model without all-training refit. Historical repeated seeds on fixed splits measure a different source of variability from newly generated splits.
+The following require a separate Step 3 decision and are retained here: pre-split/transductive correction and external re-correction; BERT corrected-value clipping; BulkFormer all-pooling sum; positional flattening of CellFM token sequences; native calibration/stacking/imbalance and selection choices; fixed heads without outer CV; and the BERT early-stopping model without all-training refit. Historical repeated seeds on fixed splits measure a different source of variability from newly generated splits.
 
 No CPOP, RankTreeEnsemble, Multi-class Pairs, MINT or other external comparison-tool logic is incorporated.

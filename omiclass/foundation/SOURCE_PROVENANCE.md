@@ -15,7 +15,7 @@ The hashes below identify the read-only source implementations used for Step 2.
   "adaptations": {
     "article_head": "Callable train(args), reusable exact architecture factory, NPZ/NPY token reader. Optimizer/loss/shuffling/epochs unchanged.",
     "bert_head": "Optional input width replaces the historical width-only FunctionType adapter. Optimizer/inner split/early stopping/SMOTE unchanged.",
-    "cellfm_corrected": "Instance-local token/CLS observer and public JSON writer. Original normalization, view selection, corrected scalar replacement, finite checks unchanged.",
+    "cellfm_corrected": "Instance-local token observer and public JSON writer. Original normalization, view selection, corrected scalar replacement, finite checks unchanged.",
     "correction_compat": "Exact original zero-gene restoration and corrected-value floor functions."
   }
 }
