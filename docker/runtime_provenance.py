@@ -61,12 +61,6 @@ def render() -> str:
                 f"source manifest SHA256: {_sha256(manifest)}",
             ]
         )
-    for input_path in (
-        Path("/app/data/protein_expression_matrix.csv"),
-        Path("/app/data/clinical_metadata.csv"),
-    ):
-        if input_path.is_file():
-            lines.append(f"input SHA256 {input_path}: {_sha256(input_path)}")
     lines.append(f"R_HOME: {os.environ.get('R_HOME', '<unset>')}")
     lines.extend(f"{name}: {os.environ.get(name, '<unset>')}" for name in THREAD_VARIABLES)
     lines.extend(["numpy.show_config():", numpy_config.getvalue().rstrip(), ""])

@@ -21,7 +21,10 @@ from omiclass.train.selection import rank_candidates
 
 
 def _metadata(cfg):
+    from omiclass.utils.identifiers import validate_delimited_header, validate_frame_identifiers
+    validate_delimited_header(cfg.project.meta_path, error_type=ValueError)
     meta = pd.read_csv(cfg.project.meta_path, index_col=0, dtype=str)
+    validate_frame_identifiers(meta, error_type=ValueError)
     meta.index = meta.index.map(str)
     if not meta.index.is_unique:
         raise ValueError('Metadata sample IDs must be unique')
@@ -190,7 +193,8 @@ def _predict(expression_file, cfg):
     version = manifest['format_version']
     if _resource_digests(cfg, version) != manifest['encoder_assets']:
         raise ValueError('Encoder assets changed since training')
-    counts = extraction.read_expression(expression_file)
+    input_protocol = extraction.input_identifier_protocol(cfg, manifest)
+    counts = extraction.read_expression(expression_file, protocol=input_protocol)
     known = set(manifest['split']['train_index'] + manifest['split']['test_index'])
     ids = counts.columns.tolist() if cfg.foundation.prediction_scope == 'all' else [s for s in counts.columns if s not in known]
     if not ids:
@@ -223,6 +227,7 @@ def _predict(expression_file, cfg):
     write_json(out / 'prediction.json', dict(source_run=str(saved), samples=ids, refitted=False,
         correction='full supplied prediction input re-corrected' if cfg.foundation.correction != 'none' else 'none',
         source_format_version=version,
+        input_identifier_protocol=input_protocol,
         encoder_verification='file_and_source_identities' if version == 2 else 'legacy_file_checks_only',
         input_expression=str(Path(expression_file).resolve()),
         tpm_input_path=str(cfg.bulkrnabert.tpm_input_path) if extraction.backend_name(cfg) == 'bulkrnabert' and cfg.bulkrnabert.tpm_input_path else None,
@@ -234,7 +239,8 @@ def run_foundation(expression_file, cfg):
     cfg = _resolve_paths(cfg)
     if cfg.foundation.mode == 'predict':
         return _predict(expression_file, cfg)
-    counts = extraction.read_expression(expression_file)
+    input_protocol = extraction.input_identifier_protocol(cfg)
+    counts = extraction.read_expression(expression_file, protocol=input_protocol)
     meta = _metadata(cfg)
     split, y, classes = _split(counts, meta, cfg)
     train, test = split['train_index'], split['test_index']
@@ -276,7 +282,7 @@ def run_foundation(expression_file, cfg):
     pd.concat(prediction_frames, ignore_index=True).to_csv(out / 'holdout_predictions.csv', index=False)
     signed = [*paths.values(), 'config.freeze.yaml']
     seed, source = extraction.encoder_seed(cfg)
-    protocol = dict(encoder_seed=seed, seed_source=source)
+    protocol = dict(encoder_seed=seed, seed_source=source, input_identifiers=input_protocol)
     if extraction.backend_name(cfg) == 'cellfm' and cfg.cellfm.num_views == 1:
         protocol['cellfm_single_view'] = 'sha256_sample_id_global_seed_zero_based_view_index'
     manifest = dict(format_version=2, status='complete', backend=extraction.backend_name(cfg), encoder_assets=encoder_assets,

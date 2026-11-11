@@ -1,22 +1,17 @@
-# Build the Docker image for omiclass
-docker build -t omiclass:dev ..
-
-# Use the examples/data folder
-data_path=$(realpath data)
-results_path=$(realpath results)
-
-mkdir -p "$results_path"
-
-docker run --rm \
-  -v "$data_path:/app/data" \
-  -v "$results_path:/app/results" \
+#!/usr/bin/env bash
+set -euo pipefail
+: "${INPUT_DIR:?Set INPUT_DIR to permitted expression.csv, metadata.csv, markers.txt inputs}"
+: "${OUTPUT_DIR:?Set OUTPUT_DIR to a writable output parent directory}"
+mkdir -p "$OUTPUT_DIR"
+docker run --rm -v "$(realpath "$INPUT_DIR"):/app/data:ro" -v "$(realpath "$OUTPUT_DIR"):/app/results" \
   omiclass:dev \
-  --override expression_file /app/data/raw_counts.csv \
+  --override expression_file /app/data/expression.csv \
+  --override meta_path /app/data/metadata.csv \
+  --override classification_column class \
   --override output_dir /app/results \
-  --override meta_path /app/data/patients_meta.csv \
-  --override class_col class \
-  --override batch_column batch \
-  --override de_covariates age,sex \
-  --override n_jobs 5 \
-  --override gene_lengths_path /app/data/gene_lengths.csv \
-  --override project_name docker_example
+  --override raw_count false \
+  --override log_transform false \
+  --override feature_selection_enabled false \
+  --override markers_path /app/data/markers.txt \
+  --override run_de false \
+  --override batch_correction.algorithm none

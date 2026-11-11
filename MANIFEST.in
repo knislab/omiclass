@@ -1,0 +1,22 @@
+include README.md setup.cfg setup.py pyproject.toml pytest.ini environment.yml Dockerfile .dockerignore
+recursive-include omiclass *.py *.R *.md
+recursive-include docs *.md
+recursive-include tests *.py
+recursive-include examples *.py *.sh *.md
+recursive-include docker *.py *.sh
+prune .step3-validation
+prune .git
+prune BulkFormer
+prune BulkRNABert
+prune CellFM
+prune experiments
+prune final_results_runs
+prune comparison_tools
+prune examples/data
+prune examples/image
+prune examples/results
+exclude LICENSE
+global-exclude *.csv *.tsv *.xlsx *.h5 *.h5ad *.joblib *.pkl *.npz *.npy *.ipynb *.html *.png *.pdf *.pyc *.pyo
+exclude omiclass/data/filtered_surface_list.txt
+recursive-include .github *.yml
+global-exclude *.pt *.pth *.ckpt *.safetensors *.pem *.so

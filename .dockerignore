@@ -1,32 +1,48 @@
-# Ignore files and directories for Docker build context
-
-# Git files
 .git
-.gitignore
-
-# virtual environment and logs
+.step3-validation
+.pytest_cache
+__pycache__
+**/__pycache__
+*.pyc
+*.egg-info
+build
+dist
 .env
-.venv/
-venv/
+.venv
+venv
 *.log
-
-# large files
-data/
-*.csv
-*.tsv
-*.xlsx
-*.h5
-*.h5ad
+.DS_Store
+BulkFormer
+BulkRNABert
+CellFM
+experiments
+final_results_runs
+comparison_tools
+manuscript_figures
+manuscript_statistics
+data
+results
+assets
+examples/data
+examples/results
+examples/image
+# Annotation/data redistribution is pending permission review. Include neither
+# hg19 nor hg38 implicitly; supply approved gene lengths as mounted input.
+omiclass/data/*.csv
+omiclass/data/filtered_surface_list.txt
 *.joblib
 *.pkl
+*.npz
+*.npy
+*.h5
+*.h5ad
 
-# Required framework reference data; experiment inputs remain bind-mounted.
-!omiclass/data/gencode_GRCh37_hg19.csv
-
-# Python cache files
-__pycache__/
-*.pyc
-.ipynb_checkpoints/
-
-# local files
-.DS_Store
+.aws/
+.codex/
+.agents/
+.env.*
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.pem

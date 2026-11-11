@@ -106,7 +106,10 @@ def create_runtime_options_from_path_conf_kwargs(
         input_mode = "batch_correction"
     else:
         mode = "train-only"
-        input_mode = "ready_for_training"
+        # A raw-count request still needs the existing normalization step when
+        # supervised DE and cohort correction are both disabled. Saved-run
+        # replay above remains governed by its recorded input mode.
+        input_mode = "raw_counts" if is_raw_count else "ready_for_training"
     if input_mode == "raw_counts":
         expr_path = None
         counts_path = expression_path

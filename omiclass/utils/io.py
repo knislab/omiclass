@@ -6,6 +6,7 @@ from omiclass.errors.errors import DataShapeError
 from io import StringIO
 from omiclass.config.schema import Config
 from omiclass.utils.pdf_export import save_pdf_plot
+from omiclass.utils.identifiers import validate_delimited_header, validate_frame_identifiers
 
 
 def load_matrix(path: Union[str, Path], numeric: bool = True) -> pd.DataFrame:
@@ -13,14 +14,14 @@ def load_matrix(path: Union[str, Path], numeric: bool = True) -> pd.DataFrame:
     if p.endswith(".parquet"):
         df = pd.read_parquet(p)
     elif p.endswith(".csv") or p.endswith(".tsv"):
+        validate_delimited_header(path)
         sep = "," if p.endswith(".csv") else "\t"
         df = pd.read_csv(p, sep=sep, index_col=0, low_memory=False)
         if numeric:
             df = df.apply(pd.to_numeric, errors="coerce")
     else:
         raise ValueError(f"Unsupported matrix file: {p}")
-    df = df[~df.index.duplicated(keep="first")]
-    df = df.loc[:, ~df.columns.duplicated(keep="first")]
+    validate_frame_identifiers(df)
     return df
 
 def load_meta_matrix(
@@ -35,14 +36,13 @@ def load_meta_matrix(
     if p.endswith(".parquet"):
         df = pd.read_parquet(p)
     elif p.endswith(".csv") or p.endswith(".tsv"):
+        validate_delimited_header(path)
         sep = "," if p.endswith(".csv") else "\t"
         df = pd.read_csv(p, sep=sep, index_col=0, low_memory=False)
     else:
         raise ValueError(f"Unsupported matrix file: {p}")
 
-    # Remove duplicates
-    df = df[~df.index.duplicated(keep="first")]
-    df = df.loc[:, ~df.columns.duplicated(keep="first")]
+    validate_frame_identifiers(df)
 
     return encode_meta_matrix(df, cluster_col, return_category_maps)
 

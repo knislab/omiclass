@@ -2,59 +2,31 @@ name: omiclass_env
 channels:
   - conda-forge
   - bioconda
-  - defaults
 dependencies:
   - python=3.9
-  - pandas
-  - numpy
-  - scipy
-  - seaborn
-  - matplotlib
-  - jupyterlab
-  - openpyxl
-  - biopython
-  - scikit-learn
-  - imbalanced-learn
-  - shap
-  - lightgbm
-  - xgboost
-  - pyarrow
-  - sra-tools
-  - rpy2
-  - scikit-optimize
+  - pip
+  - setuptools>=58
+  - wheel
+  - numpy=1.26
+  - pandas=2.2
+  - scipy=1.13
+  - scikit-learn=1.5
+  - imbalanced-learn=0.12
+  - scikit-optimize=0.10
+  - xgboost=2.1
+  - lightgbm=4.5
+  - joblib>=1.4,<2
   - pydantic>=2,<3
-  - pydantic-core>=2
-  - weasyprint
-  - lifelines
-  - networkx
-  - scikit-survival
-
+  - pyyaml>=6,<7
+  - matplotlib>=3.7,<4
+  - seaborn>=0.12,<0.14
+  - requests>=2.31,<3
+  - statsmodels>=0.14,<0.15
+  - lifelines>=0.27,<0.31
   - r-base=4.3
-  - r-matrix
-  - r-reticulate>=1.42
-  - r-rcpptoml
-  - r-rcpp
-  - r-seurat=4.3.0
-  - r-seuratobject
-  - r-sctransform
-  - r-hgnchelper
-  - r-purrr
-  - r-stringr
-  - r-tidyr
-  - r-patchwork
-  - r-openxlsx
-  - r-readr
-  - r-ggplot2
-  - r-matrixstats
-  - r-glmnet
-  - r-rtsne
-
-  - bioconductor-summarizedexperiment
-  - bioconductor-biobase
-  - bioconductor-aucell
-  - bioconductor-gseabase
-  - bioconductor-singler
-  - bioconductor-celldex
-  - bioconductor-scuttle
+  - r-jsonlite
+  - bioconductor-limma
   - bioconductor-edger
   - bioconductor-sva
+  - bioconductor-biocparallel
+  - rpy2>=3.5,<3.6

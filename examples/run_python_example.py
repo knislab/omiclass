@@ -1,21 +1,24 @@
-import sys
+"""Train the existing marker workflow on user-supplied, prepared expression."""
+import argparse
 from pathlib import Path
-
-sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from api import run
 
-base_dir = Path(__file__).resolve().parent
-expression_file = f"{base_dir}/data/raw_counts.csv"
-kwargs = {
-    "output_dir": f"{base_dir}/results",
-    "meta_path": f"{base_dir}/data/patients_meta.csv",
-    "class_col": "class",
-    "batch_column": "batch",
-    "de_covariates": ["age", "sex"],
-    "n_jobs": 5,
-    "gene_lengths_path": f"{base_dir}/data/gene_lengths.csv",
-    "project_name": "python_example",
-}
 
-run(expression_file, **kwargs)
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in ('expression', 'metadata', 'markers', 'output'):
+        parser.add_argument('--'+name, required=True, type=Path)
+    parser.add_argument('--class-column', default='class')
+    args = parser.parse_args()
+    if (args.output / 'leaderboard.csv').exists():
+        parser.error('Output is an existing trained run; use the prediction example')
+    result = run(args.expression, output_dir=args.output, meta_path=args.metadata,
+        classification_column=args.class_column, markers_path=args.markers,
+        raw_count=False, log_transform=False, feature_selection_enabled=False, run_de=False,
+        **{'batch_correction.algorithm': 'none'})
+    print(result.out_dir)
+
+
+if __name__ == '__main__':
+    main()

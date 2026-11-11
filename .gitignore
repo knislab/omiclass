@@ -1,83 +1,36 @@
-# .gitignore for the project
-
-# virtual environment and logs
 .step3-validation/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
 .env
 .venv/
 venv/
 *.log
-
-# large files
+.DS_Store
 data/
-*.csv
-*.tsv
-*.xlsx
-*.h5
-*.h5ad
+results/
+assets/
+BulkFormer/
+BulkRNABert/
+CellFM/
+examples/data/
+examples/results/
 *.joblib
 *.pkl
-*json
+*.npz
+*.npy
+*.h5
+*.h5ad
 
-# Python cache files
-__pycache__/
-*.pyc
-.ipynb_checkpoints/
-
-# local files
-.DS_Store
-toy_data/
-create_toy_dataset.py
-
-# ignore all files in the tests directory
-tests/
-!tests/
-!tests/*.py
-results/
-final_results_runs/
-comparison_tools/
-experiments/
-thesis_plots/
-!/data01/private/projects/omiclass/experiments/reference_preprocessing
-
-# Version only the additive BulkRNABert launchers; keep all run data ignored.
-examples/results/Docker_results/de_results/limma_voom_selected_genes.txt
-examples/results/Docker_results/train_artifacts/genesets/**
-examples/results/Docker_results/config.freeze.yaml
-examples/results/Python_results/de_results/limma_voom_selected_genes.txt
-examples/results/Python_results/config.freeze.yaml
-examples/results/Python_results/train_artifacts/genesets/**
-examples/results/Bash_results/de_results/limma_voom_selected_genes.txt
-examples/results/Bash_results/config.freeze.yaml
-examples/results/Bash_results/train_artifacts/genesets/**
-BulkFormer/**
-CellFM/**
-BulkFormer/**
-manuscript_figures/**
-manuscript_statistics/
-# Local CellFM runtime assets and generated embeddings
-CellFM/CellFM-torch/
-CellFM/weights/
-CellFM/smoke_outputs/
-CellFM/bulk_smoke_outputs/
-CellFM/vendor/
-
-
-
-!omiclass/data/gencode_GRCh37_hg19.csv
-!omiclass/data/gencode_v34_GRCh38_hg38.csv
-!omiclass/data/
-
-!examples/data
-!examples/data/patients_meta.csv
-!examples/data/raw_counts.csv
-!examples/data/gene_lengths.csv
-!examples/data/patients_meta_with_external.csv
-!examples/data/raw_counts_with_external.csv
-
-!examples/results/
-!examples/results/**/
-!examples/results/**/*.html
-
-# Keep the projection experiment implementation; generated inputs/results stay local.
-
-
+.aws/
+.codex/
+.agents/
+.env.*
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.pem

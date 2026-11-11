@@ -1,262 +1,118 @@
 # Omiclass
 
-Omiclass is a configurable machine-learning framework for omics classification tasks. It trains and evaluates multiple classifiers on gene-expression style input data, supports imbalance handling methods, and writes model outputs and reports to a results directory.
+Omiclass trains and evaluates the existing marker-based RF, LightGBM, XGBoost and logistic-regression stacked ensemble workflows. The opt-in foundation API exposes 104 pooled/token configurations for BulkFormer, CellFM and BulkRNABert while preserving their separate training protocols.
 
-The framework is designed to run either directly with Python or inside Docker, so the same analysis can be reproduced on a local machine, a lab server, or a clean container environment.
+This is a **private publication candidate**. The software license, annotation/data redistribution permissions and some external encoder assets remain unresolved. No license is granted by this README. Version `0.0.0.dev0` is a packaging-validation placeholder, not a published release.
 
-## Main features
+## Installation
 
-- Expression-based classification from tabular input files
-- Train/test splitting and cross-validation
-- Bayesian hyperparameter optimization
-- Random Forest, LightGBM, XGBoost and stacked classifer models
-- Imbalance handling using class weights and oversampling strategies
-- Output folders with trained models, predictions, metrics, and reports
-
-## Framework Overview
-![Schema](examples/image/schema.png)
-
-## Repository structure
-
-```text
-omiclass/
-├── omiclass/              # Framework source code
-├── examples/              # Example commands and small example config files
-├── api.py.                # Framework entery point
-├── Dockerfile             # Docker image definition
-├── environment.yml.txt    # Dependencies
-├── README.md              # This file
-├── .gitignore
-├── .dockerignore
-└── LICENSE
-```
-
-## Input files
-
-The framework expects at least two input tables:
-
-1. **Expression file**
-   - Rows should represent samples or patient according to the selected loader/configuration.
-   - Columns should contain the features used for classification.
-   - Example: `filtered_count.csv`
-
-2. **Metadata file**
-   - Contains sample-level labels and optional covariates.
-   - Must include the classification label column.
-   - Example: `filtered_meta.csv`
-
-For example, for IGHV classification, the metadata file should contain a label column such as:
-
-```text
-ighv_mut
-```
-
-Batch correction is optional. If you do not provide any batch-related settings such as `batch_column`, `batch_covariates_path`, or `batch_n_pcs`, the batch-correction step is skipped.
-
-Training-reference alternatives are available through `batch_correction.algorithm`:
-`frozen_quantile`, native `fsva_exact`, and experimental `reference_ruv`.
-They fit on explicitly listed training samples and support independent external
-application through the existing prediction workflow. The default is `limma`;
-`none` explicitly disables correction. See the [methods, configuration and limitations](docs/reference_preprocessing.md)
-and [CLL-Map → DKFZ comparison commands](experiments/reference_preprocessing/README.md).
-If you provide `markers_path` with a predefined gene list, Omiclass skips DE and gene-set selection and uses that list directly.
-
-## Quick start with Docker
-
-Build the Docker image from the repository root:
+The validation baseline is Linux with Python 3.9. Use a new environment owned by you; do not install into an experiment environment.
 
 ```bash
-docker build -t omiclass:dev .
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install .
 ```
 
-Create local folders for input and output:
+The package retains `api.run`, `api.predict` and `omiclass.*` import paths. The numerical dependency bounds reflect the corrected implementation's tested family of versions; cross-version saved-model compatibility is not guaranteed. For R-backed DE/correction, create the Conda environment from the repository root, then install the source:
 
 ```bash
-mkdir -p data results
+conda env create -f environment.yml
+conda activate omiclass_env
+python -m pip install --no-deps -e .
 ```
 
-Place your input files in `data/`, for example:
+See [installation and validation](docs/installation.md), [encoder setup and required assets](docs/encoders.md), and [licensing/resource exclusions](docs/licensing.md). Core installation does not install encoder checkpoints, a CellFM port, JAX, or GPU binaries. CPU neural-head tests additionally require the `foundation` extra.
 
-```text
-data/filtered_count.csv
-data/filtered_meta_ighv.csv
-```
+## Inputs and marker-based training
 
-Run the framework:
+Expression/count matrices have **genes/features in rows and sample IDs in columns**. Metadata has **one row per sample** and a classification column. Core input tables require unique, nonempty, trimmed identifiers; duplicate CSV/TSV headers fail before pandas can rename them. Use CSV/TSV or the existing optional Parquet loader. Foundation expression input is CSV.
 
-```bash
-docker run --rm \
-  -v "$PWD/data:/app/data" \
-  -v "$PWD/results:/app/results" \
-  omiclass:dev \
-  --override expression_file /app/data/filtered_count.csv \
-  --override meta_path /app/data/filtered_meta_ighv.csv \
-  --override output_dir /app/results \
-  --override class_col ighv_mut \
-  --override de_covariates age,sex
-```
-
-The input files remain on your server/local machine. The results are written to the mounted `results/` folder.
-
-### Rerun using Docker for prediction on a new dataset
-
-You can rerun an existing pipeline on another dataset that was prepared using the same preprocessing steps as the original run.  
-This is useful when you already trained the pipeline and want to apply the same saved models, selected genes, normalization/batch settings, and report structure to a new input dataset.
-
-When using Docker, mount the folder that contains the new input data and the previous output directory. Then pass the existing pipeline directory as `output_dir`.
-
-
-```bash
-docker run --rm \
-  -v "$PWD/data:/app/data" \
-  -v "$PWD/results:/app/results" \
-  omiclass:dev \
-  --override expression_file /app/data/filtered_count.csv \
-  --override output_dir /app/data/<Existing_pipeline> \
-  --override meta_path /app/data/merged_meta_cll.csv
-```
-
-The mounted directory is shared with the server, so the updated reports and outputs will be written back to the existing pipeline folder.
-
-## Quick start with Python
-
-You can run Omiclass directly from Python by importing the `run` function from `api.py`.
-
-Example file: `examples/python_example.py`
+Supply your own permitted input files. The minimal marker example uses an already prepared expression matrix on its intended classification scale. Historical example data, annotations, screenshots and generated reports are excluded from the publication candidate pending permission review. No trained models are shipped.
 
 ```python
 from pathlib import Path
-
 from api import run
 
-base_dir = Path(__file__).resolve().parent.parent
-
-expression_file = f"{base_dir}/data/filtered_counts.csv"
-
-kwargs = {
-    "output_dir": f"{base_dir}/results",
-    "meta_path": f"{base_dir}/data/filtered_meta_ighv.csv",
-    "class_col": "ighv_mut",
-    "batch_column": "cohort",
-    "de_covariates": ["age", "sex"],
-    "n_jobs": 5,
-}
-
-run(expression_file, **kwargs)
+result = run(
+    Path("inputs/expression.csv"),
+    output_dir=Path("outputs"),
+    meta_path=Path("inputs/metadata.csv"),
+    classification_column="class",
+    markers_path=Path("inputs/markers.txt"),
+    raw_count=False,
+    log_transform=False,
+    feature_selection_enabled=False,
+    run_de=False,
+    **{"batch_correction.algorithm": "none"},
+)
+print(result.out_dir)  # Keep this actual timestamped run directory for prediction.
 ```
 
-From the project root:
-```bash
-cd examples
-```
-Create conda environment
-```bash
-conda env create -f ../environment.yml
-conda activate omiclass_env
-```
-Run the example 
-```bash
-python python_example.py
-```
+Markers are one feature ID per line. This minimal example keeps the supplied markers and prepared scale; it does not normalize raw counts or rerank markers. Raw-count DE workflows require verified gene lengths matching the measured universe and the existing normalization protocol. Without a marker list, the existing DE workflow requires compatible R/rpy2, limma, edgeR and jsonlite. Supervised selection and learned preprocessing fit within training/CV partitions. Native nested stacking/calibration needs sufficient samples per class and may reject small partitions rather than substitute in-sample predictions.
 
-The main input expression file is passed as the first argument to `run()`.  
-Additional parameters are passed as keyword arguments through `**kwargs`.
-
-## Quick start with Bash
-
-You can run the `run` function from `api.py` from bash.
-```bash
-python api.py \
---override expression_file <data_path>/raw_counts.csv \
---override output_dir <data_path>/results \
---override meta_path <data_path>/patients_meta.csv \
---override class_col class \
---override batch_column batch \
---override de_covariates age,sex \
-```
-
-## Example folder
-
-The `examples/` folder contains:
-
-```text
-examples/
-├── README.md
-├── run_bash_example.sh
-├── run_bash_re_run_example.sh
-├── run_docker_example.sh
-├── run_docker_re_run_example.sh
-├── run_python_example.py
-└── run_python_re_run_example.py
-├── image/
-├── results/
-│   ├── Docker_results
-│   ├── Bash_results
-│   └── Python_results
-└── data/
-    ├── gene_lengths.csv
-    ├── patients_meta.csv
-    ├── patients_meta_with_external.csv
-    ├── raw_counts.csv
-    ├── raw_counts_with_external.csv
-    └── README.md
-```
-
-Use the example script as a template and replace the input paths, label column, and covariates with the values for your project.
-
-## Configuration
-Parameters are set through the public alias names.
-
-The same aliases can be used in two ways:
-
-1. **Python API**: pass parameters as keyword arguments (`**kwargs`).
-2. **Docker/CLI**: pass parameters with repeated `--override` arguments.
-
-For example, the user-facing alias `output_dir` maps internally to `project.out_dir`, and `class_col` maps internally to `project.cluster_column`. The user should set the alias name, not the internal nested path.
-
-Main fields includes:
-
-```yaml
-expression_file: path to the expression matrix
-output_dir: path to the output directory
-meta_path: path to the metadata file
-class_col: metadata column used as the classification label
-batch_column: metadata column used for batch correction
-n_jobs: number of CPU jobs to use
-```
-
-### CellFM embedding backend
-
-CellFM can replace BulkFormer at the sample-embedding stage. It consumes raw,
-non-negative RNA-seq counts with genes in rows and samples in columns. Gene IDs
-are matched exactly to CellFM's `expand_gene_info.csv` vocabulary. The pretrained
-model is frozen and valid gene-token outputs are mean-pooled for each sample.
-
-Enable one embedding backend only. CellFM uses the same downstream representation
-transformer and supports `full`, `supervised`, `pca`, and `supervised_pca`:
+For marker/core prediction, supply expression on the same prepared scale and reuse the actual completed run directory returned above:
 
 ```python
-run(
-    "data/raw_counts.csv",
-    output_dir="results/cellfm_run",
-    meta_path="data/patients_meta.csv",
-    class_col="class",
-    cellfm_enabled=True,
-    cellfm_root_dir="CellFM/CellFM-torch",
-    cellfm_checkpoint_path="CellFM/weights/CellFM_80M_weight.ckpt",
-    cellfm_device="auto",
-    cellfm_batch_size=1,
-    cellfm_reduction_strategy="supervised_pca",
-    cellfm_supervised_dimensions=200,
-    cellfm_pca_components=50,
-    feature_selection_enabled=False,
+prediction = run(
+    Path("inputs/prediction_expression.csv"),
+    output_dir=result.out_dir,
+    meta_path=Path("inputs/prediction_metadata.csv"),
 )
 ```
 
-`feature_selection_enabled` must be false for every non-`full` embedding
-strategy. The Python environment running Omiclass must also provide CellFM's
-PyTorch and MindSpore dependencies.
+That directory must contain `leaderboard.csv`, `config.freeze.yaml` and fitted model artifacts. A folder containing only HTML is not a saved model. The existing core workflow writes prediction/report artifacts under the saved run. Foundation prediction instead uses a new output directory and `api.predict`; see below. [Runnable argument-based examples](examples/README.md) check the saved-run prerequisites.
 
-## Manuscript foundation-model API
+## Foundation configurations
 
-The opt-in `foundation` configuration exposes pooled and token representations with their distinct manuscript head protocols through `api.py`. See [configuration matrix, training protocols and saved prediction](docs/foundation-api.md). Existing marker-based calls retain their original route.
+```python
+import api
+rows = api.foundation_configurations()
+assert len(rows) == 104
+```
+
+There are 41 BulkFormer, 21 CellFM one-view, 21 CellFM twenty-view and 21 BulkRNABert configurations. The [foundation API guide](docs/foundation-api.md) defines the representations, classifiers, training protocols, external assets and prediction contract. Registration and mocked-encoder coverage do not establish real-checkpoint end-to-end validation for every configuration.
+
+**CellFM token heads use sampled positions. A position is not guaranteed to represent the same gene across samples or views.** This limits positional interpretation and may affect generalization. The existing projection/flatten/dense architecture, dimensions and selection rule remain unchanged. CLS support is absent.
+
+## Preprocessing and evaluation
+
+Explicitly transductive limma correction still fits the supplied cohort and re-corrects the supplied prediction cohort. It is not an inductive/frozen transform. Frozen-reference alternatives on the core route fit within training partitions and apply fitted state to holdout/external data. These routes must not be described interchangeably; see [preprocessing methods and boundaries](docs/reference_preprocessing.md).
+
+Ordinary estimator predictions remain primary, including SVM decisions. The core's threshold derivative is fitted from training OOF predictions, without holdout-based retention. The historical validation-ranked feature-reduction diagnostic is disabled. Standalone foundation heads retain their original fixed/nested/early-stopping evaluation protocols.
+
+## Docker
+
+The image provides the core Python/R runtime, not encoder assets or a certified GPU foundation environment. From the repository root:
+
+```bash
+docker build -t omiclass:dev .
+docker run --rm \
+  -v "$PWD/inputs:/app/data:ro" -v "$PWD/outputs:/app/results" \
+  omiclass:dev \
+  --override expression_file /app/data/expression.csv \
+  --override meta_path /app/data/metadata.csv \
+  --override classification_column class \
+  --override output_dir /app/results \
+  --override markers_path /app/data/markers.txt \
+  --override raw_count false \
+  --override run_de false \
+  --override log_transform false \
+  --override feature_selection_enabled false \
+  --override batch_correction.algorithm none
+```
+
+Neither hg19 nor hg38 annotation is silently included while permission review is pending. Supply permitted gene lengths explicitly for raw-count DE workflows; the prepared-expression Docker example above does not perform normalization. Both can be added together only after approval; their omission is a disclosed resource limitation, not a change of normalization method. Runtime provenance is written to `/app/results/runtime_provenance.txt`; set `OMICLASS_RUNTIME_REPORT` if using another writable output mount.
+
+## Tests and remaining publication decisions
+
+```bash
+python -m pip install '.[foundation,test]'
+python -m pytest
+```
+
+Public tests use synthetic inputs. Encoder calls are mocked unless explicitly documented otherwise; some real sklearn/XGBoost/LightGBM/Torch fits run with small test budgets. Native fSVA needs the explicit `OMICLASS_TEST_SVA_LIB` setting. No tests launch manuscript analyses. See [installation](docs/installation.md) for isolated cache/output settings and [resource/licensing blockers](docs/licensing.md). The candidate remains unpublished until the owner approves licensing, resources, validation results and the publication destination.
+
+**Raw-count compatibility:** new core training honors `raw_count=True` even when DE and batch correction are disabled, using the existing gene-length/TPM/log1p normalization and recording its fitted lengths. Supply verified `gene_lengths_path`. Historical runs that recorded ready-expression mode remain on that scale, including runs whose old raw flag was ignored. Prediction reuses the recorded mode; it does not silently reinterpret an old model as raw-count trained.
+
+For new raw-count marker training, use the same API with `raw_count=True`, `gene_lengths_path=Path("inputs/gene_lengths.csv")`, `run_de=False` and the desired existing correction/feature-selection settings. The minimal example above intentionally uses prepared expression instead. For prediction on a new scoped run, omit a conflicting raw-count override and provide the scale recorded by that run.

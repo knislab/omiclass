@@ -97,28 +97,3 @@ def test_legacy_limma_dispatch_arguments_unchanged(tmp_path, monkeypatch):
     assert kw["n_pc"] == 0 and kw["na_fill"] is None and kw["cov_matrix"] is None
     assert kw["out_csv"] == "limma_corrected_expression.csv"
     pd.testing.assert_frame_equal(ctx.cache["X_corrected"], X)
-
-
-def test_runner_sets_only_requested_runtime_cpu_count(tmp_path):
-    from experiments.reference_preprocessing.run import build_context
-    import json
-    import yaml
-    prepared = tmp_path / "prepared"
-    seed = prepared / "seed11"
-    seed.mkdir(parents=True)
-    config = cfg(tmp_path)
-    config.runtime.n_jobs = 99
-    (seed / "config.yaml").write_text(yaml.safe_dump(config.model_dump(mode="json")))
-    (seed / "split.json").write_text(json.dumps(dict(train_index=["a"], test_index=["b"])))
-    (seed / "genes.txt").write_text("g1\ng2\n")
-    pd.DataFrame([[1., 2.], [3., 4.]], index=["g1", "g2"], columns=["a", "b"]).to_csv(prepared / "training.csv")
-    out = tmp_path / "run"
-    out.mkdir()
-    args = SimpleNamespace(prepared=prepared, seed=11, method="frozen_quantile", cores_per_seed=3,
-        controls=None, control_justification=None, n_factors=1, rscript=None, r_library=None)
-    ctx = build_context(args, out)
-    assert ctx.cfg.runtime.n_jobs == 3
-    assert ctx.cfg.runtime.cv_folds == config.runtime.cv_folds
-    assert ctx.cfg.runtime.bayesian_iterations == config.runtime.bayesian_iterations
-    assert ctx.cfg.runtime.tuning == config.runtime.tuning
-    assert ctx.cfg.runtime.feature_selection == config.runtime.feature_selection

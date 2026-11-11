@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y \
     libfribidi-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY docker/environment-viz-env.yml /tmp/environment.yml
+COPY environment.yml /tmp/environment.yml
 
 RUN micromamba env create -f /tmp/environment.yml && \
     micromamba clean --all --yes
@@ -47,12 +47,15 @@ ENV NUMEXPR_NUM_THREADS=1
 # Copy the current framework source from this build context.  The Docker image
 # deliberately does not install or retrieve a historical OmiClass checkout.
 COPY api.py /app/api.py
+COPY setup.py setup.cfg pyproject.toml README.md /app/
 COPY omiclass /app/omiclass
 COPY docker/runtime_provenance.py /opt/omiclass-docker/runtime_provenance.py
 COPY docker/entrypoint.sh /opt/omiclass-docker/entrypoint.sh
 
+RUN /opt/conda/envs/omiclass_env/bin/python -m pip install --no-deps --no-build-isolation /app
+
 # Fail the image build immediately if the current OmiClass import graph is
-# missing a runtime dependency; this does not execute the pipeline.
+# missing a core runtime dependency; foundation assets/runtimes are external.
 RUN /opt/conda/envs/omiclass_env/bin/python -c \
     "import requests, statsmodels; from omiclass.pipeline.runner import run_pipeline"
 

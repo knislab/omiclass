@@ -20,9 +20,42 @@ class Extraction:
     token_cache: Path | None = None
 
 
-def read_expression(path):
+LEGACY_INPUT_IDENTIFIERS = 'legacy_bulkrnabert_csv_v1'
+CELLFM_INPUT_IDENTIFIERS = 'cellfm_gene_symbols_v1'
+
+
+def input_identifier_protocol(cfg, manifest=None):
+    if manifest is None:
+        return CELLFM_INPUT_IDENTIFIERS if backend_name(cfg) == 'cellfm' else LEGACY_INPUT_IDENTIFIERS
+    protocol = manifest.get('extraction_protocol', {}).get('input_identifiers', LEGACY_INPUT_IDENTIFIERS)
+    if protocol not in {LEGACY_INPUT_IDENTIFIERS, CELLFM_INPUT_IDENTIFIERS}:
+        raise ValueError('Unsupported saved input identifier protocol')
+    if protocol == CELLFM_INPUT_IDENTIFIERS and backend_name(cfg) != 'cellfm':
+        raise ValueError('Saved input identifier protocol does not match the encoder')
+    return protocol
+
+
+def read_expression(path, *, protocol=LEGACY_INPUT_IDENTIFIERS):
+    # Retain the exact historical reader for old bundles and the other encoders.
     from omiclass.features.bulkrnabert import read_expression_csv
-    return read_expression_csv(Path(path))
+    if protocol == LEGACY_INPUT_IDENTIFIERS:
+        return read_expression_csv(Path(path))
+    if protocol != CELLFM_INPUT_IDENTIFIERS:
+        raise ValueError('Unsupported input identifier protocol')
+    from omiclass.errors.errors import DataError
+    from omiclass.utils.identifiers import validate_delimited_header, validate_frame_identifiers
+    validate_delimited_header(path, error_type=DataError)
+    frame = pd.read_csv(path, index_col=0, converters={0: str})
+    # CellFM deliberately sums repeated genes, including mapping collisions.
+    # Keep them for its existing preparation routine; never discard a row here.
+    validate_frame_identifiers(frame, allow_duplicate_features=True, error_type=DataError)
+    try:
+        values = frame.to_numpy(dtype=np.float64)
+    except (TypeError, ValueError) as exc:
+        raise DataError('CellFM expression must be numeric') from exc
+    if not np.isfinite(values).all() or (values < 0).any() or (values.sum(axis=0) <= 0).any():
+        raise DataError('CellFM requires finite nonnegative counts and nonempty samples')
+    return pd.DataFrame(values, index=frame.index.map(str), columns=frame.columns.map(str))
 
 
 def backend_name(cfg):

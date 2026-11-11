@@ -19,6 +19,7 @@ def test_fsva_requires_training_design_and_variable_genes():
         FrozenSVA(["target"], rscript_path="/usr/bin/Rscript").fit(X, meta)
 
 
+@pytest.mark.native_r
 def test_native_exact_fsva_fit_transform_reload_and_independence(tmp_path):
     library = os.environ.get("OMICLASS_TEST_SVA_LIB")
     if not library:

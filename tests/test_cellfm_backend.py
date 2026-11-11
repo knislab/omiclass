@@ -275,7 +275,10 @@ def test_prepare_cellfm_input_maps_caps_and_preserves_samples():
     assert prepared.counts.tolist() == [[33333, 33333], [2, 3]]
 
 
-def test_prepare_cellfm_input_maps_ensembl_ids_to_cellfm_symbols():
+def test_prepare_cellfm_input_maps_ensembl_ids_to_cellfm_symbols(monkeypatch):
+    # Test mapping with an explicit fixture, independent of annotation redistribution.
+    monkeypatch.setattr(cellfm_module, '_load_ensembl_symbol_map',
+                        lambda: {'ENSG00000000003': 'TSPAN6'})
     counts = pd.DataFrame(
         {"sample_a": [10, 20], "sample_b": [1, 2]},
         index=["ENSG00000000003", "ENSG_DOES_NOT_EXIST"],
