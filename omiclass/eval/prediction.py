@@ -42,6 +42,10 @@ def match_features(X, model):
         return prepare_pair_prediction(model, X)
     if fitted_partitions(model) or getattr(model, '_stack_schema_version_', None) == 1:
         return X
+    from sklearn.pipeline import Pipeline
+    from omiclass.train.preprocessing import TrainingPreprocessor
+    if isinstance(model, Pipeline) and isinstance(model.steps[0][1], TrainingPreprocessor):
+        return X  # Its fitted transform owns selected/reference feature coverage.
     # Historical stacks retain their inference implementation, but the public
     # prediction/evaluation boundary must not silently create required inputs.
     if hasattr(model, 'fit_honest'):

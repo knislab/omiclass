@@ -24,6 +24,9 @@ class OverrideSpec:
 
 SPEC = OverrideSpec(
     aliases={
+        "classification": "classification",
+        "classifier": "classification.classifier",
+        "classifiers": "classification.classifiers",
         "foundation": "foundation",
         "foundation_enabled": "foundation.enabled",
         "foundation_model": "foundation.model",

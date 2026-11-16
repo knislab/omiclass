@@ -746,8 +746,40 @@ class MarkerSelectionCfg(BaseModel):
         return value
 
 
+class ClassificationCfg(BaseModel):
+    """Native expression heads; omitted settings preserve the original family."""
+    model_config = ConfigDict(extra="forbid")
+    classifier: Literal["omiclass", "mlp", "svm", "lr"] = "omiclass"
+    classifiers: Optional[List[Literal["omiclass", "mlp", "svm", "lr"]]] = None
+    mlp: ArticleHeadCfg = Field(default_factory=ArticleHeadCfg)
+    lr_c_values: List[float] = Field(default_factory=lambda: [0.01, 0.1, 1.0, 10.0, 100.0])
+
+    @field_validator("classifiers")
+    @classmethod
+    def _unique_heads(cls, values):
+        if values is not None and (not values or len(values) != len(set(values))):
+            raise ValueError("classification.classifiers must be nonempty and unique")
+        return values
+
+    @field_validator("lr_c_values")
+    @classmethod
+    def _positive_c(cls, values):
+        if not values or any(not (0 < value < float('inf')) for value in values):
+            raise ValueError("LR C values must be positive and finite")
+        return values
+
+    @property
+    def requested(self):
+        return self.classifiers if self.classifiers is not None else [self.classifier]
+
+    @property
+    def active(self):
+        return self.classifiers is not None or self.classifier != "omiclass"
+
+
 # ---------- top-level Config ----------
 class Config(BaseModel):
+    classification: ClassificationCfg = Field(default_factory=ClassificationCfg)
     PDF: bool = False
     foundation: FoundationCfg = Field(default_factory=FoundationCfg)
     project: ProjectCfg = Field(default_factory=ProjectCfg)
@@ -815,6 +847,8 @@ class Config(BaseModel):
     def _serialize_optional_bulkrnabert(self, handler):
         # Keep frozen configs/output structure identical for existing runs.
         data = handler(self)
+        if self.classification == ClassificationCfg():
+            data.pop("classification", None)
         if not self.bulkrnabert.enabled:
             data.pop("bulkrnabert", None)
         if self.marker_selection.method == "de":
@@ -825,6 +859,15 @@ class Config(BaseModel):
 
     @model_validator(mode="after")
     def _final_checks(self):
+        if self.classification.active:
+            if self.marker_selection.method == "pairs" and any(c != "omiclass" for c in self.classification.requested):
+                raise ValueError("Alternative native heads currently support full expression and DE markers, not pairwise markers")
+            if self.foundation.enabled or self.bulkformer.enabled or self.cellfm.enabled or self.bulkrnabert.enabled:
+                raise ValueError("classification choices are for native expression; use foundation.classifiers for embeddings")
+            if len(self.classification.requested) > 1 and self.runtime.scoring != "f1_macro":
+                raise ValueError("Native multi-classifier comparison requires runtime.scoring='f1_macro'")
+            if self.batch_correction.algorithm in {"frozen_quantile", "fsva_exact", "reference_ruv"} and self.de.geneset_selection:
+                raise ValueError("Within-pipeline DE with frozen references is unsupported; explicitly disable DE")
         if self.marker_selection.method == "pairs":
             if self.project.modality != "rnaseq" or self.bulkformer.enabled or self.cellfm.enabled or self.bulkrnabert.enabled:
                 raise ValueError("pairs requires rnaseq expression without embedding backends")

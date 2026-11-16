@@ -907,6 +907,12 @@ class Trainer:
 
     # ----- entry point -----
     def run(self, X: pd.DataFrame, y: pd.Series) -> TrainSummary:
+        if self.cfg.classification.active:
+            from omiclass.train.classification import run_comparison
+            return run_comparison(self, X, y)
+        return self._run_omiclass(X, y)
+
+    def _run_omiclass(self, X: pd.DataFrame, y: pd.Series) -> TrainSummary:
         # Reusing a Trainer must not retain completed state from an earlier run.
         self.final_models.clear()
         self.cv_results.clear()

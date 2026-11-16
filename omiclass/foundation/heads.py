@@ -34,13 +34,30 @@ def safe_cv(y, desired, seed):
     return StratifiedKFold(n_splits=max(2, min(desired, minimum)), shuffle=True, random_state=seed)
 
 
-def fit_lr(cfg, X, y, out):
+def svm_pipeline(seed, *, representation_step=None, probability=True):
+    """Shared fixed RBF/scaling recipe; native calibration owns preprocessing."""
+    steps = [('representation', representation_step)] if representation_step is not None else []
+    return Pipeline(steps + [('scaler', StandardScaler()),
+        ('svm', SVC(C=1.0, kernel='rbf', gamma='scale', class_weight=None, probability=probability,
+                    decision_function_shape='ovr', random_state=seed))])
+
+
+def lr_pipeline(seed, *, representation_step=None, preprocessing_step=None):
+    steps = [('preprocessing', preprocessing_step)] if preprocessing_step is not None else []
+    if representation_step is not None:
+        steps.append(('representation', representation_step))
+    return Pipeline(steps + [('scaler', StandardScaler()),
+        ('logistic_regression', LogisticRegression(penalty='l2', solver='lbfgs',
+            max_iter=5000, random_state=seed))])
+
+
+def fit_lr(cfg, X, y, out, *, pipeline_factory=None):
     from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
     from omiclass.train.selection import fold_selection_score, selection_summary
     r, f = cfg.runtime, cfg.foundation
     def search(values, labels):
-        pipeline = Pipeline([('representation', representation(cfg)), ('scaler', StandardScaler()),
-            ('logistic_regression', LogisticRegression(penalty='l2', solver='lbfgs', max_iter=5000, random_state=r.random_state))])
+        pipeline = pipeline_factory() if pipeline_factory is not None else lr_pipeline(
+            r.random_state, representation_step=representation(cfg))
         fit = GridSearchCV(pipeline, {'logistic_regression__C': f.lr_c_values,
             'logistic_regression__class_weight': [None, 'balanced']}, scoring=r.scoring,
             cv=safe_cv(labels, r.tuning.inner_cv or 3, r.random_state), n_jobs=r.n_jobs,
@@ -270,9 +287,7 @@ def _fit(cfg, X, y, train_ids, test_ids, classes, cache, out):
     if classifier == 'lr':
         return fit_lr(cfg, X.loc[train_ids], y.loc[train_ids], out)
     if classifier == 'svm':
-        model = Pipeline([('representation', representation(cfg)), ('scaler', StandardScaler()),
-            ('svm', SVC(C=1.0, kernel='rbf', gamma='scale', class_weight=None, probability=True,
-                decision_function_shape='ovr', random_state=cfg.runtime.random_state))])
+        model = svm_pipeline(cfg.runtime.random_state, representation_step=representation(cfg))
         model.fit(X.loc[train_ids], y.loc[train_ids])
         if model['svm'].fit_status_:
             raise ValueError('SVC did not converge')

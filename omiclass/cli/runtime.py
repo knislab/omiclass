@@ -82,6 +82,8 @@ def create_runtime_options_from_path_conf_kwargs(
         )
 
     if cfg.batch_correction.algorithm in {"frozen_quantile", "reference_ruv", "fsva_exact"}:
+        if cfg.classification.active and kwargs.get('run_de'):
+            raise ValueError("Within-pipeline DE with frozen references is unsupported")
         if is_raw_count:
             raise ValueError("Frozen reference preprocessing requires TPM or log1p(TPM) input")
         return RuntimeOptions(

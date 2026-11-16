@@ -130,6 +130,15 @@ class TrainAndEvalStep:
         # 4) Save leaderboard
         leaderboard_csv = ctx.out_dir / "leaderboard.csv"
         summary.metrics.to_csv(leaderboard_csv, index=False)
+        comparison = ctx.cfg.classification.active
+        if comparison:
+            from omiclass.foundation.io import write_json
+            selected_cv, _ = rank_candidates(summary.metrics, summary.artifact_paths, ctx.cfg.runtime.scoring)
+            selected_before_holdout = str(selected_cv.iloc[0]['model'])
+            write_json(ctx.out_dir/'selection.json', dict(selected_model=selected_before_holdout,
+                selected_classifier=str(selected_cv.iloc[0]['classifier']),
+                scoring=ctx.cfg.runtime.scoring, source='training_outer_cv', holdout_used=False,
+                selection_score=float(selected_cv.iloc[0]['selection_score_mean'])))
 
         print(f"[ 5][Train_and_eval]: Leaderboard saved at: {leaderboard_csv}")
         # 5) Evaluate all final models on test
@@ -187,6 +196,12 @@ class TrainAndEvalStep:
                 metrics=report,
                 threshold_metrics=threshold_report,
             )
+            if comparison:
+                table = run_dir/paths['test_metrics_csv']
+                values = pd.read_csv(table)
+                values['precision_macro'] = report['report']['macro avg']['precision']
+                values['recall_macro'] = report['report']['macro avg']['recall']
+                values.to_csv(table, index=False)
 
             finalize_report_for_model(
                 run_dir=run_dir,
@@ -236,6 +251,10 @@ class TrainAndEvalStep:
                 ),
                 "mean_true_class_proba": report.get("mean_true_class_proba", np.nan),
             })
+            if comparison:
+                test_rows[-1].update(classifier=summary.metrics.loc[summary.metrics.model.eq(key),'classifier'].iloc[0],
+                    precision_macro=report['report']['macro avg']['precision'],
+                    recall_macro=report['report']['macro avg']['recall'])
 
         combined_test_csv = ctx.out_dir / "test_metrics.csv"
         final_test_res = pd.DataFrame(test_rows)
@@ -251,6 +270,8 @@ class TrainAndEvalStep:
         )
         best_model = str(cv_leaderboard.iloc[0]["model"])
         best_model_path = summary.artifact_paths[best_model]
+        if comparison and best_model != selected_before_holdout:
+            raise ValueError('Training-CV selection changed after holdout evaluation')
 
         labels_for_plot = (
             labels_from_first
@@ -379,6 +400,15 @@ class TrainAndEvalStep:
             meta=meta_payload,
             ctx=ctx,
         )
+        if comparison:
+            from omiclass.reporting.comparison import append_comparison_summary
+            append_comparison_summary(ctx.out_dir, summary.metrics, final_test_res,
+                                      best_model, ctx.cfg.runtime.scoring)
+            from omiclass.foundation.io import write_json
+            manifest = json.loads((ctx.out_dir/'classification.json').read_text())
+            manifest.update(status='complete', selected_model=best_model,
+                selected_classifier=str(summary.metrics.loc[summary.metrics.model.eq(best_model),'classifier'].iloc[0]))
+            write_json(ctx.out_dir/'classification.json', manifest)
 
         # stash for orchestrator result
         ctx.cache["combined_test_csv"] = combined_test_csv
