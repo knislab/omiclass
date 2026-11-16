@@ -33,6 +33,10 @@ class RebatchCorrectionStep:
         """
         Run limma batch correction + batch holdout, store result in ctx.cache["X_corrected"].
         """
+        if ctx.cfg.marker_selection.method == "pairs":
+            from omiclass.features.pairs import pair_input_expression
+            ctx.cache["X_recorrected"] = pair_input_expression(ctx.cache["full_expr"], ctx.cfg)
+            return
         scoped = ctx.out_dir / 'preprocessing/scoped.json'
         scope = json.loads(scoped.read_text()) if scoped.is_file() else None
         if scope is not None and not scope.get('correction_transductive', False):

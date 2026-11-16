@@ -70,6 +70,10 @@ class TrainAndEvalStep:
             X_full_raw = ctx.cache["full_expr"]
 
         gene_list = ctx.cache["gene_list"]
+        pair_features = ctx.cfg.marker_selection.method == "pairs"
+        if pair_features:
+            from omiclass.features.pairs import pair_input_expression
+            X_full_raw = pair_input_expression(X_full_raw, ctx.cfg)
 
         X_full_raw = apply_batch_holdout(
             X=X_full_raw,
@@ -102,7 +106,7 @@ class TrainAndEvalStep:
             meta.attrs['outcome_numeric'] = numeric_outcome
             meta.attrs['outcome_values'] = {value: key for key, value in ctx.cache['label_mapping'].items()}
         raw = ctx.cache.get('raw_expression', X_full_raw).loc[:, Xtr.index]
-        prep = TrainingPreprocessor(ctx.cfg, raw_expression=raw,
+        prep = None if pair_features else TrainingPreprocessor(ctx.cfg, raw_expression=raw,
             metadata=meta.loc[Xtr.index] if meta is not None else None,
             de=ctx.cache.get('de_enabled', False), covariates=ctx.cache.get('de_covariates'),
             already_logged=using_batch_corrected_matrix or ctx.cache.get('_did_raw_count_norm', False),
@@ -118,7 +122,8 @@ class TrainAndEvalStep:
         (preprocessing_dir / 'scoped.json').write_text(json.dumps(dict(
             version=1, train_ids=Xtr.index.tolist(), test_ids=Xte.index.tolist(),
             input_mode=ctx.opts.input_mode,
-            fitted_inside_estimators=True, de=prep.de, cptac=prep.cptac, reference=prep.reference,
+            fitted_inside_estimators=True, de=bool(prep and prep.de),
+            cptac=bool(prep and prep.cptac), reference=bool(prep and prep.reference),
             correction_transductive=using_batch_corrected_matrix,
             batch_input_log1p=ctx.cache.get('batch_input_log1p', False),
             frozen_raw_count_normalization=(preprocessing_dir / 'raw_count_gene_lengths.joblib').is_file())))

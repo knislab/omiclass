@@ -352,6 +352,15 @@ class DataProcessor:
         if X_full_raw.empty:
             raise DataError("Limma-corrected expression matrix is empty.")
 
+        if self.cfg.marker_selection.method == "pairs":
+            from omiclass.features.pairs import OvRTSPSelector
+            # Keep the full schema: even constant-gene filtering belongs in fit.
+            X = X_full_raw.T
+            OvRTSPSelector._matrix(X)
+            y, common = load_labels(self.cfg.project.meta_path, self.cfg.project.cluster_column,
+                                    X.index, cfg=self.cfg)
+            return check_and_prepare_xy(X.loc[common], y, na_y="drop", drop_constant_cols=False)
+
         if not gene_list:
             raise DataError("Gene list is empty in build_xy_from_corrected().")
 

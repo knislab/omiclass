@@ -44,6 +44,10 @@ SPEC = OverrideSpec(
         "classes_names": "project.classes_names",
         "classification_column": "project.cluster_column",
         "class_col": "project.cluster_column",
+        "marker_method": "marker_selection.method",
+        "pair_g": "marker_selection.g",
+        "pair_k": "marker_selection.k",
+        "pair_max_gene_reuse": "marker_selection.max_gene_reuse",
         "meta_path": "project.meta_path",
         "modality": "project.modality",
         "project_modality": "project.modality",
@@ -360,7 +364,8 @@ def normalize_user_overrides(user_kwargs: Dict[str, Any], *, strict: bool = True
     Blocks overrides that target SPEC.frozen_prefixes.
     """
     leaf_paths = _collect_leaf_paths(Config)
-    short_idx = _short_index(leaf_paths)
+    # Preserve existing short override meanings, particularly search_space.
+    short_idx = _short_index([p for p in leaf_paths if p[0] != "marker_selection"])
 
     out: Dict[str, Any] = {}
     errors: List[str] = []

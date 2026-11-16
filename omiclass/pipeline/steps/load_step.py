@@ -24,6 +24,13 @@ class LoadInputStep:
         - ctx.cache["gene_list"]: gene list associated with the matrix
         """
         dp = DataProcessor(ctx.cfg)
+        if ctx.cfg.marker_selection.method == "pairs":
+            from omiclass.batch.reference_pipeline import read_expression
+            if ctx.opts.input_mode == "raw_counts" or ctx.opts.gene_path or ctx.opts.surface_markers:
+                raise ValueError("pairs requires normalized expression without upstream gene preselection")
+            X = read_expression(ctx.opts.expression_path)
+            ctx.cache.update(full_expr=X, full_expr_t=X.T, gene_list=X.index.tolist(), input_modality="rnaseq")
+            return
         if ctx.cfg.batch_correction.algorithm in {"frozen_quantile", "reference_ruv", "fsva_exact"}:
             from omiclass.batch.reference_pipeline import read_expression
             if ctx.opts.input_mode == "raw_counts":

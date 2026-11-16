@@ -436,6 +436,7 @@ def nested_oof_cv(
     calib_cv: int,
     calibration_ensemble: bool = False,
     fit_kwargs: Optional[Dict[str, Any]] = None,
+    pair_features: bool = False,
 ) -> CVResult:
     outer = require_stratified_cv(y, int(outer_splits), int(seed), context="OOF evaluation")
 
@@ -522,6 +523,13 @@ def nested_oof_cv(
             selected = list(dict.fromkeys(g for part in partitions for g in part.selected_features_))
             m.update(selected_features=selected, n_features=len(selected),
                      preprocessing_fit_ids=[part.fit_ids_ for part in partitions])
+        if pair_features:
+            from omiclass.features.pairs import fitted_pair_selectors
+            selectors = fitted_pair_selectors(model)
+            m["n_features"] = sum(len(s.selected_pairs_) for s in selectors)
+            m["selected_features"] = [f"{a} > {b}" for s in selectors for a, b in s.selected_pairs_]
+            m["pair_selection"] = [dict(member=i, **record) for i, s in enumerate(selectors)
+                                   for record in s.selection_report_.to_dict("records")]
         representation = _bulkformer_representation_from_model(model)
         if representation is not None:
             m["bulkformer_reduction_strategy"] = representation.strategy
