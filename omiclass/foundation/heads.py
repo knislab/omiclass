@@ -35,7 +35,8 @@ def safe_cv(y, desired, seed):
 
 
 def fit_lr(cfg, X, y, out):
-    from sklearn.metrics import f1_score, accuracy_score
+    from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score
+    from omiclass.train.selection import fold_selection_score, selection_summary
     r, f = cfg.runtime, cfg.foundation
     def search(values, labels):
         pipeline = Pipeline([('representation', representation(cfg)), ('scaler', StandardScaler()),
@@ -52,9 +53,13 @@ def fit_lr(cfg, X, y, out):
         fitted = search(X.iloc[tr], y.iloc[tr])
         predicted = fitted.predict(X.iloc[va])
         probabilities = fitted.predict_proba(X.iloc[va])
-        folds.append(dict(fold=number, f1_macro=float(f1_score(y.iloc[va], predicted, average='macro', zero_division=0)),
+        metrics = dict(fold=number, f1_macro=float(f1_score(y.iloc[va], predicted, average='macro', zero_division=0)),
             accuracy=float(accuracy_score(y.iloc[va], predicted)), best_score=float(fitted.best_score_),
-            best_params=json.dumps(fitted.best_params_)))
+            precision_macro=float(precision_score(y.iloc[va], predicted, average='macro', zero_division=0)),
+            recall_macro=float(recall_score(y.iloc[va], predicted, average='macro', zero_division=0)),
+            best_params=json.dumps(fitted.best_params_))
+        metrics['selection_score'] = fold_selection_score(r.scoring, fitted, X.iloc[va], y.iloc[va], metrics)
+        folds.append(metrics)
         oof.loc[X.index[va], 'y_true'] = y.iloc[va].to_numpy()
         oof.loc[X.index[va], 'y_pred'] = predicted
         for j, label in enumerate(fitted.classes_):
@@ -68,7 +73,8 @@ def fit_lr(cfg, X, y, out):
     write_json(out / 'fit_scope.json', dict(protocol='nested_cv_lr', folds=scopes,
         final_fit_ids=X.index.tolist(), holdout_used_for_fitting=False))
     return {'logistic_regression': fitted.best_estimator_}, pd.DataFrame([dict(model='logistic_regression',
-        f1_macro_mean=float(np.mean([row['f1_macro'] for row in folds])), protocol='nested_cv_lr')])
+        f1_macro_mean=float(np.mean([row['f1_macro'] for row in folds])), protocol='nested_cv_lr',
+        **selection_summary(folds, r.scoring))])
 
 
 class NativeModel:
@@ -231,7 +237,7 @@ def fit_article(cfg, X, y, train_ids, test_ids, classes, cache, out):
     args = SimpleNamespace(**cfg.foundation.article_head.model_dump(), variant='full' if token else 'mean',
         features=features, cache=cache if token else None, labels=labels, id_column='sample_id', label_column='label',
         split=split, out=out / 'article_training', seed=cfg.runtime.random_state, device='cpu',
-        resampling='smote' if cfg.foundation.classifier == 'mlp_smote' else 'none')
+        resampling='smote' if cfg.foundation.classifier == 'mlp_smote' else 'none', fit_only=not test_ids)
     article_head.train(args)
     saved = torch.load(args.out / 'head.pt', map_location='cpu', weights_only=False)
     run = saved['run']

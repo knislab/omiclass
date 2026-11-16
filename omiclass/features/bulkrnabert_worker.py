@@ -9,6 +9,11 @@ import sys
 import hashlib
 
 
+def encoder_random_key(jax, seed=None):
+    """Omitted seeds retain the original key for historical saved-model replay."""
+    return jax.random.PRNGKey(0 if seed is None else int(seed))
+
+
 def tokenize_values(values, *, input_scale, config, tokenizer, preprocess):
     """Keep official log preprocessing and tokenizer max normalization separate."""
     import numpy as np
@@ -41,6 +46,8 @@ def main():
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--device', choices=['auto', 'cpu', 'gpu'], default='auto')
     parser.add_argument('--input-scale', choices=['tpm', 'log10_tpm'], default='tpm')
+    parser.add_argument('--seed', type=int, default=None,
+                        help='Runtime seed; omitted by historical callers to retain key 0')
     parser.add_argument('--token-dir', type=Path)
     parser.add_argument('--shape-only', action='store_true', help='Load weights and trace output shape without allocating attention tensors.')
     args = parser.parse_args()
@@ -81,7 +88,7 @@ def main():
                                  or any(not gene.strip() for gene in gene_ids)):
         raise ValueError('Invalid worker gene identity order')
     forward = hk.transform(forward_fn)
-    key = jax.random.PRNGKey(0)
+    key = encoder_random_key(jax, args.seed)
 
     def pooled(tokens):
         result = forward.apply(parameters, key, tokens)['embeddings_4']
@@ -122,7 +129,8 @@ def main():
         raise ValueError('Invalid pooled embeddings.')
     metadata = {'embeddings_4_shape': [min(args.batch_size, len(ids)), 19062, 256],
                 'pool_axis': 1, 'normalization_factor': float(config.normalization_factor),
-                'encoder_seed': 0, 'seed_source': 'fixed JAX PRNGKey(0)',
+                'encoder_seed': 0 if args.seed is None else args.seed,
+                'seed_source': 'fixed JAX PRNGKey(0)' if args.seed is None else 'worker --seed',
                 'input_scale': args.input_scale, 'max_normalization': 'official tokenizer, once',
                 'jax': jax.__version__, 'haiku': hk.__version__, 'numpy': np.__version__,
                 'devices': [str(d) for d in jax.devices()]}

@@ -22,9 +22,12 @@ def get_gene_symbols(genes_id: List[str], cfg: Config) -> List[str]:
     version = cfg.project.version
     path = get_file_version(version=version)
     p = Path(path)
+    annotation = getattr(cfg.normalization, "annotation_path", None)
+    if annotation is not None:
+        p = Path(annotation)
 
     if not p.exists():
-        raise DataError(f"Gene length file not found: {path}")
+        raise DataError(f"Gene annotation file not found: {p}")
 
     if p.suffix == ".csv":
         df = pd.read_csv(p, index_col=0)

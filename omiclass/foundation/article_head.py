@@ -136,6 +136,10 @@ def _train(args):
     split = json.loads(args.split.read_text())
     partitions = {name: list(map(str, split[key])) for name, key in
                   [('train', 'train_index'), ('test', 'test_index')]}
+    if getattr(args, 'fit_only', False):
+        # Internal multi-classifier final fit: identical training, no holdout
+        # data or outcomes consumed before the shared CV winner is persisted.
+        partitions = {'train': partitions['train']}
     if 'validation_index' in split:
         partitions['validation'] = list(map(str, split['validation_index']))
     all_ids = [sid for ids in partitions.values() for sid in ids]

@@ -9,7 +9,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import yaml
-from sklearn.metrics import accuracy_score, f1_score, log_loss, roc_auc_score, average_precision_score
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, log_loss, roc_auc_score, average_precision_score
 
 from omiclass.config.loaders import freeze_config
 from omiclass.config.schema import Config
@@ -37,8 +37,9 @@ def _resolve_paths(cfg):
     for name, value in backend:
         if isinstance(value, Path):
             setattr(backend, name, value.expanduser().resolve())
-    if cfg.normalization.gene_lengths_path is not None:
-        cfg.normalization.gene_lengths_path = Path(cfg.normalization.gene_lengths_path).expanduser().resolve()
+    for key in ['gene_lengths_path', 'annotation_path']:
+        if getattr(cfg.normalization, key) is not None:
+            setattr(cfg.normalization, key, Path(getattr(cfg.normalization, key)).expanduser().resolve())
     cfg.project.meta_path = Path(cfg.project.meta_path).expanduser().resolve()
     if cfg.foundation.split_path is not None:
         cfg.foundation.split_path = cfg.foundation.split_path.expanduser().resolve()
@@ -52,8 +53,11 @@ def _signature(cfg):
     encoder = getattr(cfg, extraction.backend_name(cfg)).model_dump(mode='json')
     for key in ['tpm_input_path', 'cache_dir']:
         encoder.pop(key, None)
-    return dict(foundation=foundation, encoder=encoder, normalization=cfg.normalization.model_dump(mode='json'),
+    signature = dict(foundation=foundation, encoder=encoder, normalization=cfg.normalization.model_dump(mode='json'),
         correction=cfg.batch_correction.model_dump(mode='json') if cfg.foundation.correction != 'none' else None)
+    if cfg.foundation.seed_policy == 'runtime_v1':
+        signature['runtime_seed'] = cfg.runtime.random_state
+    return signature
 
 
 
@@ -131,9 +135,12 @@ def _probabilities(model, X, cache, ids, n_classes):
     return np.asarray(predicted, dtype=int), p
 
 
-def _evaluation(y, predicted, p, classes):
-    result = dict(accuracy=float(accuracy_score(y, predicted)),
-        f1_macro=float(f1_score(y, predicted, average='macro', zero_division=0)),
+def _evaluation(y, predicted, p, classes, *, canonical=False):
+    labels = {'labels': list(range(len(classes)))} if canonical else {}
+    result = dict(n_test=int(len(y)), accuracy=float(accuracy_score(y, predicted)),
+        f1_macro=float(f1_score(y, predicted, average='macro', zero_division=0, **labels)),
+        precision_macro=float(precision_score(y, predicted, average='macro', zero_division=0, **labels)),
+        recall_macro=float(recall_score(y, predicted, average='macro', zero_division=0, **labels)),
         logloss=float(log_loss(y, p / p.sum(axis=1, keepdims=True), labels=list(range(len(classes))))),
         auroc_macro=None, average_precision_macro=None)
     if len(set(y)) == len(classes):
@@ -239,6 +246,14 @@ def run_foundation(expression_file, cfg):
     cfg = _resolve_paths(cfg)
     if cfg.foundation.mode == 'predict':
         return _predict(expression_file, cfg)
+    # New fits have one seed source. Old saved bundles lack this policy marker
+    # and replay their original encoder/view keys without being rewritten.
+    cfg.foundation.seed_policy = 'runtime_v1'
+    cfg.foundation.extraction_seed = cfg.runtime.random_state
+    encoder = getattr(cfg, extraction.backend_name(cfg))
+    encoder.reduction.random_state = cfg.runtime.random_state
+    if extraction.backend_name(cfg) == 'cellfm':
+        cfg.cellfm.random_state = cfg.runtime.random_state
     input_protocol = extraction.input_identifier_protocol(cfg)
     counts = extraction.read_expression(expression_file, protocol=input_protocol)
     meta = _metadata(cfg)
@@ -256,10 +271,16 @@ def run_foundation(expression_file, cfg):
         raise ValueError('Encoder assets changed during training extraction')
     X = extracted.features.loc[train+test]
     save_frame(out / 'extraction/features.npz', extracted.features)
-    models, board = heads.fit(cfg, X, y, train, test, classes, extracted.token_cache, out / 'training')
+    comparison = None
+    if cfg.foundation.classifiers is not None:
+        from omiclass.foundation.multiclassifier import fit_comparison
+        models, board, comparison = fit_comparison(cfg, X.loc[train], y.loc[train], train, classes,
+                                                  extracted.token_cache, out / 'training')
+    else:
+        models, board = heads.fit(cfg, X, y, train, test, classes, extracted.token_cache, out / 'training')
     if not models:
         raise RuntimeError('No fitted foundation models')
-    if cfg.foundation.classifier in {'omiclass', 'foundation_classifier'}:
+    if comparison is not None or cfg.foundation.classifier in {'omiclass', 'foundation_classifier'}:
         ranked, _ = rank_candidates(board, models, cfg.runtime.scoring)
         selected = str(ranked.iloc[0]['model'])
     elif len(models) == 1:
@@ -268,19 +289,37 @@ def run_foundation(expression_file, cfg):
         raise ValueError('Standalone foundation protocol returned multiple models')
     model_dir = out / 'models'
     model_dir.mkdir()
-    artifacts, paths, evaluations, prediction_frames = {}, {}, [], []
+    artifacts, paths, evaluations, prediction_frames, payloads = {}, {}, [], [], {}
+    # Persist the winner before any held-out prediction or metric is read.
+    if comparison is not None:
+        write_json(out / 'selection.json', dict(selected_model=selected,
+            selected_classifier=comparison['model_classifiers'][selected],
+            scoring=cfg.runtime.scoring, source='training_outer_cv', holdout_used=False,
+            selection_score=float(ranked.iloc[0]['selection_score_mean'])))
     for name, model in models.items():
         path = model_dir / f'{name}.joblib'
         joblib.dump(model, path)
         paths[name] = str(path.relative_to(out))
         artifacts[name] = path
         predicted, p = _probabilities(model, X, extracted.token_cache, test, len(classes))
-        evaluations.append(dict(model=name, **_evaluation(y.loc[test], predicted, p, classes)))
+        payloads[name] = dict(y_pred=predicted, y_proba=p)
+        evaluations.append(dict(model=name, **_evaluation(y.loc[test], predicted, p, classes,
+                                                        canonical=comparison is not None)))
         prediction_frames.append(_prediction_frame(test, name, predicted, p, classes, y.loc[test]))
     board.to_csv(out / 'leaderboard.csv', index=False)
     pd.DataFrame(evaluations).to_csv(out / 'test_metrics.csv', index=False)
     pd.concat(prediction_frames, ignore_index=True).to_csv(out / 'holdout_predictions.csv', index=False)
+    if comparison is not None:
+        from omiclass.foundation.reporting import write_comparison_reports
+        comparison['fold_metrics'].to_csv(out / 'cv_metrics.csv', index=False)
+        comparison['oof_predictions'].to_csv(out / 'oof_predictions.csv', index=False)
+        joblib.dump(comparison['cv_results'], out / 'cv_results.joblib')
+        write_comparison_reports(cfg, out, X.loc[train], y.loc[train], y.loc[test], classes,
+            models, board, selected, payloads, comparison)
     signed = [*paths.values(), 'config.freeze.yaml']
+    if comparison is not None:
+        signed += ['selection.json', 'leaderboard.csv', 'test_metrics.csv', 'cv_metrics.csv',
+                   'oof_predictions.csv', 'cv_results.joblib', 'final_report.html']
     seed, source = extraction.encoder_seed(cfg)
     protocol = dict(encoder_seed=seed, seed_source=source, input_identifiers=input_protocol)
     if extraction.backend_name(cfg) == 'cellfm' and cfg.cellfm.num_views == 1:
@@ -298,5 +337,10 @@ def run_foundation(expression_file, cfg):
             else 'saved manuscript protocol'),
         correction_transductive=cfg.foundation.correction != 'none',
         artifact_sha256={name: hashlib.sha256((out/name).read_bytes()).hexdigest() for name in signed})
+    if comparison is not None:
+        manifest.update(classifiers=cfg.foundation.classifiers,
+            model_classifiers=comparison['model_classifiers'],
+            selected_classifier=comparison['model_classifiers'][selected],
+            selection_scoring=cfg.runtime.scoring, selection_source='training_outer_cv')
     write_json(out / 'foundation.json', manifest)
     return PipelineRunResult(out, out / 'split.json', out / 'leaderboard.csv', artifacts, {}, out / 'test_metrics.csv')

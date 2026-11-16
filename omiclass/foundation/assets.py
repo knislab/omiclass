@@ -42,6 +42,7 @@ def encoder_identities(cfg):
         if encoder.vendor_dir is not None:
             result["vendor_implementation"] = source_identity(encoder.vendor_dir, vendor=True)
         result["gene_symbol_mapping"] = file_identity(
+            encoder.gene_mapping_path if encoder.gene_mapping_path is not None else
             Path(__file__).resolve().parents[1] / "data/gencode_v34_GRCh38_hg38.csv")
     if backend == "bulkrnabert":
         checkpoint = encoder.checkpoint_directory / encoder.model_name
@@ -49,4 +50,6 @@ def encoder_identities(cfg):
         result["checkpoint_weights"] = file_identity(checkpoint / "params.joblib")
     if cfg.normalization.gene_lengths_path is not None:
         result["normalization_gene_lengths"] = file_identity(cfg.normalization.gene_lengths_path)
+    if cfg.normalization.annotation_path is not None:
+        result["normalization_annotation"] = file_identity(cfg.normalization.annotation_path)
     return result

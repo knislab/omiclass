@@ -16,6 +16,8 @@ assets/
 BulkFormer/
 BulkRNABert/
 CellFM/
+full_runs/
+tmp/
 examples/data/
 examples/results/
 *.joblib

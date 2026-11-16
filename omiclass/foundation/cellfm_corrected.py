@@ -17,7 +17,7 @@ def continuous_expression(counts, cfg, *, legacy_single_view=False):
     """
     from omiclass.features import cellfm as backend
     vocabulary = backend.load_cellfm_vocabulary(Path(cfg.gene_info_path))
-    prepared = backend.prepare_cellfm_input(counts, vocabulary)
+    prepared = backend.prepare_cellfm_input(counts, vocabulary, **({'gene_mapping_path': cfg.gene_mapping_path} if getattr(cfg, 'gene_mapping_path', None) is not None else {}))
     order = (np.argsort(prepared.gene_ids, kind='stable') if not legacy_single_view or int(cfg.num_views) > 1
              else np.arange(len(prepared.gene_ids)))
     data = prepared.counts[:, order].astype(np.float32)
@@ -49,7 +49,7 @@ def _extract_corrected(counts, corrected, cfg, directory, observer=None, *, lega
     if hasattr(observer, 'set_cellfm_vocabulary'):
         observer.set_cellfm_vocabulary(vocabulary, random_state=cfg.random_state,
                                       legacy_single_view=legacy_single_view and cfg.num_views == 1)
-    prepared = backend.prepare_cellfm_input(counts, vocabulary)
+    prepared = backend.prepare_cellfm_input(counts, vocabulary, **({'gene_mapping_path': cfg.gene_mapping_path} if getattr(cfg, 'gene_mapping_path', None) is not None else {}))
     original = continuous_expression(counts, cfg, legacy_single_view=legacy_single_view)
     if not set(corrected.columns).issubset(prepared.sample_ids):
         raise ValueError('Corrected CellFM sample IDs are absent from original counts')

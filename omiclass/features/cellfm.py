@@ -63,9 +63,11 @@ def load_cellfm_vocabulary(path: Path) -> list[str]:
     return genes.tolist()
 
 
-def _load_ensembl_symbol_map() -> dict[str, str]:
-    path = Path(__file__).resolve().parents[1] / "data" / "gencode_v34_GRCh38_hg38.csv"
+def _load_ensembl_symbol_map(gene_mapping_path=None) -> dict[str, str]:
+    path = Path(gene_mapping_path) if gene_mapping_path is not None else Path(__file__).resolve().parents[1] / "data" / "gencode_v34_GRCh38_hg38.csv"
     if not path.is_file():
+        if gene_mapping_path is not None:
+            raise DataError(f"Configured CellFM gene mapping is missing: {path}")
         return {}
     frame = pd.read_csv(path, usecols=["gene_id", "gene_name"], dtype=str)
     frame = frame.dropna(subset=["gene_id", "gene_name"])
@@ -75,8 +77,8 @@ def _load_ensembl_symbol_map() -> dict[str, str]:
     return dict(zip(frame["gene_id"], frame["gene_name"]))
 
 
-def _map_ensembl_ids_to_symbols(index: pd.Index, vocabulary: set[str]) -> tuple[pd.Index, int]:
-    ensembl_to_symbol = _load_ensembl_symbol_map()
+def _map_ensembl_ids_to_symbols(index: pd.Index, vocabulary: set[str], gene_mapping_path=None) -> tuple[pd.Index, int]:
+    ensembl_to_symbol = _load_ensembl_symbol_map(gene_mapping_path) if gene_mapping_path is not None else _load_ensembl_symbol_map()
     if not ensembl_to_symbol:
         return index, 0
 
@@ -93,7 +95,7 @@ def _map_ensembl_ids_to_symbols(index: pd.Index, vocabulary: set[str]) -> tuple[
     return pd.Index(mapped), mapped_count
 
 
-def prepare_cellfm_input(counts: pd.DataFrame, vocabulary: Iterable[str]) -> CellFMPreparedInput:
+def prepare_cellfm_input(counts: pd.DataFrame, vocabulary: Iterable[str], *, gene_mapping_path=None) -> CellFMPreparedInput:
     if counts.empty:
         raise DataError("CellFM input count matrix is empty.")
     values = counts.copy()
@@ -118,7 +120,7 @@ def prepare_cellfm_input(counts: pd.DataFrame, vocabulary: Iterable[str]) -> Cel
         raise DataError('CellFM vocabulary gene IDs must be unique and nonempty')
     vocab_to_id = {gene: i + 1 for i, gene in enumerate(genes)}
     values.index, ensembl_mapped_genes = _map_ensembl_ids_to_symbols(
-        values.index, set(vocab_to_id)
+        values.index, set(vocab_to_id), **({'gene_mapping_path': gene_mapping_path} if gene_mapping_path is not None else {})
     )
     if values.index.duplicated().any():
         values = values.groupby(level=0, sort=False).sum()
@@ -422,7 +424,7 @@ class CellFMFeatureExtractor:
         if hasattr(self.observer, 'set_cellfm_vocabulary'):
             self.observer.set_cellfm_vocabulary(vocabulary, random_state=cfg.random_state,
                 legacy_single_view=self.legacy_single_view and cfg.num_views == 1)
-        prepared = prepare_cellfm_input(counts, vocabulary)
+        prepared = prepare_cellfm_input(counts, vocabulary, **({'gene_mapping_path': cfg.gene_mapping_path} if cfg.gene_mapping_path is not None else {}))
         utils, model_module = _import_cellfm(cfg)
         try:
             torch = importlib.import_module("torch")

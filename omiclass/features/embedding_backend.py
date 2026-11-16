@@ -32,7 +32,7 @@ def extraction_signature(backend: str, cfg: Any) -> dict[str, str]:
             "interested_gene_path": str(cfg.interested_gene_path),
         }
     if backend == "cellfm":
-        return {
+        signature = {
             "backend": backend,
             "pooling": "valid_gene_mean",
             "checkpoint_path": str(cfg.checkpoint_path),
@@ -40,6 +40,9 @@ def extraction_signature(backend: str, cfg: Any) -> dict[str, str]:
             "random_state": str(cfg.random_state),
             "num_views": str(cfg.num_views),
         }
+        if getattr(cfg, 'gene_mapping_path', None) is not None:
+            signature['gene_mapping_path'] = str(cfg.gene_mapping_path)
+        return signature
     if backend == "bulkrnabert":
         return {
             "backend": backend,

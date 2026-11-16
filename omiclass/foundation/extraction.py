@@ -198,6 +198,8 @@ def extract_bert(frame, cfg, out, tokens):
         "--root-dir", str(Path(b.root_dir).resolve()), "--checkpoint-directory", str(Path(b.checkpoint_directory).resolve()),
         "--model-name", b.model_name, "--input", str(out / "worker-input.npz"), "--output", str(out / "worker-output.npz"),
         "--batch-size", str(b.batch_size), "--device", b.device, "--input-scale", "log10_tpm"]
+    if cfg.foundation.seed_policy == 'runtime_v1':
+        cmd += ["--seed", str(cfg.runtime.random_state)]
     token_cache = out / "tokens" if tokens else None
     if token_cache is not None:
         cmd += ["--token-dir", str(token_cache)]
@@ -218,6 +220,8 @@ def extract_bert(frame, cfg, out, tokens):
 
 def encoder_seed(cfg):
     backend = backend_name(cfg)
+    if cfg.foundation.seed_policy == 'runtime_v1':
+        return int(cfg.runtime.random_state), 'runtime.random_state'
     if backend == 'cellfm':
         return int(cfg.cellfm.random_state), 'cellfm.random_state'
     if backend == 'bulkrnabert':

@@ -95,6 +95,7 @@ class CellFMCfg(BaseModel):
     root_dir: Path = Path("CellFM/CellFM-torch")
     checkpoint_path: Optional[Path] = None
     gene_info_path: Optional[Path] = None
+    gene_mapping_path: Optional[Path] = None
     vendor_dir: Optional[Path] = None
     device: str = "auto"
     batch_size: int = 1
@@ -261,6 +262,7 @@ class DEGeneSelectionCfg(BaseModel):
 class NormalizationCfg(BaseModel):
     gene_lengths_path: Optional[Path] = None
     gtf_path: Optional[Path] = None
+    annotation_path: Optional[Path] = None
 
 
 class CPTACMSPreprocessingCfg(BaseModel):
@@ -675,9 +677,12 @@ class FoundationCfg(BaseModel):
     enabled: bool = False
     model: Literal["bulkformer", "cellfm", "cellfm_1view", "cellfm_20view", "bulkrnabert"] = "bulkformer"
     classifier: Literal["omiclass", "foundation_classifier", "lr", "svm", "mlp", "mlp_smote"] = "omiclass"
+    classifiers: Optional[List[Literal["omiclass", "foundation_classifier", "lr", "svm", "mlp", "mlp_smote"]]] = None
     representation: Literal["full", "supervised", "pca", "supervised_pca", "tokens"] = "full"
     pooling: Literal["mean", "max_mean_median", "max", "median"] = "mean"
     extraction_seed: int = 0
+    # Missing in historical bundles: retain their original extraction seeds.
+    seed_policy: Optional[Literal["runtime_v1"]] = None
     input_scale: Literal["counts", "tpm"] = "counts"
     correction: Literal["none", "limma"] = "none"
     allow_transductive_correction: bool = False
@@ -700,6 +705,13 @@ class FoundationCfg(BaseModel):
     def _compatible(self):
         if not self.enabled:
             return self
+        if self.classifiers is not None:
+            canonical = ["omiclass" if value == "foundation_classifier" else value for value in self.classifiers]
+            if not canonical or len(set(canonical)) != len(canonical):
+                raise ValueError("foundation.classifiers must be nonempty and unique (including aliases)")
+            if self.representation == "tokens":
+                raise ValueError("Classifier lists require pooled representations; tokens retain their single MLP protocol")
+            self.classifiers = canonical
         backend = "cellfm" if self.model.startswith("cellfm") else self.model
         if self.pooling != "mean" and backend != "bulkformer":
             raise ValueError("Only BulkFormer supports alternative pooling")
