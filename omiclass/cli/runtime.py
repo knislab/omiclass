@@ -68,6 +68,19 @@ def create_runtime_options_from_path_conf_kwargs(
     project_out_dir = Path(cfg.project.out_dir)
     embeddings_enabled = embedding_enabled(cfg)
 
+    if cfg.marker_selection.method == "pairs":
+        if is_raw_count:
+            raise ValueError("pairs requires consistently normalized expression, e.g. TPM; normalize counts independently per sample first")
+        if kwargs.get("gene_path") or kwargs.get("geneset_path") or kwargs.get("surface_markers"):
+            raise ValueError("pairs requires the full expression gene universe, without DE preselection")
+        return RuntimeOptions(
+            mode="clean_and_predict" if has_leaderboard(project_out_dir) else "train-only",
+            input_mode="ready_for_training", expression_path=expression_path,
+            meta_path=cfg.project.meta_path, run_batch=False, run_de=False,
+            run_training=True, run_prediction=run_prediction,
+            reuse_split=bool(kwargs.get("reuse_split", False)), split_json=kwargs.get("split_json"),
+        )
+
     if cfg.batch_correction.algorithm in {"frozen_quantile", "reference_ruv", "fsva_exact"}:
         if is_raw_count:
             raise ValueError("Frozen reference preprocessing requires TPM or log1p(TPM) input")

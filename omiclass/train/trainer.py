@@ -45,6 +45,8 @@ class TrainSummary:
 
 class Trainer:
     def __init__(self, cfg: Config, artifacts_dir: Union[str, Path], preprocessor=None):
+        if cfg.marker_selection.method == "pairs" and preprocessor is not None:
+            raise ValueError("pairs owns fold-fitted preprocessing; do not supply an upstream preprocessor")
         self.cfg = cfg
         self.preprocessor = preprocessor
         self.class_name_map = None
@@ -58,6 +60,13 @@ class Trainer:
         return embedding_enabled(self.cfg)
 
     def _with_bulkformer_reduction(self, builder):
+        if self.cfg.marker_selection.method == "pairs":
+            from omiclass.features.pairs import OvRTSPSelector
+            options = self.cfg.marker_selection.model_dump(exclude={"method", "search_space"})
+
+            def pair_builder():
+                return SkPipeline([("pairs", OvRTSPSelector(**options)), ("classifier", builder())])
+            return pair_builder
         def wrapped_builder():
             estimator = builder()
             if self._bulkformer_reduction_active():
@@ -78,11 +87,19 @@ class Trainer:
         return getattr(self, 'preprocessor', None) is not None or self.cfg.runtime.feature_selection.enabled
 
     def _reduction_space(self, space: dict) -> dict:
+        if self.cfg.marker_selection.method == "pairs":
+            from skopt.space import Categorical
+            result = {f"classifier__{key}": value for key, value in space.items()}
+            result.update({f"pairs__{key}": Categorical(values)
+                           for key, values in (self.cfg.marker_selection.search_space or {}).items()})
+            return result
         prefix = ('estimator__' if self._partition_active() else '') + ('classifier__' if self._bulkformer_reduction_active() else '')
         return {prefix + key: value for key, value in space.items()}
 
     def _reduction_fit_kwargs(self, fit_kwargs: dict | None) -> dict:
         values = dict(fit_kwargs or {})
+        if self.cfg.marker_selection.method == "pairs":
+            return {f"classifier__{key}": value for key, value in values.items()}
         prefix = ('estimator__' if self._partition_active() else '') + ('classifier__' if self._bulkformer_reduction_active() else '')
         return {prefix + key: value for key, value in values.items()}
 
@@ -300,7 +317,14 @@ class Trainer:
         export_model = unwrap_for_export(model)
         path = (self.artifacts_dir / filename).resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
+        if self.cfg.marker_selection.method == "pairs":
+            export_model._omiclass_pair_features = True
         joblib.dump(export_model, path)
+        if self.cfg.marker_selection.method == "pairs":
+            from omiclass.features.pairs import fitted_pair_selectors
+            for member, selector in enumerate(fitted_pair_selectors(export_model)):
+                selector.selection_report_.to_csv(
+                    path.with_name(f"{path.stem}.pairs_{member}.csv"), index=False)
         return path
 
     def _candidate_setup(self, key, X, y, model_conf=None):
@@ -524,6 +548,7 @@ class Trainer:
             calib_cv=cvs,
             calibration_ensemble=bool(cal.ensemble),
             fit_kwargs=fit_kwargs,
+            pair_features=self.cfg.marker_selection.method == "pairs",
         )
 
         if fs is not None and bool(getattr(fs, "enabled", False)):
@@ -639,6 +664,7 @@ class Trainer:
             calib_cv=cvs,
             calibration_ensemble=bool(getattr(cal, "ensemble", False)),
             fit_kwargs=fit_kwargs,
+            pair_features=self.cfg.marker_selection.method == "pairs",
         )
         if fs is not None and bool(getattr(fs, "enabled", False)):
             cvres, consensus_genes, full_info = self._save_genesets_from_cvres(model_key=key, cvres=cvres, feature_selection_cfg=fs)
@@ -674,7 +700,7 @@ class Trainer:
 
         per_fold_best = [m.get("best_rounds") for m in cvres.per_fold_metrics]
         cap = None
-        estimator_key = "classifier__n_estimators" if self._bulkformer_reduction_active() else "n_estimators"
+        estimator_key = "classifier__n_estimators" if self._bulkformer_reduction_active() or self.cfg.marker_selection.method == "pairs" else "n_estimators"
         if self._partition_active():
             estimator_key = 'estimator__' + estimator_key
         if best_params and estimator_key in best_params:
@@ -766,6 +792,8 @@ class Trainer:
 
     # ----- stacked -----
     def run_stacked(self, key: str, X: pd.DataFrame, y: pd.Series, filename_for_artifact: str, model_conf: Config) -> tuple[dict, Path]:
+        if self.cfg.marker_selection.method == "pairs":
+            raise ValueError("pairs does not support the stacker's raw-expression passthrough")
         r = self.cfg.runtime
         stack_cfg = self.cfg.models.stacked_ensemble
         logr = stack_cfg.logistic_regression
@@ -886,6 +914,8 @@ class Trainer:
         self._failed_keys = set()
         rf_var = self.cfg.models.random_forest.variants
         selected_model_keys = self._model_keys_for_labels(y)
+        if self.cfg.marker_selection.method == "pairs":
+            selected_model_keys = tuple(k for k in selected_model_keys if k != "stacked_ensemble")
         lgbm_file_name = self.cfg.models.light_gbm.filename
         xgboost_file_name = self.cfg.models.xgboost.filename
         stacked_file_name = self.cfg.models.stacked_ensemble.filename

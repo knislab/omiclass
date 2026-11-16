@@ -728,6 +728,24 @@ class FoundationCfg(BaseModel):
         return self
 
 
+class MarkerSelectionCfg(BaseModel):
+    """Opt-in expression-order features; omitted from legacy frozen configs."""
+    method: Literal["de", "pairs"] = "de"
+    g: int = Field(default=50, gt=0)
+    k: int = Field(default=25, gt=0)
+    max_gene_reuse: int = Field(default=2, gt=0)
+    min_expression: float = 0.0
+    min_fraction: float = Field(default=0.1, ge=0, le=1)
+    search_space: Optional[Dict[Literal["g", "k", "max_gene_reuse"], List[int]]] = None
+
+    @field_validator("search_space")
+    @classmethod
+    def _positive_choices(cls, value):
+        if value is not None and any(not choices or any(v <= 0 for v in choices) for choices in value.values()):
+            raise ValueError("marker_selection.search_space requires nonempty positive integer choices")
+        return value
+
+
 # ---------- top-level Config ----------
 class Config(BaseModel):
     PDF: bool = False
@@ -741,6 +759,7 @@ class Config(BaseModel):
     models: ModelsCfg = Field(default_factory=ModelsCfg)
     de: DECfg = Field(default_factory=DECfg)
     de_gene_selection: DEGeneSelectionCfg = Field(default_factory=DEGeneSelectionCfg)
+    marker_selection: MarkerSelectionCfg = Field(default_factory=MarkerSelectionCfg)
     normalization: NormalizationCfg = Field(default_factory=NormalizationCfg)
     cptac_ms_preprocessing: CPTACMSPreprocessingCfg = Field(default_factory=CPTACMSPreprocessingCfg)
     surface_markers: SurfaceMarkerCfg = Field(default_factory=SurfaceMarkerCfg)
@@ -798,12 +817,23 @@ class Config(BaseModel):
         data = handler(self)
         if not self.bulkrnabert.enabled:
             data.pop("bulkrnabert", None)
+        if self.marker_selection.method == "de":
+            data.pop("marker_selection", None)
         if not self.foundation.enabled:
             data.pop("foundation", None)
         return data
 
     @model_validator(mode="after")
     def _final_checks(self):
+        if self.marker_selection.method == "pairs":
+            if self.project.modality != "rnaseq" or self.bulkformer.enabled or self.cellfm.enabled or self.bulkrnabert.enabled:
+                raise ValueError("pairs requires rnaseq expression without embedding backends")
+            if self.batch_correction.algorithm != "none":
+                raise ValueError("pairs currently requires batch_correction.algorithm='none'; supply consistently normalized expression")
+            if self.runtime.feature_selection.enabled or self.runtime.feature_reduction.enabled:
+                raise ValueError("pairs requires runtime.feature_selection.enabled=false and feature_reduction.enabled=false; tune g/k instead")
+            if self.project.geneset_path is not None or self.surface_markers.enabled:
+                raise ValueError("pairs selects candidates within folds; do not supply a preselected geneset or surface-marker filter")
         if self.foundation.enabled:
             if self.project.modality != "rnaseq":
                 raise ValueError("Foundation protocols require RNA-seq")

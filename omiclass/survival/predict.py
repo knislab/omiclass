@@ -72,7 +72,11 @@ def run_survival_prediction(X: Union[pd.DataFrame, Path, str],
 
     # --- load X ---
     if isinstance(X, (str, Path)):
-        X_df = load_matrix(Path(X))
+        if getattr(model, "_omiclass_pair_features", False):
+            from omiclass.batch.reference_pipeline import read_expression
+            X_df = read_expression(X)
+        else:
+            X_df = load_matrix(Path(X))
     else:
         X_df = X.copy()
 

@@ -37,6 +37,9 @@ def match_features(X, model):
     from omiclass.train.cv_engine import _bulkformer_representation_from_model
     if not isinstance(X, pd.DataFrame) or not X.columns.is_unique:
         raise ValueError('Prediction requires a DataFrame with unique feature names')
+    if getattr(model, "_omiclass_pair_features", False):
+        from omiclass.features.pairs import prepare_pair_prediction
+        return prepare_pair_prediction(model, X)
     if fitted_partitions(model) or getattr(model, '_stack_schema_version_', None) == 1:
         return X
     # Historical stacks retain their inference implementation, but the public

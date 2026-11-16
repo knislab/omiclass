@@ -15,6 +15,8 @@ class DEStep:
     name = "feature_selection"
 
     def should_run(self, ctx: RunContext) -> bool:
+        if ctx.cfg.marker_selection.method == "pairs":
+            return False  # Candidate DE is fitted inside each estimator fit.
         if ctx.opts.mode == "clean_and_predict":
             return False
         if ctx.opts.run_de is not None:

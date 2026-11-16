@@ -116,3 +116,8 @@ Public tests use synthetic inputs. Encoder calls are mocked unless explicitly do
 **Raw-count compatibility:** new core training honors `raw_count=True` even when DE and batch correction are disabled, using the existing gene-length/TPM/log1p normalization and recording its fitted lengths. Supply verified `gene_lengths_path`. Historical runs that recorded ready-expression mode remain on that scale, including runs whose old raw flag was ignored. Prediction reuses the recorded mode; it does not silently reinterpret an old model as raw-count trained.
 
 For new raw-count marker training, use the same API with `raw_count=True`, `gene_lengths_path=Path("inputs/gene_lengths.csv")`, `run_de=False` and the desired existing correction/feature-selection settings. The minimal example above intentionally uses prepared expression instead. For prediction on a new scoped run, omit a conflicting raw-count override and provide the scale recorded by that run.
+
+### Pairwise marker selection
+
+For opt-in fold-fitted DE-guided top-scoring-pairs features, configuration,
+artifacts and inference, see [Pairwise marker selection](docs/pair_markers.md).
