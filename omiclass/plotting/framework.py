@@ -173,7 +173,8 @@ class PlottingFramework:
             proba = np.asarray(payload["y_proba"])
             if proba.ndim == 1:
                 proba = np.column_stack([1.0 - proba, proba])
-            labels = list(payload.get("labels") or sorted(class_name_map))
+            raw_labels = payload.get("labels")
+            labels = list(raw_labels) if raw_labels is not None and len(raw_labels) else sorted(class_name_map)
             if len(labels) != proba.shape[1]:
                 labels = list(range(proba.shape[1]))
             if not (len(y_true) == len(y_pred) == proba.shape[0]):
